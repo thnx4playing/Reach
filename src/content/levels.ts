@@ -35,13 +35,13 @@ export function buildLevel(mapName: MapName, width: number, height: number) {
     ...staticFloor,               // ⬅️ fixed, always the same for this map
     
     // Left platform - middle of screen, flush to left (small variant)
-    { prefab: 'left-platform-small', x: 24, y: height - 260, scale: 2 },
+    { prefab: 'left-platform-small', x: 0, y: height - 260, scale: 2 },
     
     // Right platform - higher up screen, flush to right (small variant)
     { 
       prefab: 'right-platform-small', 
-      x: width - 224, 
-      y: height - 340, 
+      x: width - 160, // Adjusted for smaller platform width
+      y: height - 500, // Moved up by about 1/3 of screen height
       scale: 2 
     },
     
