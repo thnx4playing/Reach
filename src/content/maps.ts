@@ -64,3 +64,65 @@ export function getPrefab(map: MapName, name: string): Prefab | undefined {
 export function getTileSize(map: MapName) {
   return MAPS[map].prefabs.meta.tileSize;
 }
+
+// Helper functions for level generation
+
+export function prefabWidthPx(mapName: MapName, prefabName: string, scale = 2) {
+  const tile = getTileSize(mapName) * scale;
+  const pf = getPrefab(mapName, prefabName)!;
+  
+  console.log('📏 prefabWidthPx Debug:', {
+    mapName,
+    prefabName,
+    scale,
+    tile,
+    hasCells: !!pf.cells,
+    hasRects: !!pf.rects,
+    cellsRows: pf.cells?.length,
+    rectsRows: pf.rects?.length
+  });
+  
+  // For cells, count the actual width (excluding nulls at the end)
+  const colsFromCells = pf.cells?.reduce((maxCols, row, rowIndex) => {
+    // Find the last non-null cell in this row
+    let lastCol = -1;
+    for (let i = row.length - 1; i >= 0; i--) {
+      if (row[i] !== null) {
+        lastCol = i;
+        break;
+      }
+    }
+    const rowWidth = lastCol + 1;
+    console.log(`📏 Cells Row ${rowIndex}:`, { row, lastCol, rowWidth });
+    return Math.max(maxCols, rowWidth);
+  }, 0) ?? 0;
+  
+  // For rects, count the actual width (excluding nulls at the end)
+  const colsFromRects = pf.rects?.reduce((maxCols, row, rowIndex) => {
+    // Find the last non-null rect in this row
+    let lastCol = -1;
+    for (let i = row.length - 1; i >= 0; i--) {
+      if (row[i] !== null) {
+        lastCol = i;
+        break;
+      }
+    }
+    const rowWidth = lastCol + 1;
+    console.log(`📏 Rects Row ${rowIndex}:`, { row, lastCol, rowWidth });
+    return Math.max(maxCols, rowWidth);
+  }, 0) ?? 0;
+  
+  const cols = Math.max(colsFromCells, colsFromRects, 1);
+  const widthPx = cols * tile;
+  
+  console.log('📏 prefabWidthPx Result:', {
+    mapName,
+    prefabName,
+    colsFromCells,
+    colsFromRects,
+    finalCols: cols,
+    widthPx
+  });
+  
+  return widthPx;
+}

@@ -33,23 +33,22 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <SafeAreaView style={{ flex: 1 }}>
-          {currentScreen === 'home' && (
+        {currentScreen === 'home' && (
+          <SafeAreaView style={{ flex: 1 }}>
             <HomeScreen
               onMapSelect={handleMapSelect}
               onPlay={handlePlay}
             />
-          )}
-          
-          {currentScreen === 'game' && currentLevel && (
-            <GameScreen
-              levelData={currentLevel}
-              onBack={handleBack}
-            />
-          )}
-          
-          <StatusBar style="auto" />
-        </SafeAreaView>
+            <StatusBar style="auto" />
+          </SafeAreaView>
+        )}
+        
+        {currentScreen === 'game' && currentLevel && (
+          <GameScreen
+            levelData={currentLevel}
+            onBack={handleBack}
+          />
+        )}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Pressable, Text, Dimensions } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Canvas } from '@shopify/react-native-skia';
 import { DashCharacter } from './DashCharacter';
 import { PrefabNode } from '../render/PrefabNode';
 import type { MapName, AnimationState } from '../types';
 import type { LevelData } from '../content/levels';
+import { MAPS } from '../content/maps';
+import { MapImageProvider } from '../render/MapImageContext';
+import TestTile from '../render/TestTile';
 
 const { width, height } = Dimensions.get('window');
 
@@ -16,6 +20,21 @@ interface GameScreenProps {
 export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const [animationState, setAnimationState] = useState<AnimationState>('idle');
 
+  // Comprehensive GameScreen debugging
+  console.log('🎮 GameScreen Debug:', {
+    levelData,
+    mapName: levelData.mapName,
+    platformCount: levelData.platforms.length,
+    platforms: levelData.platforms.map((p, i) => ({
+      index: i,
+      prefab: p.prefab,
+      position: { x: p.x, y: p.y },
+      scale: p.scale
+    })),
+    characterSpawn: levelData.characterSpawn
+  });
+
+
   const cycleAnimation = () => {
     const states: AnimationState[] = ['idle', 'walk', 'run', 'jump', 'crouch-idle', 'crouch-walk', 'hurt', 'death'];
     const currentIndex = states.indexOf(animationState);
@@ -23,29 +42,37 @@ export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => 
     setAnimationState(states[nextIndex]);
   };
 
+  const mapDef = MAPS[levelData.mapName];
+
   return (
     <View style={styles.container}>
-      <Canvas style={styles.canvas}>
-        {/* Render all platforms */}
-        {levelData.platforms.map((platform, index) => (
-          <PrefabNode
-            key={`platform-${index}`}
-            map={levelData.mapName}
-            name={platform.prefab}
-            x={platform.x}
-            y={platform.y}
-            scale={platform.scale || 2}
+      <StatusBar style="light" hidden={false} translucent={true} />
+      <MapImageProvider source={mapDef.image} tag={`MIP:${levelData.mapName}`}>
+        <Canvas style={styles.canvas}>
+          {/* Test tile canary - shows instantly if image loading works */}
+          <TestTile />
+          
+          {/* Render all platforms */}
+          {levelData.platforms.map((platform, index) => (
+            <PrefabNode
+              key={`platform-${index}`}
+              map={levelData.mapName}
+              name={platform.prefab}
+              x={platform.x}
+              y={platform.y}
+              scale={platform.scale || 2}
+            />
+          ))}
+          
+          {/* Render character at spawn position */}
+          <DashCharacter
+            x={levelData.characterSpawn.x}
+            y={levelData.characterSpawn.y}
+            scale={2}
+            animationState={animationState}
           />
-        ))}
-        
-        {/* Render character at spawn position */}
-        <DashCharacter
-          x={levelData.characterSpawn.x}
-          y={levelData.characterSpawn.y}
-          scale={2}
-          animationState={animationState}
-        />
-      </Canvas>
+        </Canvas>
+      </MapImageProvider>
       
       {/* Controls */}
       <View style={styles.controls}>
@@ -74,13 +101,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#87CEEB',
+    paddingTop: 0,
+    paddingBottom: 0,
+    marginTop: 0,
+    marginBottom: 0,
   },
   canvas: {
     flex: 1,
   },
   controls: {
     position: 'absolute',
-    top: 60,
+    top: 50,
     left: 20,
     right: 20,
     flexDirection: 'row',
