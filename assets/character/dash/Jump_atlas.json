@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "image": "Jump_atlas.png",
+    "size": {
+      "w": 584,
+      "h": 584
+    },
+    "tileSize": 288,
+    "padding": 2,
+    "type": "character",
+    "animation": "Jump"
+  },
+  "frames": {
+    "Jump_001": {
+      "x": 2,
+      "y": 2,
+      "w": 288,
+      "h": 288,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Jump_002": {
+      "x": 294,
+      "y": 2,
+      "w": 288,
+      "h": 288,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Jump_003": {
+      "x": 2,
+      "y": 294,
+      "w": 288,
+      "h": 288,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

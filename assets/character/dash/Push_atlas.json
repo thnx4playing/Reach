@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "image": "Push_atlas.png",
+    "size": {
+      "w": 156,
+      "h": 208
+    },
+    "tileSize": 48,
+    "padding": 2,
+    "type": "character",
+    "animation": "Push"
+  },
+  "frames": {
+    "Push_1": {
+      "x": 2,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Push_2": {
+      "x": 54,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Push_3": {
+      "x": 106,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Push_4": {
+      "x": 2,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Push_5": {
+      "x": 54,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Push_6": {
+      "x": 106,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Push_7": {
+      "x": 2,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Push_8": {
+      "x": 54,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Push_9": {
+      "x": 106,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Push_10": {
+      "x": 2,
+      "y": 158,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "image": "Climb_facing_back_of_player__atlas.png",
+    "size": {
+      "w": 104,
+      "h": 104
+    },
+    "tileSize": 48,
+    "padding": 2,
+    "type": "character",
+    "animation": "Climb (facing back of player)"
+  },
+  "frames": {
+    "Climb (facing back of player)_1": {
+      "x": 2,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Climb (facing back of player)_2": {
+      "x": 54,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Climb (facing back of player)_3": {
+      "x": 2,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Climb (facing back of player)_4": {
+      "x": 54,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

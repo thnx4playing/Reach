@@ -1,0 +1,1455 @@
+{
+  "meta": {
+    "image": "Katana_Air_Attack_atlas.png",
+    "size": {
+      "w": 160,
+      "h": 460
+    },
+    "tileSize": 16,
+    "padding": 2,
+    "type": "character",
+    "animation": "Katana Air Attack"
+  },
+  "frames": {
+    "Katana Air Attack_1": {
+      "x": 2,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_2": {
+      "x": 22,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_3": {
+      "x": 42,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_4": {
+      "x": 62,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_5": {
+      "x": 82,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_6": {
+      "x": 102,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_7": {
+      "x": 122,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_8": {
+      "x": 142,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_9": {
+      "x": 2,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_10": {
+      "x": 22,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_11": {
+      "x": 42,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_12": {
+      "x": 62,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_13": {
+      "x": 82,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_14": {
+      "x": 102,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_15": {
+      "x": 122,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_16": {
+      "x": 142,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_17": {
+      "x": 2,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_18": {
+      "x": 22,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_19": {
+      "x": 42,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_20": {
+      "x": 62,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_21": {
+      "x": 82,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_22": {
+      "x": 102,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_23": {
+      "x": 122,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_24": {
+      "x": 142,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_25": {
+      "x": 2,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_26": {
+      "x": 22,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_27": {
+      "x": 42,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_28": {
+      "x": 62,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_29": {
+      "x": 82,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_30": {
+      "x": 102,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_31": {
+      "x": 122,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_32": {
+      "x": 142,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_33": {
+      "x": 2,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_34": {
+      "x": 22,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_35": {
+      "x": 42,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_36": {
+      "x": 62,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_37": {
+      "x": 82,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_38": {
+      "x": 102,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_39": {
+      "x": 122,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_40": {
+      "x": 142,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_41": {
+      "x": 2,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_42": {
+      "x": 22,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_43": {
+      "x": 42,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_44": {
+      "x": 62,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_45": {
+      "x": 82,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_46": {
+      "x": 102,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_47": {
+      "x": 122,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_48": {
+      "x": 142,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_49": {
+      "x": 2,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_50": {
+      "x": 22,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_51": {
+      "x": 42,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_52": {
+      "x": 62,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_53": {
+      "x": 82,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_54": {
+      "x": 102,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_55": {
+      "x": 122,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_56": {
+      "x": 142,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_57": {
+      "x": 2,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_58": {
+      "x": 22,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_59": {
+      "x": 42,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_60": {
+      "x": 62,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_61": {
+      "x": 82,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_62": {
+      "x": 102,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_63": {
+      "x": 122,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_64": {
+      "x": 142,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_65": {
+      "x": 2,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_66": {
+      "x": 22,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_67": {
+      "x": 42,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_68": {
+      "x": 62,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_69": {
+      "x": 82,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_70": {
+      "x": 102,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_71": {
+      "x": 122,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_72": {
+      "x": 142,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_73": {
+      "x": 2,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_74": {
+      "x": 22,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_75": {
+      "x": 42,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_76": {
+      "x": 62,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_77": {
+      "x": 82,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_78": {
+      "x": 102,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_79": {
+      "x": 122,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_80": {
+      "x": 142,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_81": {
+      "x": 2,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_82": {
+      "x": 22,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_83": {
+      "x": 42,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_84": {
+      "x": 62,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_85": {
+      "x": 82,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_86": {
+      "x": 102,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_87": {
+      "x": 122,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_88": {
+      "x": 142,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_89": {
+      "x": 2,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_90": {
+      "x": 22,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_91": {
+      "x": 42,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_92": {
+      "x": 62,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_93": {
+      "x": 82,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_94": {
+      "x": 102,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_95": {
+      "x": 122,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_96": {
+      "x": 142,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_97": {
+      "x": 2,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_98": {
+      "x": 22,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_99": {
+      "x": 42,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_100": {
+      "x": 62,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_101": {
+      "x": 82,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_102": {
+      "x": 102,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_103": {
+      "x": 122,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_104": {
+      "x": 142,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_105": {
+      "x": 2,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_106": {
+      "x": 22,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_107": {
+      "x": 42,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_108": {
+      "x": 62,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_109": {
+      "x": 82,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_110": {
+      "x": 102,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_111": {
+      "x": 122,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_112": {
+      "x": 142,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_113": {
+      "x": 2,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_114": {
+      "x": 22,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_115": {
+      "x": 42,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_116": {
+      "x": 62,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_117": {
+      "x": 82,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_118": {
+      "x": 102,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_119": {
+      "x": 122,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_120": {
+      "x": 142,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_121": {
+      "x": 2,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_122": {
+      "x": 22,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_123": {
+      "x": 42,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_124": {
+      "x": 62,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_125": {
+      "x": 82,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_126": {
+      "x": 102,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_127": {
+      "x": 122,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_128": {
+      "x": 142,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_129": {
+      "x": 2,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_130": {
+      "x": 22,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_131": {
+      "x": 42,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_132": {
+      "x": 62,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_133": {
+      "x": 82,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_134": {
+      "x": 102,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_135": {
+      "x": 122,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_136": {
+      "x": 142,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_137": {
+      "x": 2,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_138": {
+      "x": 22,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_139": {
+      "x": 42,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_140": {
+      "x": 62,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_141": {
+      "x": 82,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_142": {
+      "x": 102,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_143": {
+      "x": 122,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_144": {
+      "x": 142,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_145": {
+      "x": 2,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_146": {
+      "x": 22,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_147": {
+      "x": 42,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_148": {
+      "x": 62,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_149": {
+      "x": 82,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_150": {
+      "x": 102,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_151": {
+      "x": 122,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_152": {
+      "x": 142,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_153": {
+      "x": 2,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_154": {
+      "x": 22,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_155": {
+      "x": 42,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_156": {
+      "x": 62,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_157": {
+      "x": 82,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_158": {
+      "x": 102,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_159": {
+      "x": 122,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_160": {
+      "x": 142,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_161": {
+      "x": 2,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_162": {
+      "x": 22,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_163": {
+      "x": 42,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_164": {
+      "x": 62,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_165": {
+      "x": 82,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_166": {
+      "x": 102,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_167": {
+      "x": 122,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_168": {
+      "x": 142,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_169": {
+      "x": 2,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_170": {
+      "x": 22,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_171": {
+      "x": 42,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_172": {
+      "x": 62,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_173": {
+      "x": 82,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_174": {
+      "x": 102,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_175": {
+      "x": 122,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_176": {
+      "x": 142,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_177": {
+      "x": 2,
+      "y": 442,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_178": {
+      "x": 22,
+      "y": 442,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_179": {
+      "x": 42,
+      "y": 442,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Air Attack_180": {
+      "x": 62,
+      "y": 442,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

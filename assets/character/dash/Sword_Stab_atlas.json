@@ -1,0 +1,127 @@
+{
+  "meta": {
+    "image": "Sword_Stab_atlas.png",
+    "size": {
+      "w": 208,
+      "h": 208
+    },
+    "tileSize": 48,
+    "padding": 2,
+    "type": "character",
+    "animation": "Sword Stab"
+  },
+  "frames": {
+    "Sword Stab_1": {
+      "x": 2,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_2": {
+      "x": 54,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_3": {
+      "x": 106,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_4": {
+      "x": 158,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_5": {
+      "x": 2,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_6": {
+      "x": 54,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_7": {
+      "x": 106,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_8": {
+      "x": 158,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_9": {
+      "x": 2,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_10": {
+      "x": 54,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_11": {
+      "x": 106,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_12": {
+      "x": 158,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_13": {
+      "x": 2,
+      "y": 158,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Stab_14": {
+      "x": 54,
+      "y": 158,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

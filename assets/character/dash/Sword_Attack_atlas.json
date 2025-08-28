@@ -1,0 +1,63 @@
+{
+  "meta": {
+    "image": "Sword_Attack_atlas.png",
+    "size": {
+      "w": 136,
+      "h": 204
+    },
+    "tileSize": 64,
+    "padding": 2,
+    "type": "character",
+    "animation": "Sword Attack"
+  },
+  "frames": {
+    "Sword Attack_1": {
+      "x": 2,
+      "y": 2,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Attack_2": {
+      "x": 70,
+      "y": 2,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Attack_3": {
+      "x": 2,
+      "y": 70,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Attack_4": {
+      "x": 70,
+      "y": 70,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Attack_5": {
+      "x": 2,
+      "y": 138,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Sword Attack_6": {
+      "x": 70,
+      "y": 138,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}
