@@ -30,7 +30,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => 
         {levelData.platforms.map((platform, index) => (
           <PrefabNode
             key={`platform-${index}`}
-            map={levelData.map}
+            map={levelData.mapName}
             name={platform.prefab}
             x={platform.x}
             y={platform.y}
@@ -40,8 +40,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => 
         
         {/* Render character at spawn position */}
         <DashCharacter
-          x={levelData.playerSpawn.x}
-          y={levelData.playerSpawn.y}
+          x={levelData.characterSpawn.x}
+          y={levelData.characterSpawn.y}
           scale={2}
           animationState={animationState}
         />

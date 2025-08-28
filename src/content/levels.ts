@@ -14,9 +14,9 @@ export interface Platform {
 }
 
 export interface LevelData {
-  map: MapName;
+  mapName: MapName;
   platforms: Platform[];
-  playerSpawn: {
+  characterSpawn: {
     x: number;
     y: number;
   };
@@ -25,7 +25,7 @@ export interface LevelData {
 // Basic level layouts for each map theme
 export const LEVELS: Record<MapName, LevelData> = {
   dark: {
-    map: 'dark',
+    mapName: 'dark',
     platforms: [
       // Floor at bottom
       { prefab: 'floor', x: 0, y: height - 80, scale: 2 },
@@ -44,14 +44,14 @@ export const LEVELS: Record<MapName, LevelData> = {
       { prefab: 'floor', x: width / 2 - 100, y: height - 300, scale: 2 },
       { prefab: 'floor', x: width / 2 + 50, y: height - 400, scale: 2 },
     ],
-    playerSpawn: {
+    characterSpawn: {
       x: width / 2,
       y: height - 120, // On top of floor
     },
   },
   
   desert: {
-    map: 'desert',
+    mapName: 'desert',
     platforms: [
       // Floor at bottom
       { prefab: 'floor', x: 0, y: height - 80, scale: 2 },
@@ -70,14 +70,14 @@ export const LEVELS: Record<MapName, LevelData> = {
       { prefab: 'floor', x: width / 2 - 100, y: height - 300, scale: 2 },
       { prefab: 'floor', x: width / 2 + 50, y: height - 400, scale: 2 },
     ],
-    playerSpawn: {
+    characterSpawn: {
       x: width / 2,
       y: height - 120, // On top of floor
     },
   },
   
   dungeon: {
-    map: 'dungeon',
+    mapName: 'dungeon',
     platforms: [
       // Floor at bottom
       { prefab: 'floor', x: 0, y: height - 80, scale: 2 },
@@ -96,14 +96,14 @@ export const LEVELS: Record<MapName, LevelData> = {
       { prefab: 'floor', x: width / 2 - 100, y: height - 300, scale: 2 },
       { prefab: 'floor', x: width / 2 + 50, y: height - 400, scale: 2 },
     ],
-    playerSpawn: {
+    characterSpawn: {
       x: width / 2,
       y: height - 120, // On top of floor
     },
   },
   
   frozen: {
-    map: 'frozen',
+    mapName: 'frozen',
     platforms: [
       // Floor at bottom
       { prefab: 'floor', x: 0, y: height - 80, scale: 2 },
@@ -122,14 +122,14 @@ export const LEVELS: Record<MapName, LevelData> = {
       { prefab: 'floor', x: width / 2 - 100, y: height - 300, scale: 2 },
       { prefab: 'floor', x: width / 2 + 50, y: height - 400, scale: 2 },
     ],
-    playerSpawn: {
+    characterSpawn: {
       x: width / 2,
       y: height - 120, // On top of floor
     },
   },
   
   grassy: {
-    map: 'grassy',
+    mapName: 'grassy',
     platforms: [
       // Floor at bottom
       { prefab: 'floor', x: 0, y: height - 80, scale: 2 },
@@ -148,7 +148,7 @@ export const LEVELS: Record<MapName, LevelData> = {
       { prefab: 'floor', x: width / 2 - 100, y: height - 300, scale: 2 },
       { prefab: 'floor', x: width / 2 + 50, y: height - 400, scale: 2 },
     ],
-    playerSpawn: {
+    characterSpawn: {
       x: width / 2,
       y: height - 120, // On top of floor
     },

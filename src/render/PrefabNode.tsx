@@ -29,18 +29,24 @@ export function PrefabNode({
       {rows.map((row, ry) =>
         row.map((cell, rx) => {
           if (!cell) return null; // hole
-          const r = (grid.frames as any)[cell]; // {x,y,w,h}
+          const frame = (grid.frames as any)[cell]; // {x,y,w,h}
+          if (!frame) {
+            console.warn(`Frame "${cell}" not found in grid`);
+            return null;
+          }
+          
           const dx = x + rx * tile * scale;
           const dy = y + ry * tile * scale;
+          
           return (
             <SkImage
               key={`${name}-${rx}-${ry}`}
               image={skiaImage}
               x={dx}
               y={dy}
-              width={r.w * scale}
-              height={r.h * scale}
-              rect={{ x: r.x, y: r.y, width: r.w, height: r.h }}
+              width={frame.w * scale}
+              height={frame.h * scale}
+              rect={[frame.x, frame.y, frame.w, frame.h]}
             />
           );
         })
@@ -86,7 +92,7 @@ export function PrefabNodeSrcRect({
               y={dy}
               width={rect.w * scale}
               height={rect.h * scale}
-              rect={{ x: rect.x, y: rect.y, width: rect.w, height: rect.h }}
+              rect={[rect.x, rect.y, rect.w, rect.h]}
             />
           );
         })
