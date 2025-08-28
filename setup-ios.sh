@@ -73,7 +73,7 @@ echo "✅ Dependencies installed successfully"
 
 # Install iOS dependencies
 echo "🍎 Installing iOS dependencies..."
-npx expo install --ios
+npx expo install
 
 if [ $? -ne 0 ]; then
     echo "❌ Failed to install iOS dependencies."

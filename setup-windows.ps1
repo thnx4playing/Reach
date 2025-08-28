@@ -67,7 +67,7 @@ Write-Host "✅ Dependencies installed successfully" -ForegroundColor Green
 
 # Install Android dependencies
 Write-Host "🤖 Installing Android dependencies..." -ForegroundColor Yellow
-npx expo install --android
+npx expo install
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Failed to install Android dependencies." -ForegroundColor Red
