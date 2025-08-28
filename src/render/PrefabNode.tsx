@@ -73,8 +73,7 @@ export function PrefabNode({ map, name, x = 0, y = 0, scale = 1 }: Props) {
           )}
         </Group>
 
-        {/* Debug outline stays so we can see placement */}
-        <Rect x={dx} y={dy} width={dw} height={dh} color="magenta" style="stroke" strokeWidth={1} />
+
       </React.Fragment>
     );
   };
