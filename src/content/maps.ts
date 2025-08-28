@@ -126,3 +126,30 @@ export function prefabWidthPx(mapName: MapName, prefabName: string, scale = 2) {
   
   return widthPx;
 }
+
+// ---- Prefab Variants ----
+import { cropPrefabColumns } from "./prefabTools";
+
+// Create new small variants without overwriting originals
+Object.entries(MAPS).forEach(([mapName, def]) => {
+  const p = def.prefabs.prefabs;
+
+  if (p["left-platform"]) {
+    p["left-platform-small"] = cropPrefabColumns(p["left-platform"], /*leftCols*/ 2, /*rightCols*/ 0);
+  }
+  if (p["right-platform"]) {
+    p["right-platform-small"] = cropPrefabColumns(p["right-platform"], /*leftCols*/ 0, /*rightCols*/ 2);
+  }
+
+  if (__DEV__) {
+    // quick sanity: log widths (columns) before/after
+    const width = (pf: any) =>
+      pf?.cells?.[0]?.length ?? pf?.rects?.[0]?.length ?? "?";
+    console.log("[prefab variants]", mapName, {
+      left: width(p["left-platform"]),
+      leftSmall: width(p["left-platform-small"]),
+      right: width(p["right-platform"]),
+      rightSmall: width(p["right-platform-small"]),
+    });
+  }
+});

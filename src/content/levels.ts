@@ -34,14 +34,14 @@ export function buildLevel(mapName: MapName, width: number, height: number) {
   const platforms = [
     ...staticFloor,               // ⬅️ fixed, always the same for this map
     
-    // Left platform - middle of screen, flush to left
-    { prefab: 'left-platform', x: 0, y: height / 2 - 64, scale: 2 },
+    // Left platform - middle of screen, flush to left (small variant)
+    { prefab: 'left-platform-small', x: 24, y: height - 260, scale: 2 },
     
-    // Right platform - higher up screen, flush to right (properly positioned)
+    // Right platform - higher up screen, flush to right (small variant)
     { 
-      prefab: 'right-platform', 
-      x: width - prefabWidthPx(mapName, 'right-platform', 2), 
-      y: height / 4, 
+      prefab: 'right-platform-small', 
+      x: width - 224, 
+      y: height - 340, 
       scale: 2 
     },
     
