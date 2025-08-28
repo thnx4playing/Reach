@@ -63,7 +63,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => 
       {/* Map info */}
       <View style={styles.mapInfo}>
         <Text style={styles.mapInfoText}>
-          Map: {levelData.map.charAt(0).toUpperCase() + levelData.map.slice(1)}
+          Map: {levelData.mapName.charAt(0).toUpperCase() + levelData.mapName.slice(1)}
         </Text>
       </View>
     </View>
