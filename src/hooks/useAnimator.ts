@@ -1,19 +1,47 @@
 import { useEffect, useRef, useState } from 'react';
 
-export function useAnimator(frames: string[], fps = 12) {
-  const [idx, setIdx] = useState(0);
-  const timer = useRef<NodeJS.Timeout | null>(null);
+type AnimatorOpts = { loop?: boolean; holdOnEnd?: boolean };
+
+export function useAnimator(
+  frames: string[],
+  fps = 12,
+  opts: AnimatorOpts = {}
+) {
+  const { loop = true, holdOnEnd = true } = opts;
+  const [frameIdx, setFrameIdx] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    setFrameIdx(0);
+  }, [frames]);
 
   useEffect(() => {
     if (!frames.length) return;
-    const interval = 1000 / fps;
-    timer.current = setInterval(() => {
-      setIdx(i => (i + 1) % frames.length);
-    }, interval);
-    return () => { 
-      if (timer.current) clearInterval(timer.current); 
-    };
-  }, [frames, fps]);
 
-  return frames[idx] ?? frames[0];
+    if (timerRef.current) clearInterval(timerRef.current);
+    let stopped = false;
+
+    const tick = () => {
+      setFrameIdx((i) => {
+        const next = i + 1;
+        if (next >= frames.length) {
+          if (loop) return 0;
+          stopped = true;
+          return holdOnEnd ? frames.length - 1 : i;
+        }
+        return next;
+      });
+    };
+
+    const interval = Math.max(1, Math.floor(1000 / Math.max(1, fps)));
+    timerRef.current = setInterval(() => {
+      if (!stopped) tick();
+    }, interval);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [frames, fps, loop, holdOnEnd]);
+
+  return frames[Math.min(frameIdx, Math.max(0, frames.length - 1))] ?? frames[0];
 }

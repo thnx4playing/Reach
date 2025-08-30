@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Pressable, Text, Dimensions } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { Canvas } from '@shopify/react-native-skia';
+import { makeStaticFloor } from '../content/floor';
 import { DashCharacter } from './DashCharacter';
+import { CirclePad } from '../input/CirclePad';
+import { JumpButton } from '../input/JumpButton';
 import { PrefabNode } from '../render/PrefabNode';
-import type { MapName, AnimationState } from '../types';
+import ParallaxBackground from '../render/ParallaxBackground';
+import { PARALLAX } from '../content/parallaxConfig';
 import type { LevelData } from '../content/levels';
 import { MAPS } from '../content/maps';
 import { MapImageProvider } from '../render/MapImageContext';
-import TestTile from '../render/TestTile';
+// import TestTile from '../render/TestTile';
+import idleJson from '../../assets/character/dash/Idle_atlas.json';
 
-const { width, height } = Dimensions.get('window');
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+// Feel
+const SCALE      = 2;
+const WALK_SPEED = 120;
+const RUN_SPEED  = 260;
+const GRAVITY    = 1800;
+const JUMP_VEL   = 400;  // Reduced from 620 for smoother jump
 
 interface GameScreenProps {
   levelData: LevelData;
@@ -18,41 +29,133 @@ interface GameScreenProps {
 }
 
 export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
-  const [animationState, setAnimationState] = useState<AnimationState>('idle');
+  const [cameraY, setCameraY] = useState(0);
+  const [elapsedSec, setElapsedSec] = useState(0);
 
-  // Comprehensive GameScreen debugging
-  console.log('🎮 GameScreen Debug:', {
-    levelData,
-    mapName: levelData.mapName,
-    platformCount: levelData.platforms.length,
-    platforms: levelData.platforms.map((p, i) => ({
-      index: i,
-      prefab: p.prefab,
-      position: { x: p.x, y: p.y },
-      scale: p.scale
-    })),
-    characterSpawn: levelData.characterSpawn
-  });
+  const floorPieces = useMemo(
+    () => makeStaticFloor(levelData.mapName, SCREEN_W, SCREEN_H, SCALE, 'floor'),
+    [levelData.mapName]
+  );
+  // NOTE: if you ever see a teleport when changing maps, try Math.max(...) here.
+  const floorTopY = useMemo(() => Math.min(...floorPieces.map(p => p.y)), [floorPieces]);
 
+  const firstIdleKey = Object.keys((idleJson as any).frames)[0];
+  const firstIdleFrame = (idleJson as any).frames[firstIdleKey];
+  const charW = (firstIdleFrame?.w ?? 32) * SCALE;
 
-  const cycleAnimation = () => {
-    const states: AnimationState[] = ['idle', 'walk', 'run', 'jump', 'crouch-idle', 'crouch-walk', 'hurt', 'death'];
-    const currentIndex = states.indexOf(animationState);
-    const nextIndex = (currentIndex + 1) % states.length;
-    setAnimationState(states[nextIndex]);
-  };
+  // INPUT (smoothed elsewhere)
+  const dirXRef    = useRef<-1|0|1>(0);
+  const speedRef   = useRef<'idle'|'run'>('idle');
+
+  const [dirX, setDirX] = useState<-1|0|1>(0);
+  const [speedLevel, setSpeedLevel] = useState<'idle'|'run'>('idle');
+
+  // WORLD STATE (authoritative in refs; state mirrors for rendering)
+  const xRef  = useRef(Math.round(SCREEN_W * 0.5 - charW / 2));
+  const zRef  = useRef(0);          // height above floor
+  const vzRef = useRef(0);
+  const [x, setX] = useState(xRef.current);
+  const [z, setZ] = useState(zRef.current);
+
+  // Simple timer for parallax animation
+  useEffect(() => {
+    const t0 = Date.now();
+    const id = setInterval(() => setElapsedSec((Date.now() - t0) / 1000), 16);
+    return () => clearInterval(id);
+  }, []);
 
   const mapDef = MAPS[levelData.mapName];
 
+  // Pad callback (from CirclePad): update refs + state mirror
+  const onPad = (o: { dirX: -1|0|1; magX: number }) => {
+    // Hysteresis is in your CirclePad → GameScreen smoothing already; just map to level.
+    setDirX(o.dirX);
+    dirXRef.current = o.dirX;
+
+    let level: 'idle'|'run' = 'idle';
+    if (o.magX > 0.6) level = 'run';  // Lowered from 0.75 to reduce delay
+
+    setSpeedLevel(level);
+    speedRef.current = level;
+  };
+
+  // Jump only if grounded
+  const doJump = () => {
+    if (zRef.current <= 0.0001) {
+      vzRef.current = JUMP_VEL;
+    }
+  };
+
+  // ONE RAF LOOP — runs once; uses refs so it never duplicates.
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+
+            const loop = (t: number) => {
+      // At the very start of your loop(t):
+      if (__DEV__) {
+        // increment a global frame id and reset per-frame draw counter
+        (globalThis as any).__dashFrameID = ((globalThis as any).__dashFrameID ?? 0) + 1;
+        (globalThis as any).__dashDraws = 0;
+      }
+
+      const dt = Math.min(0.033, (t - last) / 1000);
+      last = t;
+
+      // Horizontal
+      const speed = speedRef.current === 'idle' ? 0 : RUN_SPEED;
+      xRef.current = Math.max(0, Math.min(SCREEN_W - charW, xRef.current + dirXRef.current * speed * dt));
+
+      // Vertical
+      vzRef.current -= GRAVITY * dt;
+      zRef.current  += vzRef.current * dt;
+
+      if (zRef.current <= 0) {
+        zRef.current = 0;
+        vzRef.current = 0;
+      }
+
+      // Push to state for render
+      setX(xRef.current);
+      setZ(zRef.current);
+
+      raf = requestAnimationFrame(loop);
+    };
+
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [charW]); // only depends on sprite width
+
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" hidden={false} translucent={true} />
+    <View style={styles.root}>
       <MapImageProvider source={mapDef.image} tag={`MIP:${levelData.mapName}`}>
         <Canvas style={styles.canvas}>
-          {/* Test tile canary - shows instantly if image loading works */}
-          <TestTile />
+          {/* Parallax Background - only show for grassy map for now */}
+          {levelData.mapName === 'grassy' && (
+            <ParallaxBackground
+              variant={PARALLAX.grassy}
+              cameraY={cameraY}
+              timeSec={elapsedSec}
+              viewport={{ width: SCREEN_W, height: SCREEN_H }}
+            />
+          )}
           
-          {/* Render all platforms */}
+          {/* Test tile canary - shows instantly if image loading works */}
+          {/* <TestTile /> */}
+          
+          {/* Render floor pieces */}
+          {floorPieces.map((piece, index) => (
+            <PrefabNode
+              key={`floor-${index}`}
+              map={levelData.mapName}
+              name={piece.prefab}
+              x={piece.x}
+              y={piece.y}
+              scale={piece.scale}
+            />
+          ))}
+          
+          {/* Render all other platforms */}
           {levelData.platforms.map((platform, index) => (
             <PrefabNode
               key={`platform-${index}`}
@@ -63,97 +166,30 @@ export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => 
               scale={platform.scale || 2}
             />
           ))}
-          
-          {/* Render character at spawn position */}
+
+          {/* 🔴 IMPORTANT: ensure there is ONLY ONE DashCharacter in the tree */}
           <DashCharacter
-            x={levelData.characterSpawn.x}
-            y={levelData.characterSpawn.y}
-            scale={2}
-            animationState={animationState}
+            floorTopY={floorTopY}
+            posX={x}
+            lift={z}
+            scale={SCALE}
+            input={{
+              vx: speedLevel === 'idle' ? 0 : (dirX * RUN_SPEED),
+              dirX,
+              crouch: false,  // Always false - no crouch functionality
+              onGround: z <= 0.0001,
+            }}
           />
         </Canvas>
       </MapImageProvider>
-      
-      {/* Controls */}
-      <View style={styles.controls}>
-        <Pressable style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </Pressable>
-        
-        <Pressable style={styles.animationButton} onPress={cycleAnimation}>
-          <Text style={styles.animationButtonText}>
-            Animation: {animationState}
-          </Text>
-        </Pressable>
-      </View>
-      
-      {/* Map info */}
-      <View style={styles.mapInfo}>
-        <Text style={styles.mapInfoText}>
-          Map: {levelData.mapName.charAt(0).toUpperCase() + levelData.mapName.slice(1)}
-        </Text>
-      </View>
+
+      <CirclePad size={72} onChange={onPad} />
+      <JumpButton size={72} onJump={doJump} />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#87CEEB',
-    paddingTop: 0,
-    paddingBottom: 0,
-    marginTop: 0,
-    marginBottom: 0,
-  },
-  canvas: {
-    flex: 1,
-  },
-  controls: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  backButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 12,
-    borderRadius: 8,
-    minWidth: 100,
-  },
-  backButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    fontSize: 14,
-  },
-  animationButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 12,
-    borderRadius: 8,
-    minWidth: 150,
-  },
-  animationButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    fontSize: 12,
-  },
-  mapInfo: {
-    position: 'absolute',
-    bottom: 40,
-    left: 20,
-    right: 20,
-    alignItems: 'center',
-  },
-  mapInfoText: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    color: 'white',
-    padding: 8,
-    borderRadius: 6,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  root: { flex: 1, backgroundColor: '#000' },
+  canvas: { flex: 1 },
 });

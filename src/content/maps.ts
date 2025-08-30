@@ -44,7 +44,7 @@ const frozenImage  = require("../../assets/maps/frozen/frozen-tileset.png") as n
 // GRASSY
 import grassyGrid  from "../../assets/maps/grassy/grassy-tileset_grid.json";
 import grassyPrefs from "../../assets/maps/grassy/grassy_prefabs.json";
-const grassyImage  = require("../../assets/maps/grassy/grassy-tileset.png") as number;
+const grassyImage  = require("../../assets/maps/grassy/grassy-tileset-extruded.png") as number;
 
 // ---- Registry ----
 export const MAPS = {
@@ -71,16 +71,7 @@ export function prefabWidthPx(mapName: MapName, prefabName: string, scale = 2) {
   const tile = getTileSize(mapName) * scale;
   const pf = getPrefab(mapName, prefabName)!;
   
-  console.log('📏 prefabWidthPx Debug:', {
-    mapName,
-    prefabName,
-    scale,
-    tile,
-    hasCells: !!pf.cells,
-    hasRects: !!pf.rects,
-    cellsRows: pf.cells?.length,
-    rectsRows: pf.rects?.length
-  });
+
   
   // For cells, count the actual width (excluding nulls at the end)
   const colsFromCells = pf.cells?.reduce((maxCols, row, rowIndex) => {
@@ -93,7 +84,7 @@ export function prefabWidthPx(mapName: MapName, prefabName: string, scale = 2) {
       }
     }
     const rowWidth = lastCol + 1;
-    console.log(`📏 Cells Row ${rowIndex}:`, { row, lastCol, rowWidth });
+
     return Math.max(maxCols, rowWidth);
   }, 0) ?? 0;
   
@@ -108,21 +99,14 @@ export function prefabWidthPx(mapName: MapName, prefabName: string, scale = 2) {
       }
     }
     const rowWidth = lastCol + 1;
-    console.log(`📏 Rects Row ${rowIndex}:`, { row, lastCol, rowWidth });
+
     return Math.max(maxCols, rowWidth);
   }, 0) ?? 0;
   
   const cols = Math.max(colsFromCells, colsFromRects, 1);
   const widthPx = cols * tile;
   
-  console.log('📏 prefabWidthPx Result:', {
-    mapName,
-    prefabName,
-    colsFromCells,
-    colsFromRects,
-    finalCols: cols,
-    widthPx
-  });
+
   
   return widthPx;
 }
@@ -145,11 +129,6 @@ Object.entries(MAPS).forEach(([mapName, def]) => {
     // quick sanity: log widths (columns) before/after
     const width = (pf: any) =>
       pf?.cells?.[0]?.length ?? pf?.rects?.[0]?.length ?? "?";
-    console.log("[prefab variants]", mapName, {
-      left: width(p["left-platform"]),
-      leftSmall: width(p["left-platform-small"]),
-      right: width(p["right-platform"]),
-      rightSmall: width(p["right-platform-small"]),
-    });
+
   }
 });

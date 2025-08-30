@@ -20,7 +20,7 @@ src/
 ├── hooks/
 │   └── useAnimator.ts       # Animation frame hook
 ├── render/
-│   ├── SpriteNodeSkia.tsx   # Skia sprite rendering
+│   ├── SpriteAtlasSprite.tsx # Atlas-based sprite rendering
 │   └── PrefabNode.tsx       # Prefab rendering system
 └── types/
     └── index.ts             # TypeScript definitions

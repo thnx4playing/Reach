@@ -33,18 +33,7 @@ export function MapImageProvider({
 
   const skImage = imgFromNumber ?? imgFromUri ?? null;
 
-  useEffect(() => {
-    // One concise, high-signal log
-    // eslint-disable-next-line no-console
-    console.log(`[${tag}]`, {
-      inputType: typeof source,
-      uri,
-      numReady: !!imgFromNumber,
-      uriReady: !!imgFromUri,
-      finalReady: !!skImage,
-      size: skImage ? { w: skImage.width(), h: skImage.height() } : null,
-    });
-  }, [imgFromNumber, imgFromUri, skImage, source, uri, tag]);
+
 
   return <Ctx.Provider value={{ skImage }}>{children}</Ctx.Provider>;
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { Group, Image as SkImage, Rect, useImage } from "@shopify/react-native-skia";
+import { Group, Image as SkImage, Rect, useImage, Atlas, Skia, rect } from "@shopify/react-native-skia";
 import { Image as RNImage } from "react-native";
 import { MAPS, MapName } from "../content/maps";
 import { useMapSkImage } from "./MapImageContext";
@@ -32,49 +32,31 @@ export function PrefabNode({ map, name, x = 0, y = 0, scale = 1 }: Props) {
   // 3) Final image we'll draw with
   const skImage = imgFromCtx ?? imgLocal ?? null;
 
-  useEffect(() => {
-    // One concise log per prefab to prove what we're drawing with
-    // eslint-disable-next-line no-console
-    console.log("[PrefabNode:image]", {
-      map, name,
-      fromCtx: !!imgFromCtx,
-      fromLocal: !!imgLocal,
-      final: !!skImage,
-    });
-  }, [map, name, imgFromCtx, imgLocal, skImage]);
+
 
   const draw = (f: any, rx: number, ry: number, key: string) => {
+    if (!skImage) return null;
+
     // source rect from the tilesheet (pixels)
     const sx = f.x, sy = f.y, sw = f.w, sh = f.h;
 
-    // destination box on screen (pixels)
+    // destination position on screen (pixels)
     const dx = rx * tile * scale;
     const dy = ry * tile * scale;
-    const dw = sw * scale;
-    const dh = sh * scale;
 
-    // scale the *entire* tileset so that sw×sh → dw×dh
-    const s = dw / sw; // = scale for square tiles
+    // Create sprite rect for Atlas
+    const spriteRect = rect(sx, sy, sw, sh);
+    
+    // Create transform for Atlas (scale and position)
+    const transform = Skia.RSXform(scale, 0, dx, dy);
 
     return (
-      <React.Fragment key={key}>
-        {/* 1) clip to destination box */}
-        <Group clip={{ x: dx, y: dy, width: dw, height: dh }}>
-          {/* 2) draw the whole image translated so (sx,sy) maps to (dx,dy) */}
-          {skImage && (
-            <SkImage
-              image={skImage}
-              x={dx - sx * s}
-              y={dy - sy * s}
-              width={skImage.width() * s}
-              height={skImage.height() * s}
-              filterMode="nearest"
-            />
-          )}
-        </Group>
-
-
-      </React.Fragment>
+      <Atlas
+        key={key}
+        image={skImage}
+        sprites={[spriteRect]}
+        transforms={[transform]}
+      />
     );
   };
 

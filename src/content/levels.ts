@@ -34,17 +34,6 @@ export function buildLevel(mapName: MapName, width: number, height: number) {
   const platforms = [
     ...staticFloor,               // ⬅️ fixed, always the same for this map
     
-    // Left platform - middle of screen, flush to left (small variant)
-    { prefab: 'left-platform-small', x: 0, y: height - 260, scale: 2 },
-    
-    // Right platform - higher up screen, flush to right (small variant)
-    { 
-      prefab: 'right-platform-small', 
-      x: width - 160, // Adjusted for smaller platform width
-      y: height - 500, // Moved up by about 1/3 of screen height
-      scale: 2 
-    },
-    
     // Map-specific decorations
     ...getMapDecorations(mapName, width, height)
   ];
@@ -86,6 +75,10 @@ function getMapDecorations(mapName: MapName, width: number, height: number) {
       return [
         { prefab: 'vase-tall', x: 80, y: height - 100, scale: 2 },
         { prefab: 'vase', x: 250, y: height - 100, scale: 2 },
+        // Floor decorations - sit on top of the top floor tile (no collision)
+        { prefab: 'tree-large', x: width - 100, y: height - 191, scale: 2 }, // Lowered by additional 2px (was 193, now 191)
+        // Platform above the tree
+        { prefab: 'platform-basic', x: width - 100, y: height - 309, scale: 2 }, // 50px above the tree (was 209, now 309)
       ];
     default:
       return [];
