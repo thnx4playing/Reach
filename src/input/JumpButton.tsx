@@ -6,7 +6,7 @@ type Props = {
   size?: number; // overall diameter
 };
 
-export const JumpButton: React.FC<Props> = ({ onJump, size = 72 }) => {
+export const JumpButton: React.FC<Props> = ({ onJump, size = 140 }) => {
   return (
     <Pressable
       onPressIn={onJump}
@@ -29,9 +29,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 22,
     right: 22,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },

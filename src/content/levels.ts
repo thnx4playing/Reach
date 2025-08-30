@@ -1,55 +1,46 @@
 import { Dimensions } from 'react-native';
 import type { MapName } from './maps';
-import { prefabWidthPx, getTileSize } from './maps';
+import { prefabWidthPx, getTileSize, MAPS } from './maps';
 import { makeStaticFloor } from './floor';
-
-// Re-export MapName for convenience
-export type { MapName } from './maps';
 
 const { width, height } = Dimensions.get('window');
 
-export interface Platform {
-  prefab: string;
-  x: number;
-  y: number;
-  scale?: number;
-}
-
-export interface LevelData {
+export type Platform = { prefab: string; x: number; y: number; scale?: number };
+export type LevelData = {
   mapName: MapName;
   platforms: Platform[];
-  characterSpawn: {
-    x: number;
-    y: number;
-  };
-}
+  characterSpawn: { x: number; y: number };
+};
 
+const prefabHeightPx = (mapName: MapName, prefab: string, scale = 2) => {
+  const tile = getTileSize(mapName);
+  // @ts-ignore runtime lookup
+  const pf = (MAPS as any)[mapName]?.prefabs?.prefabs?.[prefab];
+  const rows = (pf?.cells?.length ?? pf?.rects?.length ?? 1);
+  return rows * tile * scale;
+};
 
-// Build level function using static floor
-export function buildLevel(mapName: MapName, width: number, height: number) {
+function buildLevel(mapName: MapName, w: number, h: number): LevelData {
   const FLOOR_SCALE = 2;
-
-  const staticFloor = makeStaticFloor(mapName, width, height, FLOOR_SCALE);
-
+  const staticFloor = makeStaticFloor(mapName, w, h, FLOOR_SCALE);
+  const decorations = getMapDecorations(mapName, w, h);
+  
   const platforms = [
-    ...staticFloor,               // ⬅️ fixed, always the same for this map
-    
-    // Map-specific decorations
-    ...getMapDecorations(mapName, width, height)
+    ...staticFloor,               // Floor pieces
+    ...decorations               // Map decorations
   ];
 
-  return { 
+
+
+  return {
     mapName,
     platforms,
-    characterSpawn: {
-      x: width / 2,
-      y: height - 100, // On top of floor (adjusted for new floor position)
-    }
+    characterSpawn: { x: w * 0.5, y: h - 100 },
   };
 }
 
 // Map-specific decorations
-function getMapDecorations(mapName: MapName, width: number, height: number) {
+function getMapDecorations(mapName: MapName, width: number, height: number): Platform[] {
   switch (mapName) {
     case 'dark':
       return [
@@ -73,19 +64,16 @@ function getMapDecorations(mapName: MapName, width: number, height: number) {
       ];
     case 'grassy':
       return [
-        { prefab: 'vase-tall', x: 80, y: height - 100, scale: 2 },
-        { prefab: 'vase', x: 250, y: height - 100, scale: 2 },
         // Floor decorations - sit on top of the top floor tile (no collision)
-        { prefab: 'tree-large', x: width - 100, y: height - 191, scale: 2 }, // Lowered by additional 2px (was 193, now 191)
+        { prefab: 'tree-large', x: width - 100, y: (height - prefabHeightPx(mapName, 'floor', 2)) - prefabHeightPx(mapName, 'tree-large', 2) + 1, scale: 2 },
         // Platform above the tree
-        { prefab: 'platform-basic', x: width - 100, y: height - 309, scale: 2 }, // 50px above the tree (was 209, now 309)
+        { prefab: 'platform-basic', x: width - 100, y: (height - prefabHeightPx(mapName, 'floor', 2)) - prefabHeightPx(mapName, 'tree-large', 2) - 50, scale: 2 }
       ];
     default:
       return [];
   }
 }
 
-// Enhanced level layouts for each map theme using static floor system
 export const LEVELS: Record<MapName, LevelData> = {
   dark: buildLevel('dark', width, height),
   desert: buildLevel('desert', width, height),

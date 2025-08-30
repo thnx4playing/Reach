@@ -67,9 +67,21 @@ export function getTileSize(map: MapName) {
 
 // Helper functions for level generation
 
+// Cache to prevent spam warnings for missing prefabs
+const missingPrefabWarnings = new Set<string>();
+
 export function prefabWidthPx(mapName: MapName, prefabName: string, scale = 2) {
   const tile = getTileSize(mapName) * scale;
-  const pf = getPrefab(mapName, prefabName)!;
+  const pf = getPrefab(mapName, prefabName);
+  
+  if (!pf) {
+    const warningKey = `${mapName}:${prefabName}`;
+    if (!missingPrefabWarnings.has(warningKey)) {
+      console.warn(`prefabWidthPx: prefab "${prefabName}" not found in map "${mapName}"`);
+      missingPrefabWarnings.add(warningKey);
+    }
+    return tile; // fallback to single tile width
+  }
   
 
   

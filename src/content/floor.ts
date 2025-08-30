@@ -1,47 +1,68 @@
-import { MAPS, MapName } from "./maps";
+import { Dimensions } from 'react-native';
+import type { MapName } from './maps';
+import { getTileSize, MAPS } from './maps';
 
-export type PlatformSpec = { prefab: string; x: number; y: number; scale: number };
+/**
+ * Returns the Y pixel coordinate of the TOP of the floor strip.
+ * You should place feet at (floorTopY + FOOT_OFFSET - lift).
+ *
+ * @param screenH device screen height in px
+ * @param floorPrefabHeightPx height of your floor image in px (not tiles)
+ */
+export const getFloorTopY = (screenH: number, floorPrefabHeightPx: number) => {
+  return Math.round(screenH - floorPrefabHeightPx);
+};
 
-/** Build a static floor that spans the bottom of the screen. */
+/**
+ * Creates static floor pieces for a given map
+ */
 export function makeStaticFloor(
-  map: MapName,
-  screenWidth: number,
-  screenHeight: number,
-  scale = 2,
-  prefabName: string = "floor" // your 2-tiles-stacked prefab
-): PlatformSpec[] {
-  const def = MAPS[map];
-  const tile = def.prefabs.meta.tileSize;
+  mapName: MapName, 
+  screenWidth: number, 
+  screenHeight: number, 
+  scale: number, 
+  prefabName: string = 'floor'
+) {
 
-  const pf = def.prefabs.prefabs[prefabName];
-  if (!pf) throw new Error(`Missing prefab "${prefabName}" for map "${map}"`);
+  
+  const tileSize = getTileSize(mapName) * scale;
+  
+  // NEW: read prefab rows and compute true floor height
+  const meta = (MAPS as any)[mapName]?.prefabs?.meta;
+  const pf = (MAPS as any)[mapName]?.prefabs?.prefabs?.[prefabName];
+  const baseTile = meta?.tileSize ?? 16;
+  const rows = (pf?.cells?.length ?? pf?.rects?.length ?? 2);
 
-  // prefab width/height in tiles (supports cells OR rects definitions)
-  const colsCells = pf.cells ? Math.max(...pf.cells.map(r => r.length)) : 0;
-  const colsRects = pf.rects ? Math.max(...pf.rects.map(r => r.length)) : 0;
-  const rowsCells = pf.cells ? pf.cells.length : 0;
-  const rowsRects = pf.rects ? pf.rects.length : 0;
+  const floorHeight = rows * baseTile * scale; // ← instead of 48 * scale
+  const floorTopY = Math.round(screenHeight - floorHeight);
+  
+  // Calculate how many floor tiles we need to cover the screen width
+  const tilesNeeded = Math.ceil(screenWidth / tileSize);
+  
 
-  const cols = Math.max(colsCells, colsRects, 1);
-  const rows = Math.max(rowsCells, rowsRects, 2); // your floor is two tiles tall
-
-  const prefabWpx = cols * tile * scale;
-  const prefabHpx = rows * tile * scale;
-
-  // floor sits flush with bottom to cover all blue background
-  const y = Math.round(screenHeight - prefabHpx);
-
-  // fill width (+1 tile so we never see a seam on wide screens)
-  const count = Math.ceil(screenWidth / prefabWpx) + 1;
-
-  const pieces: PlatformSpec[] = [];
-  for (let i = 0; i < count; i++) {
-    pieces.push({
+  
+  const floorPieces = [];
+  for (let i = 0; i < tilesNeeded; i++) {
+    const piece = {
+      x: i * tileSize,
+      y: floorTopY,
       prefab: prefabName,
-      x: Math.round(i * prefabWpx), // pixel-snap to avoid hairline gaps
-      y,
-      scale,
-    });
+      scale: scale,
+    };
+    floorPieces.push(piece);
+    
+    // Debug: log first few pieces
+
   }
-  return pieces;
+  
+
+  
+  return floorPieces;
 }
+
+// Default export using current device size and a reasonable fallback height.
+// Change FLOOR_PREFAB_HEIGHT_PX to your actual floor image height.
+const FLOOR_PREFAB_HEIGHT_PX = 48; // <-- set to your asset height
+const screenH = Dimensions.get('window').height;
+export const floorTopY = getFloorTopY(screenH, FLOOR_PREFAB_HEIGHT_PX);
+export default floorTopY;

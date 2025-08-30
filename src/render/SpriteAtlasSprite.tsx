@@ -35,10 +35,13 @@ export default function SpriteAtlasSprite({
   // Identity RSXform; we position/scale with Groups instead.
   const transforms = useMemo(() => [Skia.RSXform(1, 0, 0, 0)], []);
 
-  // Feet anchoring
-  const drawW = fw * scale;
-  const drawH = fh * scale;
-  const topY  = baselineY - drawH;
+      // Feet anchoring (respect pivot from atlas)
+    // pivotY is normalized [0..1] from the TOP of the frame.
+    // If pivotY = 1, baseline aligns with the bottom of the frame (old behavior).
+    const drawW = fw * scale;
+    const drawH = fh * scale;
+    const pY = (frame as any).pivotY ?? 1;
+    const topY = Math.round(baselineY - drawH * pY);
 
   // Horizontal flip by mirroring X only (no upside-down)
   const outerTransform = flipX
@@ -60,8 +63,8 @@ export default function SpriteAtlasSprite({
   if (__DEV__) {
     (globalThis as any).__dashDraws = ((globalThis as any).__dashDraws ?? 0) + 1;
     const frameID = (globalThis as any).__dashFrameID ?? 0;
-    // This will print once per *real* draw of the sprite each frame
-    console.log('DASH_DRAW', { frameID, draws: (globalThis as any).__dashDraws, tag, frame, scale, flipX });
+    // Diagnostic counter still active but logging disabled to reduce console spam
+    // console.log('DASH_DRAW', { frameID, draws: (globalThis as any).__dashDraws, tag, frame, scale, flipX });
   }
 
   return (

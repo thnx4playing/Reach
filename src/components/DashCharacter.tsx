@@ -33,6 +33,7 @@ type Props = {
   scale?: number;      // overall character scale multiplier
   input?: InputState;
   id?: string;         // unique identifier for debugging
+  footOffset?: number; // NEW - tunable foot offset
 };
 
 function sortFramesNumeric(keys: string[]) {
@@ -53,11 +54,11 @@ function useAnim(json: AtlasData, png: number, fps: number) {
   return useMemo(() => ({ atlas: { image, frames: framesMap }, frames, fps, json }) as const, [image, framesMap, frames, fps]);
 }
 
-// Hysteresis thresholds to prevent jitter
-const WALK_IN = 8;   // enter walk above this speed
-const WALK_OUT = 3;  // leave walk below this speed (lower than WALK_IN)
-const RUN_IN = 140;  // enter run above this speed
-const RUN_OUT = 120; // leave run below this speed (lower than RUN_IN)
+// Hysteresis thresholds to prevent jitter - more responsive
+const WALK_IN = 3;   // enter walk above this speed (more responsive)
+const WALK_OUT = 1;  // leave walk below this speed (lower than WALK_IN)
+const RUN_IN = 80;   // enter run above this speed (more responsive)
+const RUN_OUT = 60;  // leave run below this speed (lower than RUN_IN)
 
 function pickState(input?: InputState, prevState?: AnimationState): AnimationState {
   const vx = Math.abs(input?.vx ?? 0);
@@ -88,7 +89,7 @@ function pickState(input?: InputState, prevState?: AnimationState): AnimationSta
   return 'run';
 }
 
-export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 2, input, id = "Dash@World" }) => {
+export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 2, input, id = "Dash@World", footOffset = 2 }) => {
   const idle  = useAnim(idleJson,  idlePng,  10);
   const walk  = useAnim(walkJson,  walkPng,  12);
   const run   = useAnim(runJson,   runPng,   16);
@@ -132,13 +133,14 @@ export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 
 
   // --- RENDER EXACTLY ONE FRAME ---
   // IMPORTANT: This is the ONLY place we render the character sprite
+  const FOOT_OFFSET = footOffset;  // tunable from props
   return (
     <SpriteAtlasSprite
       tag={`${id}:${state}`}
       image={current.atlas.image!}
-      frame={{ x: fr.x, y: fr.y, w: fr.w, h: fr.h }}
+      frame={{ x: fr.x, y: fr.y, w: fr.w, h: fr.h, pivotX: fr.pivotX, pivotY: fr.pivotY }}
       x={posX}
-      baselineY={floorTopY - lift}
+      baselineY={floorTopY + FOOT_OFFSET - lift}
       scale={drawScale}
       flipX={facingLeft}
     />

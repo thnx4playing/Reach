@@ -29,15 +29,20 @@ export default function ParallaxBackground({
   timeSec,
   viewport,
 }: ParallaxBackgroundProps) {
+
+  
   const { width, height } = viewport;
+  
+
 
   return (
     <Group>
-      {variant.layers.map((layer, layerIndex) => {
+      {(variant.layers ? variant.layers : []).map((layer, layerIndex) => {
         const image = useImage(layer.src);
         if (!image) return null;
 
         // Scale to viewport width
+        if (!image || typeof (image as any).width !== 'function' || typeof (image as any).height !== 'function') return null;
         const iw = image.width();
         const ih = image.height();
         const scale = width / iw;

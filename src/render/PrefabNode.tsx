@@ -16,9 +16,15 @@ function resolveUri(source: number | string) {
 }
 
 export function PrefabNode({ map, name, x = 0, y = 0, scale = 1 }: Props) {
+  
   const { grid, prefabs, image: tileset } = MAPS[map];
   const pf = prefabs.prefabs[name];
-  if (!pf) return null;
+  
+
+  
+  if (!pf) {
+    return null;
+  }
 
   const tile = prefabs.meta.tileSize;
 
@@ -35,10 +41,13 @@ export function PrefabNode({ map, name, x = 0, y = 0, scale = 1 }: Props) {
 
 
   const draw = (f: any, rx: number, ry: number, key: string) => {
+    
     if (!skImage) return null;
 
     // source rect from the tilesheet (pixels)
     const sx = f.x, sy = f.y, sw = f.w, sh = f.h;
+
+
 
     // destination position on screen (pixels)
     const dx = rx * tile * scale;
@@ -60,7 +69,10 @@ export function PrefabNode({ map, name, x = 0, y = 0, scale = 1 }: Props) {
     );
   };
 
-  const getFrame = (cell: string) => (grid as any)[cell] || (grid as any)?.frames?.[cell];
+  const getFrame = (cell: string) => {
+    const frame = (grid as any)[cell] || (grid as any)?.frames?.[cell];
+    return frame;
+  };
 
   return (
     <Group transform={[{ translateX: x }, { translateY: y }]}>
