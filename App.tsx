@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
+import 'react-native-gesture-handler';
+import 'react-native-reanimated';
+
+
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 import { HomeScreen } from './src/components/HomeScreen';
 import { GameScreen } from './src/components/GameScreen';
 import { LEVELS } from './src/content/levels';
@@ -20,7 +25,7 @@ export default function App() {
 
   const handlePlay = () => {
     if (selectedMap) {
-      setCurrentLevel(LEVELS[selectedMap]);
+      setCurrentLevel(LEVELS[selectedMap as keyof typeof LEVELS]);
       setCurrentScreen('game');
     }
   };
