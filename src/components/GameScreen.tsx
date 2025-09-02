@@ -89,6 +89,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => 
   const dirXRef = useRef(0);
   const speedRef = useRef<'idle'|'walk'|'run'>('idle');
   const onGroundRef = useRef(true);
+  const didWrapRef = useRef(false);
 
   // Highest surface under a given X (one-way collision)
 
@@ -291,6 +292,9 @@ const floorTopY = useMemo(() => {
           (globalThis as any).__dashFrameID = ((globalThis as any).__dashFrameID ?? 0) + 1;
           (globalThis as any).__dashDraws = 0;
         }
+        
+        // Reset wrap flag for this frame
+        didWrapRef.current = false;
 
       const dt = Math.min(0.033, (t - last) / 1000);
       last = t;
@@ -410,8 +414,7 @@ const floorTopY = useMemo(() => {
         return;
       }
       
-      // Store player box for render section
-      setCurrentPlayerBox(box);
+      // Store player box for render section (will be set after wrapping)
       
       // Increment frame counter
       setFrameCount(prev => prev + 1);
@@ -437,20 +440,56 @@ const floorTopY = useMemo(() => {
           vxRef.current += step;
         }
       } else {
-        // In air: preserve momentum with minimal drag
-        vxRef.current *= 0.995;    // minimal air drag
+  // In air: stop momentum when no direction is pressed
+  if (dirXRef.current === 0) {
+    vxRef.current *= 0.1;  // Stop momentum immediately
+    if (Math.abs(vxRef.current) < 5) {
+      vxRef.current = 0;   // Snap to zero if very small
+    }
+  } else {
+    // Allow some air control when direction is pressed
+    const desired = dirXRef.current * target;
+    const dv = desired - vxRef.current;
+    const step = Math.sign(dv) * Math.min(Math.abs(dv), ACCEL * 0.3); // Reduced air control
+    vxRef.current += step;
+  }
+}
+
+      const prevX = xRef.current;
+      xRef.current = xRef.current + vxRef.current * dt;
+
+      // --- Screen wrap (left/right) keeping momentum & state ---
+      {
+        const spriteW = CHAR_W;               // xRef is LEFT EDGE of the sprite
+        const spriteCenter = xRef.current + spriteW * 0.5;  // Center of the sprite
         
-        // Allow some air control but preserve momentum
-        if (dirXRef.current !== 0) {
-          const desired = dirXRef.current * target;
-          const dv = desired - vxRef.current;
-          const step = Math.sign(dv) * Math.min(Math.abs(dv), ACCEL * 0.3); // Reduced air control
-          vxRef.current += step;
+        // If the sprite center crossed the left edge, wrap to the right
+        if (spriteCenter < 0) {
+          xRef.current += SCREEN_W;
+          didWrapRef.current = true;
+          if (__DEV__) dbg('WRAP: L→R', { x: Math.round(xRef.current), center: Math.round(spriteCenter) });
+        }
+        // If the sprite center crossed the right edge, wrap to the left
+        else if (spriteCenter > SCREEN_W) {
+          xRef.current -= SCREEN_W;
+          didWrapRef.current = true;
+          if (__DEV__) dbg('WRAP: R→L', { x: Math.round(xRef.current), center: Math.round(spriteCenter) });
         }
       }
 
-      const prevX = xRef.current;
-      xRef.current = Math.max(0, Math.min(SCREEN_W - CHAR_W, xRef.current + vxRef.current * dt));
+      // Rebuild player box at the new X (used by side/vertical collision below)
+      box = getPlayerBox({
+        xRefIsLeftEdge: true,
+        x: xRef.current,
+        z: zRef.current,
+        floorTopY,
+        charW: CHAR_W,
+        colW: COL_W,
+        colH: COL_H,
+      });
+
+      // Store player box for render
+      setCurrentPlayerBox(box);
 
       const prevZ = zRef.current;
 
@@ -605,9 +644,10 @@ const floorTopY = useMemo(() => {
         return;
       }
 
-      // Improved side collision with smaller pushes
-      const SIDE_PUSH = 2; // Fixed small push distance
-      try {
+      // Improved side collision with smaller pushes (skip on wrap frame)
+      if (!didWrapRef.current) {
+        const SIDE_PUSH = 2; // Fixed small push distance
+        try {
         if (!platformSlabs || !Array.isArray(platformSlabs)) {
           console.error('CRASH: platformSlabs is invalid in side collision', { platformSlabs });
           return;
@@ -651,6 +691,7 @@ const floorTopY = useMemo(() => {
       } catch (error) {
         console.error('CRASH in side collision:', error);
       }
+        } // Close the didWrapRef guard
 
       // Debug: Log character position and collision state
       if (__DEV__ && Math.random() < 0.01) { // 1% chance to log
