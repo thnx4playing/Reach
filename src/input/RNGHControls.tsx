@@ -61,7 +61,21 @@ export default React.memo(function RNGHControls({
 
     // light smoothing -> responsive but not jittery
     const alpha = 0.25;
-    magXRef.current = magXRef.current * (1 - alpha) + nx * alpha;
+    
+    // Separate smoothing for magnitude and direction to prevent asymmetry
+    const currentMag = Math.abs(magXRef.current);
+    const currentDir = Math.sign(magXRef.current);
+    const newMag = Math.abs(nx);
+    const newDir = Math.sign(nx);
+    
+    // Smooth the magnitude
+    const smoothedMag = currentMag * (1 - alpha) + newMag * alpha;
+    
+    // Use the new direction (prevents mixing positive/negative values)
+    const finalMag = newDir !== 0 ? smoothedMag : 0;
+    
+    // Update the reference with the final value
+    magXRef.current = newDir * finalMag;
     let sm = magXRef.current;
 
     const abs = Math.abs(sm);
@@ -90,25 +104,26 @@ export default React.memo(function RNGHControls({
       .maxDistance(30)
       .minPointers(1)
       .shouldCancelWhenOutside(false)
-      .onTouchesDown((e) => {
-        'worklet';
-        const t = (e.changedTouches?.[0] ?? e.allTouches?.[0]) as any;
-        const x = t?.x ?? 0, y = t?.y ?? 0;
-        // Strict jump zone - must be clearly in jump area
-        const jumpOk = inside(x, y, centers.jump.x, centers.jump.y, r * 1.2);
-        // Also check that it's NOT in the pad area to prevent conflicts
-        const padOk = inside(x, y, centers.pad.x, centers.pad.y, r * 1.2);
-        // Only activate if clearly in jump zone and not in pad zone
-        const ok = jumpOk && !padOk;
-        jumpZoneValid.value = ok;
-      })
-      .onStart((e) => {
-        'worklet';
-        // Only jump if zone is valid AND it's a single finger tap
-        if (jumpZoneValid.value && e.numberOfPointers === 1) {
-          runOnJS(onJump)();
-        }
-      })
+             .onTouchesDown((e) => {
+         'worklet';
+         const t = (e.changedTouches?.[0] ?? e.allTouches?.[0]) as any;
+         const x = t?.x ?? 0, y = t?.y ?? 0;
+         // Strict jump zone - must be clearly in jump area
+         const jumpOk = inside(x, y, centers.jump.x, centers.jump.y, r * 1.2);
+         // Also check that it's NOT in the pad area to prevent conflicts
+         const padOk = inside(x, y, centers.pad.x, centers.pad.y, r * 1.2);
+         // Only activate if clearly in jump zone and not in pad zone
+         const ok = jumpOk && !padOk;
+         jumpZoneValid.value = ok;
+       })
+
+             .onStart((e) => {
+         'worklet';
+         // Only jump if zone is valid AND it's a single finger tap
+         if (jumpZoneValid.value && e.numberOfPointers === 1) {
+           runOnJS(onJump)();
+         }
+       })
       .onTouchesCancelled(() => {
         'worklet';
         // Gesture cancelled - no action needed
@@ -117,10 +132,11 @@ export default React.memo(function RNGHControls({
         'worklet';
         // Gesture ended - no action needed
       })
-      .onFinalize(() => {
-        'worklet';
-        // Gesture finalized - no action needed
-      });
+             .onFinalize(() => {
+         'worklet';
+         // Reset zone validity when gesture finalizes
+         jumpZoneValid.value = false;
+       });
   }, [centers.jump.x, centers.jump.y, r, onJump, jumpZoneValid]);
 
   // ---- Pan (Pad) with zone-based activation ----
@@ -130,30 +146,50 @@ export default React.memo(function RNGHControls({
       .minDistance(8)
       .minPointers(1)
       .shouldCancelWhenOutside(false)
-      .onTouchesDown((e) => {
-        'worklet';
-        const t = (e.changedTouches?.[0] ?? e.allTouches?.[0]) as any;
-        const x = t?.x ?? 0, y = t?.y ?? 0;
-        // Strict pad zone - must be clearly in pad area
-        const padOk = inside(x, y, centers.pad.x, centers.pad.y, r);
-        // Also check that it's NOT in the jump area to prevent conflicts
-        const jumpOk = inside(x, y, centers.jump.x, centers.jump.y, r * 1.2);
-        // Only activate if clearly in pad zone and not in jump zone
-        const ok = padOk && !jumpOk;
-        padZoneValid.value = ok;
-      })
-      .onStart((e) => {
-        'worklet';
-        if (padZoneValid.value) {
-          const t = (e.changedTouches?.[0] ?? e.allTouches?.[0]) as any;
-          const x = t?.x ?? 0, y = t?.y ?? 0;
-          runOnJS(emitPadFrom)(x, y);
-        }
-      })
-      .onChange((e) => {
-        'worklet';
-        runOnJS(emitPadFrom)(e.x, e.y);
-      })
+             .onTouchesDown((e) => {
+         'worklet';
+         const t = (e.changedTouches?.[0] ?? e.allTouches?.[0]) as any;
+         const x = t?.x ?? 0, y = t?.y ?? 0;
+         // Strict pad zone - must be clearly in pad area
+         const padOk = inside(x, y, centers.pad.x, centers.pad.y, r);
+         // Also check that it's NOT in the jump area to prevent conflicts
+         const jumpOk = inside(x, y, centers.jump.x, centers.jump.y, r * 1.2);
+         
+         // Check if this is a center press (within 15px of center)
+         const dx = x - centers.pad.x;
+         const dy = y - centers.pad.y;
+         const distance = Math.sqrt(dx * dx + dy * dy);
+         const isCenterPress = distance < 15;
+         
+         // Only activate if clearly in pad zone, not in jump zone, and NOT a center press
+         const ok = padOk && !jumpOk && !isCenterPress;
+         padZoneValid.value = ok;
+       })
+
+             .onStart((e) => {
+         'worklet';
+         if (padZoneValid.value) {
+           const t = (e.changedTouches?.[0] ?? e.allTouches?.[0]) as any;
+           const x = t?.x ?? 0, y = t?.y ?? 0;
+           runOnJS(emitPadFrom)(x, y);
+         }
+       })
+             .onChange((e) => {
+         'worklet';
+         // Check if the current position is far enough from center to emit movement
+         const dx = e.x - centers.pad.x;
+         const dy = e.y - centers.pad.y;
+         const distance = Math.sqrt(dx * dx + dy * dy);
+         // Only emit if moved at least 15px from center (prevents center press activation)
+         if (distance >= 15) {
+           // Also check if we're still in the pad zone (allows continued movement after jump)
+           const padOk = inside(e.x, e.y, centers.pad.x, centers.pad.y, r);
+           const jumpOk = inside(e.x, e.y, centers.jump.x, centers.jump.y, r * 1.2);
+           if (padOk && !jumpOk) {
+             runOnJS(emitPadFrom)(e.x, e.y);
+           }
+         }
+       })
       .onEnd(() => {
         'worklet';
         // Gesture ended - no action needed
@@ -162,10 +198,12 @@ export default React.memo(function RNGHControls({
         'worklet';
         // Gesture cancelled - no action needed
       })
-      .onFinalize(() => {
-        'worklet';
-        runOnJS(resetPad)();
-      });
+             .onFinalize(() => {
+         'worklet';
+         // Reset zone validity when gesture finalizes
+         padZoneValid.value = false;
+         runOnJS(resetPad)();
+       });
   }, [centers.pad.x, centers.pad.y, r, onPad, padZoneValid]);
 
   // Use separate gesture detectors to prevent touch registry conflicts

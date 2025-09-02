@@ -21,8 +21,16 @@ export function makeStaticFloor(
   screenWidth: number, 
   screenHeight: number, 
   scale: number, 
-  prefabName: string = 'floor'
+  prefabName?: string
 ) {
+  // Use the correct floor prefab name for each map
+  if (!prefabName) {
+    if (mapName === 'grassy') {
+      prefabName = 'floor-final';
+    } else {
+      prefabName = 'floor';
+    }
+  }
 
   
   const tileSize = getTileSize(mapName) * scale;

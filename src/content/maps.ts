@@ -42,9 +42,9 @@ import frozenPrefs from "../../assets/maps/frozen/frozen_prefabs.json";
 const frozenImage  = require("../../assets/maps/frozen/frozen-tileset.png") as number;
 
 // GRASSY
-import grassyGrid  from "../../assets/maps/grassy/grassy-tileset_grid.json";
+import grassyGrid  from "../../assets/maps/grassy/grassy_prefabs_final.json";
 import grassyPrefs from "../../assets/maps/grassy/grassy_prefabs.json";
-const grassyImage  = require("../../assets/maps/grassy/grassy-tileset-extruded.png") as number;
+const grassyImage  = require("../../assets/maps/grassy/grassy_prefabs_final.png") as number;
 
 // ---- Registry ----
 export const MAPS = {
@@ -144,3 +144,134 @@ Object.entries(MAPS).forEach(([mapName, def]) => {
 
   }
 });
+
+// --- Foot Inset System ---
+
+export function prefabHeightPx(map: MapName, prefabName: string, scale = 2) {
+  const tile = getTileSize(map) * scale;
+  const pf = MAPS[map].prefabs.prefabs[prefabName];
+  // Fix: use || instead of ?? to handle empty arrays (length 0)
+  const rows = (pf?.cells?.length || pf?.rects?.length || 1);
+  return rows * tile;
+}
+
+/**
+ * Visual foot inset per prefab (px at scale=1).
+ * Positive values sink the object downward to hide any "air gap"
+ * caused by transparent pixels at the bottom of the art.
+ */
+const PREFAB_FOOT_INSET: Record<string, number> = {
+  // 2.5px @ scale=1 => 5px @ scale=2 (raised by additional 5px)
+  'tree-large-final': 2.5,
+  'tree-medium-final': 2.5,
+  'tree-small-final': 2.5,
+  // Floor and platform prefabs that use the same top block
+  'floor': 2.5,
+  'floor-final': 2.5,
+  'platform-grass-3-final': 2.5,
+  'platform-grass-1-final': 2.5,
+  'platform-wood-3-final': 2.5,
+  'platform-wood-1-final': 2.5,
+  'platform-wood-2-left-final': 2.5,
+  'platform-wood-2-right-final': 2.5,
+  // Mushrooms and grass decorations
+  'mushroom-red-large-final': 2.5,
+  'mushroom-red-medium-final': 2.5,
+  'mushroom-red-small-final': 2.5,
+  'mushroom-green-large-final': 2.5,
+  'mushroom-green-medium-final': 2.5,
+  'mushroom-green-small-final': 2.5,
+  'grass-1-final': 2.5,
+  'grass-2-final': 2.5,
+  'grass-3-final': 2.5,
+  'grass-4-final': 2.5,
+  'grass-5-final': 2.5,
+  'grass-6-final': 2.5,
+  // add others here if you notice a gap: e.g. 'lamp-post': 2
+};
+
+export function prefabFootInsetPx(map: MapName, prefabName: string, scale = 2) {
+  return (PREFAB_FOOT_INSET[prefabName] ?? 0) * scale;
+}
+
+/** Compute a top-left Y that makes a prefab sit flush on a given surfaceTopY. */
+export function alignPrefabYToSurfaceTop(map: MapName, prefabName: string, surfaceTopY: number, scale = 2) {
+  const height = prefabHeightPx(map, prefabName, scale);
+  const footInset = prefabFootInsetPx(map, prefabName, scale);
+  return Math.round(surfaceTopY - height + footInset);
+}
+
+// --- One-Way Platform Collision System ---
+
+// Describe top-surface spans for collision (in pixels, local to the prefab)
+export type TopSegmentPx = { x: number; y: number; w: number; h: number };
+
+// Solid platform rectangles (in local prefab pixels)
+export type SlabPx = { x: number; yTop: number; w: number; h: number };
+
+/**
+ * Returns horizontal segments that form the *walkable top* of a prefab.
+ * We scan the first (top-most) row that has any solid tiles, then compress
+ * contiguous solid columns into segments. Works for `rects` or `cells`.
+ */
+export function prefabTopSolidSegmentsPx(map: MapName, prefabName: string, scale = 2): TopSegmentPx[] {
+  const pf = MAPS[map].prefabs.prefabs[prefabName];
+  if (!pf) return [];
+
+  const rows = (pf.rects?.length ? pf.rects : pf.cells) as Array<Array<any | null>>;
+  if (!rows?.length) return [];
+
+  // Find the first row that contains any solid tile
+  let topRowIdx = 0;
+  while (topRowIdx < rows.length && !rows[topRowIdx]?.some(Boolean)) topRowIdx++;
+
+  const row = rows[topRowIdx] || [];
+  const tile = getTileSize(map) * scale;
+
+  // Compress contiguous non-null columns into segments
+  const segs: TopSegmentPx[] = [];
+  let start: number | null = null;
+  for (let c = 0; c <= row.length; c++) {
+    const solid = c < row.length ? !!row[c] : false; // sentinel false at end
+    if (solid && start === null) start = c;
+    if ((!solid || c === row.length) && start !== null) {
+      const cols = c - start;
+      segs.push({ x: start * tile, y: topRowIdx * tile, w: cols * tile, h: tile });
+      start = null;
+    }
+  }
+  return segs;
+}
+
+/**
+ * Returns solid platform rectangles (slabs) for a prefab.
+ * Only creates collision boxes for actual solid tiles, not empty space.
+ */
+export function prefabPlatformSlabsPx(map: MapName, prefabName: string, scale = 2): SlabPx[] {
+  const pf = getPrefab(map, prefabName);
+  if (!pf) return [];
+  const rows = (pf.rects?.length ? pf.rects : pf.cells) as Array<Array<any | null>>;
+  if (!rows?.length) return [];
+
+  const tile = getTileSize(map) * scale;
+  const slabs: SlabPx[] = [];
+
+  // Create collision boxes only for individual solid tiles
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    
+    for (let c = 0; c < row.length; c++) {
+      if (row[c]) { // If this tile is solid
+        slabs.push({
+          x: c * tile,
+          yTop: r * tile,
+          w: tile,
+          h: tile,
+        });
+      }
+    }
+  }
+  
+  return slabs;
+}

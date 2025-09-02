@@ -1,6 +1,9 @@
 import { Dimensions } from 'react-native';
 import type { MapName } from './maps';
-import { prefabWidthPx, getTileSize, MAPS } from './maps';
+import { prefabWidthPx, getTileSize, MAPS, prefabHeightPx, alignPrefabYToSurfaceTop } from './maps';
+
+// Re-export MapName for use in other files
+export type { MapName };
 import { makeStaticFloor } from './floor';
 
 const { width, height } = Dimensions.get('window');
@@ -9,37 +12,190 @@ export type Platform = { prefab: string; x: number; y: number; scale?: number };
 export type LevelData = {
   mapName: MapName;
   platforms: Platform[];
+  decorations: Platform[];
   characterSpawn: { x: number; y: number };
 };
 
-const prefabHeightPx = (mapName: MapName, prefab: string, scale = 2) => {
-  const tile = getTileSize(mapName);
-  // @ts-ignore runtime lookup
-  const pf = (MAPS as any)[mapName]?.prefabs?.prefabs?.[prefab];
-  const rows = (pf?.cells?.length ?? pf?.rects?.length ?? 1);
-  return rows * tile * scale;
-};
+
 
 function buildLevel(mapName: MapName, w: number, h: number): LevelData {
   const FLOOR_SCALE = 2;
   const staticFloor = makeStaticFloor(mapName, w, h, FLOOR_SCALE);
   const decorations = getMapDecorations(mapName, w, h);
   
-  const platforms = [
-    ...staticFloor,               // Floor pieces
-    ...decorations               // Map decorations
-  ];
-
-
+  // For grassy map, use the special platform generation
+  if (mapName === 'grassy') {
+    const floorTopY = Math.round(h - prefabHeightPx(mapName, 'floor-final', 2));
+    
+    // Generate random platforms
+    const platforms: Platform[] = [];
+    
+    // Generate fewer platforms to reduce memory pressure
+    // Generate 5 platform-grass-1-final (reduced from 10)
+    for (let i = 0; i < 5; i++) {
+      const platform = generateRandomPlatform(mapName, 'platform-grass-1-final', w, h, floorTopY, platforms);
+      if (platform) {
+        platforms.push(platform);
+      }
+    }
+    
+    // Generate 3 platform-grass-3-final (reduced from 5)
+    for (let i = 0; i < 3; i++) {
+      const platform = generateRandomPlatform(mapName, 'platform-grass-3-final', w, h, floorTopY, platforms);
+      if (platform) {
+        platforms.push(platform);
+      }
+    }
+    
+    // Add the tree decoration (separate from platforms)
+    const treeDecoration: Platform = {
+      prefab: 'tree-large-final',
+      x: w - 100,
+      y: alignPrefabYToSurfaceTop(mapName, 'tree-large-final', floorTopY, 2) - 4, // Move up by 2px (4px at scale=2)
+      scale: 2
+    };
+    
+    // Add mushrooms on the left side of the screen
+    const leftMushroom: Platform = {
+      prefab: 'mushroom-red-large-final',
+      x: 20, // Closer to left side of screen
+      y: alignPrefabYToSurfaceTop(mapName, 'mushroom-red-large-final', floorTopY, 2) - 4, // Same alignment as tree
+      scale: 2
+    };
+    
+    const rightMushroom: Platform = {
+      prefab: 'mushroom-red-small-final',
+      x: 35, // 15px to the right of the large mushroom
+      y: alignPrefabYToSurfaceTop(mapName, 'mushroom-red-small-final', floorTopY, 2) - 4, // Same alignment as tree
+      scale: 2
+    };
+    
+    // Add grass prefabs randomly on the floor
+    const grassPrefabs: Platform[] = [
+      { prefab: 'grass-1-final', x: 50, y: alignPrefabYToSurfaceTop(mapName, 'grass-1-final', floorTopY, 2) - 4, scale: 2 },
+      { prefab: 'grass-2-final', x: 150, y: alignPrefabYToSurfaceTop(mapName, 'grass-2-final', floorTopY, 2) - 4, scale: 2 },
+      { prefab: 'grass-3-final', x: 250, y: alignPrefabYToSurfaceTop(mapName, 'grass-3-final', floorTopY, 2) - 4, scale: 2 },
+      { prefab: 'grass-4-final', x: 350, y: alignPrefabYToSurfaceTop(mapName, 'grass-4-final', floorTopY, 2) - 4, scale: 2 },
+      { prefab: 'grass-5-final', x: 450, y: alignPrefabYToSurfaceTop(mapName, 'grass-5-final', floorTopY, 2) - 4, scale: 2 },
+      { prefab: 'grass-6-final', x: 550, y: alignPrefabYToSurfaceTop(mapName, 'grass-6-final', floorTopY, 2) - 4, scale: 2 }
+    ];
+    
+    return {
+      mapName,
+      platforms: [
+        ...staticFloor,               // Floor pieces
+        ...platforms                  // Generated platforms
+      ],
+      decorations: [
+        ...decorations,               // Map decorations
+        treeDecoration,               // Tree decoration
+        leftMushroom,                 // Left mushroom
+        rightMushroom,                // Right mushroom
+        ...grassPrefabs               // Grass prefabs
+      ],
+      characterSpawn: { x: w * 0.5, y: h - 100 },
+    };
+  }
 
   return {
     mapName,
-    platforms,
+    platforms: [
+      ...staticFloor,               // Floor pieces
+      ...decorations               // Map decorations
+    ],
+    decorations: [],
     characterSpawn: { x: w * 0.5, y: h - 100 },
   };
 }
 
 // Map-specific decorations
+function generateRandomPlatform(
+  mapName: MapName,
+  prefabName: string,
+  width: number,
+  height: number,
+  floorTopY: number,
+  existingPlatforms: Platform[],
+  maxAttempts: number = 100
+): Platform | null {
+  const scale = 2;
+  const prefabWidth = prefabWidthPx(mapName, prefabName, scale);
+  const prefabHeight = prefabHeightPx(mapName, prefabName, scale);
+  
+  // Define safe zones - reduced margins for better distribution
+  const margin = 40; // Reduced margin to use more of the screen
+  const minX = margin;
+  const maxX = width - margin - prefabWidth;
+  
+  // Different height ranges for different platform types
+  let minY, maxY;
+  if (prefabName === 'platform-grass-1-final') {
+    // Single blocks: some low (jumpable), some high
+    const isLowPlatform = Math.random() < 0.6; // 60% chance for low platform
+    if (isLowPlatform) {
+      minY = floorTopY - 200; // Low platforms (jumpable from ground)
+      maxY = floorTopY - 100;
+    } else {
+      minY = 150; // High platforms
+      maxY = floorTopY - 200;
+    }
+  } else {
+    // Multi-block platforms: mostly in middle range
+    minY = 200;
+    maxY = floorTopY - 150;
+  }
+  
+  // Minimum distance between platforms for better spacing
+  const minDistance = 100; // Increased for better spacing
+  
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const x = Math.random() * (maxX - minX) + minX;
+    const y = Math.random() * (maxY - minY) + minY;
+    
+    // Check for overlaps and minimum distance with existing platforms
+    let hasOverlap = false;
+    for (const existing of existingPlatforms) {
+      const existingWidth = prefabWidthPx(mapName, existing.prefab, existing.scale ?? scale);
+      const existingHeight = prefabHeightPx(mapName, existing.prefab, existing.scale ?? scale);
+      
+      // Calculate center points for distance check
+      const newCenterX = x + prefabWidth / 2;
+      const newCenterY = y + prefabHeight / 2;
+      const existingCenterX = existing.x + existingWidth / 2;
+      const existingCenterY = existing.y + existingHeight / 2;
+      
+      // Check distance between centers
+      const distance = Math.sqrt(
+        Math.pow(newCenterX - existingCenterX, 2) + 
+        Math.pow(newCenterY - existingCenterY, 2)
+      );
+      
+      // Also check for direct rectangle overlap as backup
+      const directOverlap = x < existing.x + existingWidth &&
+                           x + prefabWidth > existing.x &&
+                           y < existing.y + existingHeight &&
+                           y + prefabHeight > existing.y;
+      
+      if (distance < minDistance || directOverlap) {
+        hasOverlap = true;
+        break;
+      }
+    }
+    
+    if (!hasOverlap) {
+      return {
+        prefab: prefabName,
+        x: Math.round(x),
+        y: Math.round(y),
+        scale
+      };
+    }
+  }
+  
+  // If we couldn't find a non-overlapping position after maxAttempts, return null
+  return null;
+}
+
 function getMapDecorations(mapName: MapName, width: number, height: number): Platform[] {
   switch (mapName) {
     case 'dark':
@@ -63,12 +219,7 @@ function getMapDecorations(mapName: MapName, width: number, height: number): Pla
         { prefab: 'vase-tall', x: 300, y: height - 100, scale: 2 },
       ];
     case 'grassy':
-      return [
-        // Floor decorations - sit on top of the top floor tile (no collision)
-        { prefab: 'tree-large', x: width - 100, y: (height - prefabHeightPx(mapName, 'floor', 2)) - prefabHeightPx(mapName, 'tree-large', 2) + 1, scale: 2 },
-        // Platform above the tree
-        { prefab: 'platform-basic', x: width - 100, y: (height - prefabHeightPx(mapName, 'floor', 2)) - prefabHeightPx(mapName, 'tree-large', 2) - 50, scale: 2 }
-      ];
+      return []; // Tree is handled in buildLevel
     default:
       return [];
   }
