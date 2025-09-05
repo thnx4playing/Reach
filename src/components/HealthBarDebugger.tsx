@@ -130,9 +130,14 @@ export const HealthBarDebugger: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 400, // Fixed height so it doesn't cover game controls
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Semi-transparent white
+    zIndex: 10000, // Ensure it's above everything
   },
   title: {
     fontSize: 18,

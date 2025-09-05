@@ -17,14 +17,13 @@ export const HealthBar: React.FC<HealthBarProps> = ({
   y = 0 
 }) => {
   // Map health percentage to the correct image file
-  // Health system uses 5 hits, so we have 6 levels: 5,4,3,2,1,0 bars remaining
   const getHealthImagePath = (healthPercent: number): any => {
-    if (healthPercent >= 100) return require('../../assets/ui/health_100.png'); // 5 bars (0 hits)
-    if (healthPercent >= 80) return require('../../assets/ui/health_80.png');   // 4 bars (1 hit)
-    if (healthPercent >= 60) return require('../../assets/ui/health_60.png');   // 3 bars (2 hits)
-    if (healthPercent >= 40) return require('../../assets/ui/health_40.png');   // 2 bars (3 hits)
-    if (healthPercent >= 20) return require('../../assets/ui/health_20.png');   // 1 bar (4 hits)
-    return require('../../assets/ui/health_0.png'); // 0 bars (5 hits - dead)
+    if (healthPercent >= 100) return require('../../assets/ui/health_100.png'); // 6 hearts
+    if (healthPercent >= 83) return require('../../assets/ui/health_80.png');   // 5 hearts
+    if (healthPercent >= 67) return require('../../assets/ui/health_60.png');   // 4 hearts
+    if (healthPercent >= 50) return require('../../assets/ui/health_40.png');   // 3 hearts
+    if (healthPercent >= 33) return require('../../assets/ui/health_20.png');   // 2 hearts
+    return require('../../assets/ui/health_0.png'); // 1 heart or empty
   };
 
   const healthImage = useImage(getHealthImagePath(health));
@@ -34,21 +33,11 @@ export const HealthBar: React.FC<HealthBarProps> = ({
   }
 
   return (
-    <Canvas
-      style={{
-        position: 'absolute',
-        top: y,
-        left: x,
-        width: width,
-        height: height,
-        zIndex: 9999,
-        pointerEvents: 'none'
-      }}
-    >
+    <Canvas style={{ width: width + x, height: height + y }}>
       <Image
         image={healthImage}
-        x={0}
-        y={0}
+        x={x}
+        y={y}
         width={width}
         height={height}
         fit="contain" // Maintains aspect ratio and fits within bounds
@@ -74,14 +63,13 @@ export const HealthBarPreloaded: React.FC<HealthBarProps> = ({
   const health0 = useImage(require('../../assets/ui/health_0.png'));
 
   // Select the current health image
-  // Health system uses 5 hits, so we have 6 levels: 5,4,3,2,1,0 bars remaining
   const getCurrentHealthImage = (healthPercent: number) => {
-    if (healthPercent >= 100) return health100; // 5 bars (0 hits)
-    if (healthPercent >= 80) return health80;   // 4 bars (1 hit)
-    if (healthPercent >= 60) return health60;   // 3 bars (2 hits)
-    if (healthPercent >= 40) return health40;   // 2 bars (3 hits)
-    if (healthPercent >= 20) return health20;   // 1 bar (4 hits)
-    return health0; // 0 bars (5 hits - dead)
+    if (healthPercent >= 100) return health100;
+    if (healthPercent >= 83) return health80;
+    if (healthPercent >= 67) return health60;
+    if (healthPercent >= 50) return health40;
+    if (healthPercent >= 33) return health20;
+    return health0;
   };
 
   const currentImage = getCurrentHealthImage(health);
@@ -91,21 +79,11 @@ export const HealthBarPreloaded: React.FC<HealthBarProps> = ({
   }
 
   return (
-    <Canvas
-      style={{
-        position: 'absolute',
-        top: y,
-        left: x,
-        width: width,
-        height: height,
-        zIndex: 9999,
-        pointerEvents: 'none'
-      }}
-    >
+    <Canvas style={{ width: width + x, height: height + y }}>
       <Image
         image={currentImage}
-        x={0}
-        y={0}
+        x={x}
+        y={y}
         width={width}
         height={height}
         fit="contain"
@@ -114,7 +92,7 @@ export const HealthBarPreloaded: React.FC<HealthBarProps> = ({
   );
 };
 
-// Usage example component
+// Simple usage component
 export const GameHealthBar: React.FC<{ playerHealth: number }> = ({ playerHealth }) => {
   return (
     <HealthBar

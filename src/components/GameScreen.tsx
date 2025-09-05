@@ -929,8 +929,14 @@ const floorTopY = useMemo(() => {
         </Canvas>
       </MapImageProvider>
       
-      {/* Health Bar Debugger - temporarily replacing HealthBar */}
-      <HealthBarDebugger />
+      {/* Health Bar - rendered outside Canvas as Skia component */}
+      <HealthBar 
+        health={((maxHits - hits) / maxHits) * 100} 
+        width={120} 
+        height={20} 
+        x={20} 
+        y={20} 
+      />
       
       {/* Death modal */}
       <DeathModal 
