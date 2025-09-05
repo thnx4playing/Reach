@@ -46,18 +46,41 @@ const HealthBar: React.FC<HealthBarProps> = ({
   const sourceY = Math.floor(segment * segmentHeight);
   const sourceHeight = Math.floor(segmentHeight);
 
+  // Debug log to verify rendering
+  if (__DEV__) {
+    console.log("[HealthBar] Rendering:", {
+      health,
+      segment,
+      sourceY,
+      imageWidth,
+      imageHeight,
+      segmentHeight,
+      position: { x, y, width, height }
+    });
+  }
+
   return (
-    <Canvas style={{ width: width + x, height: height + y }}>
+    <Canvas 
+      style={{ 
+        position: 'absolute',
+        top: y,
+        left: x,
+        width: width,
+        height: height,
+        zIndex: 9999,
+        pointerEvents: 'none'
+      }}
+    >
       {/* Use Group with clip to ensure no bleeding */}
       <Group
         clip={
-          <Rect x={x} y={y} width={width} height={height} />
+          <Rect x={0} y={0} width={width} height={height} />
         }
       >
         <Image
           image={healthBarImage}
-          x={x}
-          y={y - sourceY}
+          x={0}
+          y={-sourceY}
           width={width}
           height={height}
           fit="fill"
@@ -99,16 +122,26 @@ const HealthBarSafe: React.FC<HealthBarProps> = ({
   const sourceHeight = Math.round(segmentHeight);
 
   return (
-    <Canvas style={{ width: width + x, height: height + y }}>
+    <Canvas 
+      style={{ 
+        position: 'absolute',
+        top: y,
+        left: x,
+        width: width,
+        height: height,
+        zIndex: 9999,
+        pointerEvents: 'none'
+      }}
+    >
       <Group
         clip={
-          <Rect x={x} y={y} width={width} height={height} />
+          <Rect x={0} y={0} width={width} height={height} />
         }
       >
         <Image
           image={healthBarImage}
-          x={x}
-          y={y - sourceY}
+          x={0}
+          y={-sourceY}
           width={width}
           height={height}
           fit="contain" // Use contain instead of fill to maintain aspect ratio
