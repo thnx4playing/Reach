@@ -72,13 +72,7 @@ export default function HPBar() {
     h: logical.h * assetScaleY,
   }), [logical, assetScaleX, assetScaleY]);
 
-  // Debug: verify we're using actual image pixels
-  if (__DEV__ && img) {
-    console.log("[HPBar shader verify]", {
-      imgW: img?.width?.(), imgH: img?.height?.(),
-      framePx, scale: SCALE
-    });
-  }
+  // Debug logging removed to reduce console spam
 
   const width  = logical.w * SCALE; // HUD display size uses logical (keeps UI consistent)
   const height = logical.h * SCALE;

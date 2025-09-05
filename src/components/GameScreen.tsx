@@ -19,7 +19,7 @@ import { dbg } from '../utils/dbg';
 
 // Health system imports
 import { useHealth } from '../systems/health/HealthContext';
-import HPBar from '../ui/HPBar';
+import HealthBar from './HealthBar';
 import { DeathModal } from '../ui/DeathModal';
 import { useDamageAnimations } from '../systems/health/useDamageAnimations';
 
@@ -928,8 +928,14 @@ const floorTopY = useMemo(() => {
         </Canvas>
       </MapImageProvider>
       
-      {/* HP Bar - rendered outside Canvas as Skia component */}
-      <HPBar />
+      {/* Health Bar - rendered outside Canvas as Skia component */}
+      <HealthBar 
+        health={((maxHits - hits) / maxHits) * 100} 
+        width={120} 
+        height={24} 
+        x={20} 
+        y={20} 
+      />
       
       {/* Death modal */}
       <DeathModal 

@@ -42,19 +42,7 @@ export function SubImageShader({
     { translateY: frame.y },
   ];
 
-  // Optional: sanity log to prove corners map correctly
-  if (__DEV__) {
-    const mapX0 = frame.x + (0 - 0) * (1 / scale);
-    const mapX1 = frame.x + (dw - 0) * (1 / scale);
-    const mapY0 = frame.y + (0 - 0) * (1 / scale);
-    const mapY1 = frame.y + (dh - 0) * (1 / scale);
-    console.log("[HPBar shader map]", {
-      dx, dy, dw, dh,
-      expectX0: frame.x, expectX1: frame.x + frame.w,
-      expectY0: frame.y, expectY1: frame.y + frame.h,
-      calcX0: mapX0, calcX1: mapX1, calcY0: mapY0, calcY1: mapY1,
-    });
-  }
+  // Debug logging removed to reduce console spam
 
   return (
     <Rect x={dx} y={dy} width={dw} height={dh} antiAlias={false}>
