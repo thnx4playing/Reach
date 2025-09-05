@@ -115,9 +115,6 @@ export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 
   const [prevState, setPrevState] = useState<AnimationState>('idle');
   const state = pickState(input, prevState, isHurt, isDead);
   
-  if (__DEV__) {
-    console.log(`DASH CHARACTER DEBUG: state=${state}, isHurt=${isHurt}, isDead=${isDead}, prevState=${prevState}`);
-  }
   
   // Update previous state when current state changes
   useEffect(() => {

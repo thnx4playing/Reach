@@ -69,7 +69,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // Handlers for death modal
   const handleRestart = useCallback(() => {
     // Reset health and restart level
-    console.log('Restart requested');
     // TODO: Implement level restart logic
   }, []);
 
@@ -123,25 +122,11 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const maxHits = sys.state.maxHits;
   const { isHurt } = useDamageAnimations();
   
-  // Debug: Log health system state
-  console.log('[GAMESCREEN DEBUG] Health system state:', {
-    isDead,
-    bars,
-    hits,
-    maxHits,
-    isHurt,
-    sysState: sys.state,
-    instanceId: sys.instanceId
-  });
   
   // Update feetY ref with current player position
   const feetY = currentPlayerBox?.feetY ?? (levelData?.floorTopY ?? 0);
   feetYRef.current = feetY;
   
-  // Debug initial state
-  if (__DEV__ && Math.random() < 0.001) {
-    console.log('[INITIAL STATE DEBUG] feetY:', feetY, 'floorTopY:', levelData?.floorTopY, 'vzRef:', vzRef.current, 'onGroundRef:', onGroundRef.current, 'zRef:', zRef.current);
-  }
 
   // Optional: disable input when dead
   const inputEnabled = !isDead;
@@ -165,10 +150,6 @@ const floorTopY = useMemo(() => {
   const floorHeight = rows * tile * SCALE; // rows * tile * SCALE
   const result = Math.round(SCREEN_H - floorHeight);
   
-  // Optional debug log
-  if (__DEV__) {
-    console.log('floor rows:', rows, 'tile:', tile, 'SCALE:', SCALE, 'floorTopY:', result);
-  }
   
   return result;
 }, [levelData.mapName]);
@@ -202,7 +183,6 @@ const floorTopY = useMemo(() => {
 
   // Pad callback (from CirclePad): update refs + state mirror
   const onPad = (o: { dirX: -1|0|1; magX: number }) => {
-    if (__DEV__) console.log('PAD:', { dirX: o.dirX, magX: +o.magX.toFixed(2) });
     setDirX(o.dirX);
     dirXRef.current = o.dirX;
 
@@ -215,20 +195,13 @@ const floorTopY = useMemo(() => {
   // Jump buffering - call this from the button
   const requestJump = () => { 
     try {
-      if (__DEV__) console.log('[JUMP REQUEST] requestJump() fired');
-      
       // Safety check for jumpStateRef
       if (!jumpStateRef.current) {
-        console.error('CRASH PREVENTION: jumpStateRef is null, reinitializing');
         jumpStateRef.current = initJumpState();
       }
       
       noteJumpPressed(jumpStateRef.current);
-      if (__DEV__) {
-        dbg('Jump requested - buffered for:', jumpStateRef.current.bufferMsLeft, 'ms');
-      }
     } catch (error) {
-      console.error('CRASH PREVENTION: Error in requestJump:', error);
       // Reinitialize jump state if there's an error
       jumpStateRef.current = initJumpState();
     }
@@ -261,17 +234,6 @@ const floorTopY = useMemo(() => {
       }
     }
     
-    // Debug: Show individual tile colliders
-    if (__DEV__) {
-      dbg(`Created ${out.length} individual tile colliders`);
-      for (let i = 0; i < Math.min(10, out.length); i++) {
-        const s = out[i];
-        dbg(`Tile ${i}:`, {
-          bounds: `x: ${Math.round(s.left)}-${Math.round(s.right)}, y: ${Math.round(s.yTop)}-${Math.round(s.yBottom)}`,
-          size: `${Math.round(s.right - s.left)}x${Math.round(s.yBottom - s.yTop)}`,
-        });
-      }
-    }
     
     return out;
   }, [levelData.mapName, levelData.platforms, SCALE]);
@@ -280,12 +242,6 @@ const floorTopY = useMemo(() => {
   const platformSlabsRef = useRef<any[]>([]);
   useEffect(() => {
     platformSlabsRef.current = platformSlabs;
-    if (__DEV__ && platformSlabs.length > 50) {
-      console.warn('LARGE PLATFORM ARRAY:', {
-        count: platformSlabs.length,
-        frameCount
-      });
-    }
   }, [platformSlabs, frameCount]);
 
   // DISABLED: App state monitoring - was potentially causing crashes
@@ -465,15 +421,6 @@ const floorTopY = useMemo(() => {
       // Horizontal movement with momentum preservation
       const target = speedRef.current === 'idle' ? 0 : RUN_SPEED;
       
-      if (__DEV__ && Math.random() < 0.1) { // 10% chance to log
-        console.log('MOVEMENT DEBUG:', {
-          dirX: dirXRef.current,
-          speedLevel: speedRef.current,
-          target,
-          vx: Math.round(vxRef.current),
-          onGround: onGroundRef.current
-        });
-      }
 
       // Apply friction only on ground
       if (onGroundRef.current) {
@@ -566,28 +513,20 @@ const floorTopY = useMemo(() => {
       let vzWas = vzRef.current;
 
       // ==== LANDING (falling only) ====
-      if (__DEV__ && Math.random() < 0.01) {
-        console.log('[PHYSICS DEBUG] vzRef.current:', vzRef.current, 'onGroundRef.current:', onGroundRef.current);
-      }
       
       // Reset fall session when not falling
       if (vzRef.current >= 0 && fallingRef.current) {
         fallingRef.current = false;
         peakZRef.current = 0;
-        if (__DEV__) console.log('[Z-FALL] RESET: Not falling anymore');
       }
       
       if (vzRef.current < 0) { // Only when actually falling (not stationary or rising)
-        if (__DEV__) {
-          console.log('[LANDING DEBUG] Falling detected, vzRef.current:', vzRef.current);
-        }
         
         // --- FALL SESSION (z-based) ---
         // Start fall session when character starts falling, regardless of ground state
         if (!fallingRef.current) {
           fallingRef.current = true;
           peakZRef.current = Math.max(0, zRef.current); // start from current height above floor, but never negative
-          if (__DEV__) console.log('[Z-FALL] START: z=', peakZRef.current.toFixed(1));
         } else {
           // Track highest height reached during this airtime
           peakZRef.current = Math.max(peakZRef.current, Math.max(0, zRef.current));
@@ -608,9 +547,6 @@ const floorTopY = useMemo(() => {
             if (box.right <= s.left || box.left >= s.right) continue;
             // swept cross: feet moved from above to below the slab top
             if (prevFeetY <= s.yTop + 1e-4 && currFeetY >= s.yTop - CROSS_PAD) {
-              if (__DEV__ && Math.random() < 0.01) {
-                console.log('[PLATFORM COLLISION] Hit platform! s.yTop:', s.yTop, 'prevFeetY:', prevFeetY, 'currFeetY:', currFeetY);
-              }
               if (bestTop === null || s.yTop < bestTop) bestTop = s.yTop;
             }
           }
@@ -618,9 +554,6 @@ const floorTopY = useMemo(() => {
           console.error('CRASH in landing collision:', error);
         }
         if (bestTop !== null) {
-          if (__DEV__) {
-            console.log('[LANDING SUCCESS] Character landed! bestTop:', bestTop, 'prevFeetY:', prevFeetY, 'currFeetY:', currFeetY);
-          }
           zRef.current  = Math.max(0, floorTopY - bestTop);
           vzRef.current = 0;
           onGroundRef.current = true;
@@ -630,10 +563,8 @@ const floorTopY = useMemo(() => {
           if (fallingRef.current) {
             const dropPx = Math.max(0, peakZRef.current - zRef.current); // zAtLand is ~0
             const threshold = Dimensions.get('window').height / 5; // tune: /5 to test, /3 later
-            if (__DEV__) console.log('[Z-FALL] LAND(top): drop=', dropPx.toFixed(1), 'thr=', threshold.toFixed(1), 'peakZ=', peakZRef.current.toFixed(1));
             if (dropPx >= threshold) {
-              const ok = takeDamage(1);
-              if (__DEV__) console.log(ok ? '[Z-FALL] DAMAGE applied' : '[Z-FALL] damage skipped (iframes/dead)');
+              takeDamage(1);
             }
             fallingRef.current = false;
             peakZRef.current = 0;
@@ -646,9 +577,6 @@ const floorTopY = useMemo(() => {
 
       // ==== CEILING (rising only) ====
       if (vzRef.current > 0 && !lastVzReason.current) {
-        if (__DEV__ && Math.random() < 0.01) {
-          console.log('[JUMP DEBUG] Rising detected, vzRef.current:', vzRef.current);
-        }
         const ignoreCeilNow = jumpStateRef.current.ignoreCeilFrames > 0;
         if (!ignoreCeilNow) {
           let bestBottom: number | null = null;
@@ -714,10 +642,8 @@ const floorTopY = useMemo(() => {
           if (fallingRef.current) {
             const dropPx = Math.max(0, peakZRef.current - zRef.current); // zAtLand ~ 0
             const threshold = Dimensions.get('window').height / 5;
-            if (__DEV__) console.log('[Z-FALL] LAND(clamp): drop=', dropPx.toFixed(1), 'thr=', threshold.toFixed(1), 'peakZ=', peakZRef.current.toFixed(1));
             if (dropPx >= threshold) {
-              const ok = takeDamage(1);
-              if (__DEV__) console.log(ok ? '[Z-FALL] DAMAGE applied' : '[Z-FALL] damage skipped (iframes/dead)');
+              takeDamage(1);
             }
             fallingRef.current = false;
             peakZRef.current = 0;
@@ -726,16 +652,6 @@ const floorTopY = useMemo(() => {
         lastVzReason.current = 'floor-clamp';
       }
 
-      // (optional dev print to catch phantom zeroing)
-      if (__DEV__) {
-        if (vzWasRef.current > 0 && vzRef.current === 0 && lastVzReason.current === '') {
-          console.warn('PHANTOM ZERO-UP', {
-            vzWas: Math.round(vzWasRef.current),
-            z: Math.round(zRef.current),
-            onGround: onGroundRef.current,
-          });
-        }
-      }
 
       // 3) Horizontal blocking (only when vertically overlapping)
       // after xRef update
@@ -781,26 +697,12 @@ const floorTopY = useMemo(() => {
           
           // moving right, hit left side
           if (vxRef.current > 0 && boxNow.right > s.left && boxNow.left < s.left) {
-            if (__DEV__ && Math.random() < 0.1) {
-              dbg('Blocked right movement by tile:', {
-                tile: `x: ${Math.round(s.left)}-${Math.round(s.right)}, y: ${Math.round(s.yTop)}-${Math.round(s.yBottom)}`,
-                box: `x: ${Math.round(boxNow.left)}-${Math.round(boxNow.right)}, y: ${Math.round(boxNow.top)}-${Math.round(boxNow.bottom)}`,
-                push: SIDE_PUSH
-              });
-            }
             xRef.current -= SIDE_PUSH; // Small fixed push
             vxRef.current = 0;
             break;
           }
           // moving left, hit right side
           if (vxRef.current < 0 && boxNow.left < s.right && boxNow.right > s.right) {
-            if (__DEV__ && Math.random() < 0.1) {
-              dbg('Blocked left movement by tile:', {
-                tile: `x: ${Math.round(s.left)}-${Math.round(s.right)}, y: ${Math.round(s.yTop)}-${Math.round(s.yBottom)}`,
-                box: `x: ${Math.round(boxNow.left)}-${Math.round(boxNow.right)}, y: ${Math.round(boxNow.top)}-${Math.round(boxNow.bottom)}`,
-                push: SIDE_PUSH
-              });
-            }
             xRef.current += SIDE_PUSH; // Small fixed push
             vxRef.current = 0;
             break;
@@ -811,18 +713,6 @@ const floorTopY = useMemo(() => {
       }
         } // Close the didWrapRef guard
 
-      // Debug: Log character position and collision state
-      if (__DEV__ && Math.random() < 0.01) { // 1% chance to log
-        dbg('Character collision debug:', {
-          pos: `(${Math.round(xRef.current)}, ${Math.round(zRef.current)})`,
-          vel: `(${Math.round(vxRef.current)}, ${Math.round(vzRef.current)})`,
-          onGround: onGroundRef.current,
-          box: `x: ${Math.round(box.left)}-${Math.round(box.right)}, y: ${Math.round(box.top)}-${Math.round(box.bottom)}`,
-          cx: Math.round(box.cx),
-          feetY: Math.round(box.feetY),
-          platformCount: platformSlabs.length
-        });
-      }
 
       // Update onGround based on vertical velocity (only when falling or landed)
       if (vzRef.current <= 0) {
@@ -847,28 +737,6 @@ const floorTopY = useMemo(() => {
           vzRef.current = JUMP_VELOCITY;        // e.g., 632
           onGroundRef.current = false;
           consumeJump(jumpStateRef.current);
-          
-          if (__DEV__) {
-            console.log('[JUMP EXECUTION] Jump executed! vzRef:', prevVz, '->', vzRef.current, 'onGroundRef:', onGroundRef.current);
-          }
-          
-          if (__DEV__) {
-            // Quick sanity log (do once when you press jump)
-            console.log('JUMP start', {
-              cx: Math.round(box.cx), 
-              feetY: Math.round(box.feetY),
-              top: Math.round(box.top), 
-              bottom: Math.round(box.bottom),
-              prevVz: Math.round(prevVz),
-              newVz: Math.round(vzRef.current),
-            });
-            
-            dbg('Jump executed!', {
-              cx: Math.round(box.cx),
-              feetY: Math.round(box.feetY),
-              coyote: true
-            });
-          }
         }
       } catch (error) {
         console.error('CRASH in jump system:', error);
@@ -917,7 +785,6 @@ const floorTopY = useMemo(() => {
 
     raf = requestAnimationFrame(loop);
     return () => {
-      console.log('GAME LOOP STOPPED - Last known state:', lastKnownState.current);
       cancelAnimationFrame(raf);
     };
   }, [CHAR_W]); // only depends on sprite width
@@ -1062,8 +929,7 @@ const floorTopY = useMemo(() => {
       </MapImageProvider>
       
       {/* HP Bar - rendered outside Canvas as Skia component */}
-      {console.log("[GAMESCREEN HPBAR] About to render HPBar with hits=", hits, "maxHits=", maxHits)}
-      <HPBar hits={hits} maxHits={maxHits} />
+      <HPBar />
       
       {/* Death modal */}
       <DeathModal 

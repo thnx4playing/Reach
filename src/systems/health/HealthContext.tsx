@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useRef, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from "react";
 import { HealthSystem } from "./HealthSystem";
 
 // Guard against duplicate module loading
@@ -26,35 +26,22 @@ export const HealthProvider: React.FC<{ children: React.ReactNode; }> = ({ child
 
   // Debug: Log provider mount
   useEffect(() => {
-    console.log('[HEALTH CONTEXT DEBUG] HealthProvider mounted');
     return () => {
-      console.log('[HEALTH CONTEXT DEBUG] HealthProvider unmounted');
+      // Cleanup on unmount
     };
   }, []);
 
   // Initialize the health system
   if (!sysRef.current) {
-    console.log('[HEALTH CONTEXT DEBUG] Initializing new HealthSystem with 5 hearts');
     sysRef.current = new HealthSystem(5); // 5 hearts total
-  } else {
-    console.log('[HEALTH CONTEXT DEBUG] Using existing HealthSystem:', sysRef.current.instanceId);
   }
 
   const triggerUpdate = useCallback(() => {
-    if (__DEV__) {
-      console.log('HEALTH CONTEXT DEBUG: triggerUpdate() called, forcing re-render');
-    }
     forceUpdate(prev => prev + 1);
   }, []);
 
   const takeDamage = useCallback((n?: number) => {
-    if (__DEV__) {
-      console.log(`HEALTH CONTEXT DEBUG: takeDamage(${n}) called`);
-    }
     const result = sysRef.current!.takeDamage(n);
-    if (__DEV__) {
-      console.log(`HEALTH CONTEXT DEBUG: takeDamage result=${result}, will triggerUpdate=${result}`);
-    }
     if (result) triggerUpdate();
     return result;
   }, [triggerUpdate]);
@@ -71,9 +58,6 @@ export const HealthProvider: React.FC<{ children: React.ReactNode; }> = ({ child
 
           // Compute value directly to ensure it's always current
         const sys = sysRef.current!;
-        if (__DEV__) {
-          console.log('[HEALTH CONTEXT] Computing value: sys=', sys, 'hits=', sys.state.hits, 'bars=', sys.bars);
-        }
         const value: Ctx = {
           sys,
           hits: sys.state.hits,
@@ -85,26 +69,14 @@ export const HealthProvider: React.FC<{ children: React.ReactNode; }> = ({ child
           reset
         };
 
-        useEffect(() => {
-          if (__DEV__) console.log('[HEALTH_CTX] mounted instanceId=', sysRef.current!.instanceId);
-        }, []);
 
   return <C.Provider value={value}>{children}</C.Provider>;
 };
 
 export function useHealth() { 
   const v = useContext(C); 
-  console.log('[HEALTH CONTEXT DEBUG] useHealth called, context value:', v);
   if (!v) {
-    console.error('[HEALTH CONTEXT DEBUG] useHealth outside provider - context is null');
     throw new Error("useHealth outside provider"); 
   }
-  console.log('[HEALTH CONTEXT DEBUG] useHealth returning:', {
-    hits: v.hits,
-    isDead: v.isDead,
-    bars: v.bars,
-    instanceId: v.instanceId,
-    sysState: v.sys.state
-  });
   return v; 
 }

@@ -1,83 +1,103 @@
-import React, { useMemo } from "react";
-import { Dimensions, Image as RNImage } from "react-native";
-import { Canvas, Rect } from "@shopify/react-native-skia";
+import React, { useMemo, useRef, useEffect } from "react";
+import { Dimensions } from "react-native";
+import { Canvas } from "@shopify/react-native-skia";
 import { useImage } from "@shopify/react-native-skia";
-import { SubImage } from "./SubImage";
+import { SubImageShader } from "./SubImageShader";
+import hpAtlas from "../../assets/ui/hp_bar.json";
 
-// Each frame is 116x23, stacked vertically with 1px gaps -> pitch=24
+// Global module state
+const __hpbarGlobal = (global as any);
+__hpbarGlobal.__hpbarMounts ??= 0;
+__hpbarGlobal.__hpbarSingleton ??= null; // will hold the id of the active instance
+
 const HP_SPRITE = require("../../assets/ui/hp_bar.png");
-const HP_URI = RNImage.resolveAssetSource(HP_SPRITE)?.uri ?? "";
-const FRAME_W = 116;
-const FRAME_H = 23;
-const PITCH = 24; // 23px frame + 1px spacer row
-const SCALE = 2;  // HUD scale on screen
 
-function frameFromHits(hits: number, maxHits: number) {
-  // Rows top→bottom are FULL→EMPTY:
-  // row = hits (0..maxHits). For maxHits=5:
-  // 0 => 5/5 (y = 0)
-  // 1 => 4/5 (y = 24)
-  // ...
-  // 5 => 0/5 (y = 120)
-  const row = Math.max(0, Math.min(maxHits, hits));
-  return { x: 0, y: row * PITCH, w: FRAME_W, h: FRAME_H };
+type Frame = { x: number; y: number; w: number; h: number };
+type Atlas = { frames: Record<string, Frame> };
+const FRAMES = (hpAtlas as unknown as Atlas).frames;
+
+// "Design" size of the atlas JSON (what the JSON was authored for)
+const DESIGN_W = 116;
+const DESIGN_H = 141;
+
+const SCALE = 2;
+const MAX_BARS = 5;
+
+function clamp(n: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, n));
 }
 
-export default function HPBar({ hits, maxHits }: { hits: number; maxHits: number }) {
-  const img = useImage(HP_URI);
-  const frame = useMemo(() => frameFromHits(hits, maxHits), [hits, maxHits]);
+export default function HPBar() {
+  const idRef = useRef(Math.random().toString(36).slice(2));
 
-  const dw = Math.round(frame.w * SCALE);
-  const dh = Math.round(frame.h * SCALE);
-
-  const { width: screenW } = Dimensions.get("window");
-  const padding = 12;
-  const x = Math.round(screenW - padding - dw);
-  const y = padding;
-
-  console.log(`[HPBar] hits=${hits} maxHits=${maxHits} row=${Math.max(0, Math.min(maxHits, hits))} frame=`, frame);
-  console.log(`[HPBar] HP_URI=`, HP_URI, "img=", img ? `loaded ${img.width}x${img.height}` : "loading...");
-
-  // If the image isn't ready yet, draw a faint placeholder so your slot is visible.
-  if (!img) {
-    return (
-      <Canvas
-        style={{
-          position: "absolute",
-          left: x,
-          top: y,
-          width: dw,
-          height: dh,
-          pointerEvents: "none",
-          zIndex: 9999,
-        }}
-      >
-        <Rect x={0} y={0} width={dw} height={dh} color="rgba(255,255,255,0.07)" />
-      </Canvas>
-    );
+  // Dev-only singleton guard
+  if (__DEV__ && __hpbarGlobal.__hpbarSingleton && __hpbarGlobal.__hpbarSingleton !== idRef.current) {
+    // Another instance is already active – render nothing
+    return null;
   }
+
+  // On mount, claim singleton; on unmount, release it
+  useEffect(() => {
+    __hpbarGlobal.__hpbarMounts += 1;
+    if (__DEV__) {
+      if (!__hpbarGlobal.__hpbarSingleton) __hpbarGlobal.__hpbarSingleton = idRef.current;
+      console.log("[HPBar MOUNTED]", idRef.current, "active=", __hpbarGlobal.__hpbarMounts, "singleton=", __hpbarGlobal.__hpbarSingleton);
+    }
+    return () => {
+      __hpbarGlobal.__hpbarMounts -= 1;
+      if (__DEV__ && __hpbarGlobal.__hpbarSingleton === idRef.current) {
+        __hpbarGlobal.__hpbarSingleton = null;
+      }
+      if (__DEV__) console.log("[HPBar UNMOUNTED]", idRef.current, "active=", __hpbarGlobal.__hpbarMounts);
+    };
+  }, []);
+
+  const img = useImage(HP_SPRITE);          // <<< important: require(), not URI
+
+  const { useHealth } = require("../systems/health/HealthContext");
+  let bars = MAX_BARS;
+  try { bars = Math.max(0, Math.min(MAX_BARS, useHealth()?.bars ?? MAX_BARS)); } catch {}
+
+  const key = `hp_${bars}`;
+  const logical = FRAMES[key] ?? FRAMES["hp_5"]; // JSON frame in "design" pixels
+
+  // Map the JSON's 116×141 grid to the *actual* image pixel grid
+  const assetScaleX = img ? img.width()  / DESIGN_W : 1;
+  const assetScaleY = img ? img.height() / DESIGN_H : 1;
+
+  const framePx: Frame = useMemo(() => ({
+    x: logical.x * assetScaleX,
+    y: logical.y * assetScaleY,
+    w: logical.w * assetScaleX,
+    h: logical.h * assetScaleY,
+  }), [logical, assetScaleX, assetScaleY]);
+
+  // Debug: verify we're using actual image pixels
+  if (__DEV__ && img) {
+    console.log("[HPBar shader verify]", {
+      imgW: img?.width?.(), imgH: img?.height?.(),
+      framePx, scale: SCALE
+    });
+  }
+
+  const width  = logical.w * SCALE; // HUD display size uses logical (keeps UI consistent)
+  const height = logical.h * SCALE;
+
 
   return (
     <Canvas
       style={{
         position: "absolute",
-        left: x,
-        top: y,
-        width: dw,
-        height: dh,
-        pointerEvents: "none",
+        right: 12,
+        top: 42,
+        width,
+        height,
         zIndex: 9999,
+        pointerEvents: "none",
       }}
     >
-      <SubImage image={img} frame={frame} x={0} y={0} scale={SCALE} />
-      {/* Micro-test: draw a thin outline so you see the exact box the bar occupies */}
-      <Rect
-        x={0}
-        y={0}
-        width={dw}
-        height={dh}
-        color="rgba(255,255,255,0.15)"
-      />
+      {/* framePx is in actual image pixels; SubImageShader uses ImageShader for precise sampling */}
+      <SubImageShader image={img} frame={framePx} x={0} y={0} scale={SCALE} />
     </Canvas>
   );
 }

@@ -35,9 +35,6 @@ export default React.memo(function RNGHControls({
       pad:  { x: margin + r,          y },
       jump: { x: layout.w - margin - r, y },
     };
-    if (__DEV__ && Math.random() < 0.01) {
-      console.log('[JUMP BUTTON] Position:', result.jump, 'size:', size, 'layout:', layout);
-    }
     return result;
   }, [layout, margin, r]);
 
@@ -70,10 +67,6 @@ export default React.memo(function RNGHControls({
     const dirX: -1 | 0 | 1 = Math.abs(out) < 0.05 ? 0 : (out < 0 ? -1 : 1);
     onPad({ dirX, magX: out });
 
-    if (__DEV__ && Math.random() < 0.08) {
-      // eslint-disable-next-line no-console
-      console.log('PAD sample', { nx: +nx.toFixed(2), out: +out.toFixed(2) });
-    }
   };
 
   const resetPad = () => {
@@ -103,16 +96,7 @@ export default React.memo(function RNGHControls({
     .hitSlop(12)
     .onStart(() => { 
       'worklet'; 
-      if (__DEV__) {
-        console.log('[JUMP BUTTON] Jump button pressed!');
-      }
       runOnJS(onJump)(); 
-    })
-    .onTouchesDown((e) => {
-      'worklet';
-      if (__DEV__) {
-        console.log('[JUMP BUTTON] Touch down detected!');
-      }
     });
 
   // ---- RENDER ----
