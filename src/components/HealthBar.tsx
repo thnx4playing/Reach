@@ -1,5 +1,5 @@
 import React from 'react';
-import { Canvas, Image, useImage, Rect, Group } from '@shopify/react-native-skia';
+import { Canvas, Image, useImage, Group, rect } from '@shopify/react-native-skia';
 
 interface HealthBarProps {
   health: number; // 0-100 percentage
@@ -71,19 +71,14 @@ const HealthBar: React.FC<HealthBarProps> = ({
         pointerEvents: 'none'
       }}
     >
-      {/* Use Group with clip to ensure no bleeding */}
-      <Group
-        clip={
-          <Rect x={0} y={0} width={width} height={height} />
-        }
-      >
+      <Group>
         <Image
           image={healthBarImage}
           x={0}
-          y={-sourceY}
+          y={-sourceY} // Offset the image to show only the desired segment
           width={width}
-          height={height}
-          fit="fill"
+          height={(imageHeight / imageWidth) * width} // Maintain aspect ratio
+          clip={rect(0, 0, width, height)} // Clip to only show the health bar area
         />
       </Group>
     </Canvas>
@@ -133,18 +128,13 @@ const HealthBarSafe: React.FC<HealthBarProps> = ({
         pointerEvents: 'none'
       }}
     >
-      <Group
-        clip={
-          <Rect x={0} y={0} width={width} height={height} />
-        }
-      >
+      <Group clip={rect(0, 0, width, height)}>
         <Image
           image={healthBarImage}
           x={0}
-          y={-sourceY}
+          y={-sourceY} // Offset to show correct segment
           width={width}
-          height={height}
-          fit="contain" // Use contain instead of fill to maintain aspect ratio
+          height={(imageHeight / healthBarImage.width()) * width} // Maintain aspect ratio
         />
       </Group>
     </Canvas>
