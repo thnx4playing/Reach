@@ -14,6 +14,7 @@ export type LevelData = {
   platforms: Platform[];
   decorations: Platform[];
   characterSpawn: { x: number; y: number };
+  floorTopY: number;
 };
 
 
@@ -94,9 +95,13 @@ function buildLevel(mapName: MapName, w: number, h: number): LevelData {
         ...grassPrefabs               // Grass prefabs
       ],
       characterSpawn: { x: w * 0.5, y: h - 100 },
+      floorTopY,
     };
   }
 
+  // Calculate floorTopY for non-grassy maps
+  const floorTopY = Math.round(h - prefabHeightPx(mapName, 'floor', 2));
+  
   return {
     mapName,
     platforms: [
@@ -105,6 +110,7 @@ function buildLevel(mapName: MapName, w: number, h: number): LevelData {
     ],
     decorations: [],
     characterSpawn: { x: w * 0.5, y: h - 100 },
+    floorTopY,
   };
 }
 

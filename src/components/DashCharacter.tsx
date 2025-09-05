@@ -10,13 +10,17 @@ import idleJson   from '../../assets/character/dash/Idle_atlas.json';
 import walkJson   from '../../assets/character/dash/Walk_atlas.json';
 import runJson    from '../../assets/character/dash/Run_atlas.json';
 import jumpJson   from '../../assets/character/dash/Jump_atlas.json';
+import hurtJson   from '../../assets/character/dash/Hurt-Damaged_atlas.json';
+import deathJson  from '../../assets/character/dash/Death_atlas.json';
 
 const idlePng  = require('../../assets/character/dash/Idle_atlas.png') as number;
 const walkPng  = require('../../assets/character/dash/Walk_atlas.png') as number;
 const runPng   = require('../../assets/character/dash/Run_atlas.png') as number;
 const jumpPng  = require('../../assets/character/dash/Jump_atlas.png') as number;
+const hurtPng  = require('../../assets/character/dash/Hurt-Damaged_atlas.png') as number;
+const deathPng = require('../../assets/character/dash/Death_atlas.png') as number;
 
-type AnimationState = 'idle'|'walk'|'run'|'jump';
+type AnimationState = 'idle'|'walk'|'run'|'jump'|'hurt'|'death';
 
 type InputState = {
   vx?: number;
@@ -34,6 +38,8 @@ type Props = {
   input?: InputState;
   id?: string;         // unique identifier for debugging
   footOffset?: number; // NEW - tunable foot offset
+  isHurt?: boolean;    // NEW - override to hurt animation
+  isDead?: boolean;    // NEW - override to death animation
 };
 
 function sortFramesNumeric(keys: string[]) {
@@ -60,7 +66,13 @@ const WALK_OUT = 1;  // leave walk below this speed (lower than WALK_IN)
 const RUN_IN = 80;   // enter run above this speed (more responsive)
 const RUN_OUT = 60;  // leave run below this speed (lower than RUN_IN)
 
-function pickState(input?: InputState, prevState?: AnimationState): AnimationState {
+function pickState(input?: InputState, prevState?: AnimationState, isHurt?: boolean, isDead?: boolean): AnimationState {
+  // Death animation takes highest priority
+  if (isDead) return 'death';
+  
+  // Hurt animation takes priority over everything else (except death)
+  if (isHurt) return 'hurt';
+  
   const vx = Math.abs(input?.vx ?? 0);
   const dirX = Math.abs(input?.dirX ?? 0);
   const onGround = !!input?.onGround;
@@ -89,17 +101,23 @@ function pickState(input?: InputState, prevState?: AnimationState): AnimationSta
   return 'run';
 }
 
-export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 2, input, id = "Dash@World", footOffset = 2 }) => {
+export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 2, input, id = "Dash@World", footOffset = 2, isHurt = false, isDead = false }) => {
   const idle  = useAnim(idleJson,  idlePng,  10);
   const walk  = useAnim(walkJson,  walkPng,  12);
   const run   = useAnim(runJson,   runPng,   16);
   const jump  = useAnim(jumpJson,  jumpPng,  10);
+  const hurt  = useAnim(hurtJson,  hurtPng,  12);
+  const death = useAnim(deathJson, deathPng, 10);
 
   // Mount count guard removed to clean up code
 
   // Track previous state for hysteresis
   const [prevState, setPrevState] = useState<AnimationState>('idle');
-  const state = pickState(input, prevState);
+  const state = pickState(input, prevState, isHurt, isDead);
+  
+  if (__DEV__) {
+    console.log(`DASH CHARACTER DEBUG: state=${state}, isHurt=${isHurt}, isDead=${isDead}, prevState=${prevState}`);
+  }
   
   // Update previous state when current state changes
   useEffect(() => {
@@ -107,7 +125,9 @@ export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 
   }, [state]);
 
   // Select animation based on state - EXACTLY ONE animation selected
-  const current = state === 'jump' ? jump :
+  const current = state === 'death' ? death :
+                  state === 'hurt' ? hurt :
+                  state === 'jump' ? jump :
                   state === 'walk' ? walk :
                   state === 'run' ? run :
                   idle; // fallback
@@ -120,9 +140,11 @@ export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 
 
   // Use animator with loop rules per state
   const isJumping = state === 'jump';
+  const isHurting = state === 'hurt';
+  const isDying = state === 'death';
   const frameName = useAnimator(current.frames, current.fps, {
-    loop: !isJumping,     // idle/run loop, jump does not
-    holdOnEnd: true       // hold last jump frame while airborne
+    loop: !isJumping && !isHurting && !isDying,  // idle/run loop, jump/hurt/death do not
+    holdOnEnd: isJumping || isHurting || isDying // hold last frame for jump/hurt/death
   });
   const fr = current.json.frames[frameName] || { x: 0, y: 0, w: 48, h: 48 };
 

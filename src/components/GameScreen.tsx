@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Text, Pressable } from 'react-native';
 import { Canvas, Rect } from '@shopify/react-native-skia';
 
@@ -16,6 +16,12 @@ import { MapImageProvider } from '../render/MapImageContext';
 import idleJson from '../../assets/character/dash/Idle_atlas.json';
 // Quiet logger
 import { dbg } from '../utils/dbg';
+
+// Health system imports
+import { useHealth } from '../systems/health/HealthContext';
+import HPBar from '../ui/HPBar';
+import { DeathModal } from '../ui/DeathModal';
+import { useDamageAnimations } from '../systems/health/useDamageAnimations';
 
 // debug flag
 const VCOLLECT = __DEV__;
@@ -44,8 +50,7 @@ function zToY(floorTopY: number, zWorld: number) {
 
 // Feel
 const SCALE      = 2;
-const WALK_SPEED = 120;
-const RUN_SPEED  = 195; // Reduced by 25% (was 260)
+const RUN_SPEED  = 195; // Single movement speed
 const GRAVITY    = 1800;
   const JUMP_VEL   = 822;  // Increased by 30% (was 632, originally 565)
   const JUMP_VELOCITY = JUMP_VEL;  // Alias for consistency
@@ -59,7 +64,19 @@ interface GameScreenProps {
   onBack: () => void;
 }
 
-export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
+// Inner game component that uses health hooks
+const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
+  // Handlers for death modal
+  const handleRestart = useCallback(() => {
+    // Reset health and restart level
+    console.log('Restart requested');
+    // TODO: Implement level restart logic
+  }, []);
+
+  const handleMainMenu = useCallback(() => {
+    onBack();
+  }, [onBack]);
+
   const [cameraY, setCameraY] = useState(0);
   const [cameraX, setCameraX] = useState(0);
   const [currentPlayerBox, setCurrentPlayerBox] = useState<{left: number; right: number; top: number; bottom: number; cx: number; feetY: number; w: number; h: number} | null>(null);
@@ -79,7 +96,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => 
   const [x, setX] = useState(SCREEN_W * 0.5);
   const [z, setZ] = useState(0);
   const [dirX, setDirX] = useState(0);
-  const [speedLevel, setSpeedLevel] = useState<'idle'|'walk'|'run'>('idle');
+  const [speedLevel, setSpeedLevel] = useState<'idle'|'run'>('idle');
   
   // Refs for physics
   const xRef = useRef(SCREEN_W * 0.5);
@@ -87,9 +104,47 @@ export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => 
   const vxRef = useRef(0);
   const vzRef = useRef(0);
   const dirXRef = useRef(0);
-  const speedRef = useRef<'idle'|'walk'|'run'>('idle');
+  const speedRef = useRef<'idle'|'run'>('idle');
   const onGroundRef = useRef(true);
   const didWrapRef = useRef(false);
+  const feetYRef = useRef(levelData?.floorTopY ?? 0);
+  // --- Fall damage state machine (z-based) ---
+  const peakZRef = useRef<number>(0);
+  const fallingRef = useRef<boolean>(false);
+  const vzPrevRef = useRef<number>(0);
+  const onGroundPrevRef = useRef<boolean>(true);
+
+  const SCREEN_H = Dimensions.get('window').height;
+  // Tune this feel later. Use /5 for easy confirmation, /3 for your original design.
+  const FALL_THRESHOLD = SCREEN_H / 5;
+
+  // Health system integration
+  const { isDead, bars, takeDamage, hits, sys } = useHealth();
+  const maxHits = sys.state.maxHits;
+  const { isHurt } = useDamageAnimations();
+  
+  // Debug: Log health system state
+  console.log('[GAMESCREEN DEBUG] Health system state:', {
+    isDead,
+    bars,
+    hits,
+    maxHits,
+    isHurt,
+    sysState: sys.state,
+    instanceId: sys.instanceId
+  });
+  
+  // Update feetY ref with current player position
+  const feetY = currentPlayerBox?.feetY ?? (levelData?.floorTopY ?? 0);
+  feetYRef.current = feetY;
+  
+  // Debug initial state
+  if (__DEV__ && Math.random() < 0.001) {
+    console.log('[INITIAL STATE DEBUG] feetY:', feetY, 'floorTopY:', levelData?.floorTopY, 'vzRef:', vzRef.current, 'onGroundRef:', onGroundRef.current, 'zRef:', zRef.current);
+  }
+
+  // Optional: disable input when dead
+  const inputEnabled = !isDead;
 
   // Highest surface under a given X (one-way collision)
 
@@ -144,6 +199,40 @@ const floorTopY = useMemo(() => {
   // Diagnostic refs for vz tracking
   const lastVzReason = useRef<string>('');
   const vzWasRef = useRef<number>(0);
+
+  // Pad callback (from CirclePad): update refs + state mirror
+  const onPad = (o: { dirX: -1|0|1; magX: number }) => {
+    if (__DEV__) console.log('PAD:', { dirX: o.dirX, magX: +o.magX.toFixed(2) });
+    setDirX(o.dirX);
+    dirXRef.current = o.dirX;
+
+    // Simplified: just run or idle based on any movement
+    const level = Math.abs(o.magX) < 0.02 ? 'idle' : 'run';
+    setSpeedLevel(level);
+    speedRef.current = level;
+  };
+
+  // Jump buffering - call this from the button
+  const requestJump = () => { 
+    try {
+      if (__DEV__) console.log('[JUMP REQUEST] requestJump() fired');
+      
+      // Safety check for jumpStateRef
+      if (!jumpStateRef.current) {
+        console.error('CRASH PREVENTION: jumpStateRef is null, reinitializing');
+        jumpStateRef.current = initJumpState();
+      }
+      
+      noteJumpPressed(jumpStateRef.current);
+      if (__DEV__) {
+        dbg('Jump requested - buffered for:', jumpStateRef.current.bufferMsLeft, 'ms');
+      }
+    } catch (error) {
+      console.error('CRASH PREVENTION: Error in requestJump:', error);
+      // Reinitialize jump state if there's an error
+      jumpStateRef.current = initJumpState();
+    }
+  };
 
   // Slab type used by physics in world-Y units (screen coordinates)
   type WorldSlab = {
@@ -221,52 +310,6 @@ const floorTopY = useMemo(() => {
 
 
 
-  // Pad callback (from CirclePad): update refs + state mirror
-  const onPad = (o: { dirX: -1|0|1; magX: number }) => {
-    if (__DEV__) console.log('PAD:', { dirX: o.dirX, magX: +o.magX.toFixed(2) });
-    setDirX(o.dirX);
-    dirXRef.current = o.dirX;
-
-    // Hysteresis bands: enter at *_IN, exit at *_OUT (OUT < IN)
-    const WALK_IN = 0.05, WALK_OUT = 0.03; // Match CirclePad sensitivity
-    const RUN_IN  = 0.35, RUN_OUT  = 0.25; // Match CirclePad sensitivity
-
-    let level = speedRef.current;
-    const m = o.magX;
-
-    if (level === 'idle') {
-      level = m >= RUN_IN ? 'run' : (m >= WALK_IN ? 'walk' : 'idle');
-    } else if (level === 'walk') {
-      level = m >= RUN_IN ? 'run' : (m <= WALK_OUT ? 'idle' : 'walk');
-    } else { // run
-      level = m <= RUN_OUT ? 'walk' : 'run';
-    }
-
-    setSpeedLevel(level);
-    speedRef.current = level;
-  };
-
-  // Jump buffering - call this from the button
-  const requestJump = () => { 
-    try {
-      if (__DEV__) console.log('JUMP: requestJump() fired');
-      
-      // Safety check for jumpStateRef
-      if (!jumpStateRef.current) {
-        console.error('CRASH PREVENTION: jumpStateRef is null, reinitializing');
-        jumpStateRef.current = initJumpState();
-      }
-      
-      noteJumpPressed(jumpStateRef.current);
-      if (__DEV__) {
-        dbg('Jump requested - buffered for:', jumpStateRef.current.bufferMsLeft, 'ms');
-      }
-    } catch (error) {
-      console.error('CRASH PREVENTION: Error in requestJump:', error);
-      // Reinitialize jump state if there's an error
-      jumpStateRef.current = initJumpState();
-    }
-  };
 
 
 
@@ -420,9 +463,17 @@ const floorTopY = useMemo(() => {
       setFrameCount(prev => prev + 1);
 
       // Horizontal movement with momentum preservation
-      const target = speedRef.current === 'idle' ? 0
-                   : speedRef.current === 'walk' ? WALK_SPEED
-                   : RUN_SPEED;
+      const target = speedRef.current === 'idle' ? 0 : RUN_SPEED;
+      
+      if (__DEV__ && Math.random() < 0.1) { // 10% chance to log
+        console.log('MOVEMENT DEBUG:', {
+          dirX: dirXRef.current,
+          speedLevel: speedRef.current,
+          target,
+          vx: Math.round(vxRef.current),
+          onGround: onGroundRef.current
+        });
+      }
 
       // Apply friction only on ground
       if (onGroundRef.current) {
@@ -515,7 +566,33 @@ const floorTopY = useMemo(() => {
       let vzWas = vzRef.current;
 
       // ==== LANDING (falling only) ====
+      if (__DEV__ && Math.random() < 0.01) {
+        console.log('[PHYSICS DEBUG] vzRef.current:', vzRef.current, 'onGroundRef.current:', onGroundRef.current);
+      }
+      
+      // Reset fall session when not falling
+      if (vzRef.current >= 0 && fallingRef.current) {
+        fallingRef.current = false;
+        peakZRef.current = 0;
+        if (__DEV__) console.log('[Z-FALL] RESET: Not falling anymore');
+      }
+      
       if (vzRef.current < 0) { // Only when actually falling (not stationary or rising)
+        if (__DEV__) {
+          console.log('[LANDING DEBUG] Falling detected, vzRef.current:', vzRef.current);
+        }
+        
+        // --- FALL SESSION (z-based) ---
+        // Start fall session when character starts falling, regardless of ground state
+        if (!fallingRef.current) {
+          fallingRef.current = true;
+          peakZRef.current = Math.max(0, zRef.current); // start from current height above floor, but never negative
+          if (__DEV__) console.log('[Z-FALL] START: z=', peakZRef.current.toFixed(1));
+        } else {
+          // Track highest height reached during this airtime
+          peakZRef.current = Math.max(peakZRef.current, Math.max(0, zRef.current));
+        }
+        
         let bestTop: number | null = null;
         try {
           if (!platformSlabs || !Array.isArray(platformSlabs)) {
@@ -531,6 +608,9 @@ const floorTopY = useMemo(() => {
             if (box.right <= s.left || box.left >= s.right) continue;
             // swept cross: feet moved from above to below the slab top
             if (prevFeetY <= s.yTop + 1e-4 && currFeetY >= s.yTop - CROSS_PAD) {
+              if (__DEV__ && Math.random() < 0.01) {
+                console.log('[PLATFORM COLLISION] Hit platform! s.yTop:', s.yTop, 'prevFeetY:', prevFeetY, 'currFeetY:', currFeetY);
+              }
               if (bestTop === null || s.yTop < bestTop) bestTop = s.yTop;
             }
           }
@@ -538,15 +618,37 @@ const floorTopY = useMemo(() => {
           console.error('CRASH in landing collision:', error);
         }
         if (bestTop !== null) {
+          if (__DEV__) {
+            console.log('[LANDING SUCCESS] Character landed! bestTop:', bestTop, 'prevFeetY:', prevFeetY, 'currFeetY:', currFeetY);
+          }
           zRef.current  = Math.max(0, floorTopY - bestTop);
           vzRef.current = 0;
           onGroundRef.current = true;
           lastVzReason.current = 'land-top';
+
+          // --- Z-BASED LANDING DAMAGE ---
+          if (fallingRef.current) {
+            const dropPx = Math.max(0, peakZRef.current - zRef.current); // zAtLand is ~0
+            const threshold = Dimensions.get('window').height / 5; // tune: /5 to test, /3 later
+            if (__DEV__) console.log('[Z-FALL] LAND(top): drop=', dropPx.toFixed(1), 'thr=', threshold.toFixed(1), 'peakZ=', peakZRef.current.toFixed(1));
+            if (dropPx >= threshold) {
+              const ok = takeDamage(1);
+              if (__DEV__) console.log(ok ? '[Z-FALL] DAMAGE applied' : '[Z-FALL] damage skipped (iframes/dead)');
+            }
+            fallingRef.current = false;
+            peakZRef.current = 0;
+          }
+        } else {
+          // No landing this frame → remain airborne and keep tracking apex
+          onGroundRef.current = false;
         }
       }
 
       // ==== CEILING (rising only) ====
       if (vzRef.current > 0 && !lastVzReason.current) {
+        if (__DEV__ && Math.random() < 0.01) {
+          console.log('[JUMP DEBUG] Rising detected, vzRef.current:', vzRef.current);
+        }
         const ignoreCeilNow = jumpStateRef.current.ignoreCeilFrames > 0;
         if (!ignoreCeilNow) {
           let bestBottom: number | null = null;
@@ -604,7 +706,23 @@ const floorTopY = useMemo(() => {
       if (!lastVzReason.current && zRef.current < 0) {
         zRef.current = 0;
         if (vzRef.current < 0) vzRef.current = 0; // don't kill upward motion
-        onGroundRef.current = true;
+        // Only set onGround=true if we're not actively jumping (vz > 0 means rising)
+        if (vzRef.current <= 0) {
+          onGroundRef.current = true;
+          
+          // --- Z-BASED LANDING DAMAGE ---
+          if (fallingRef.current) {
+            const dropPx = Math.max(0, peakZRef.current - zRef.current); // zAtLand ~ 0
+            const threshold = Dimensions.get('window').height / 5;
+            if (__DEV__) console.log('[Z-FALL] LAND(clamp): drop=', dropPx.toFixed(1), 'thr=', threshold.toFixed(1), 'peakZ=', peakZRef.current.toFixed(1));
+            if (dropPx >= threshold) {
+              const ok = takeDamage(1);
+              if (__DEV__) console.log(ok ? '[Z-FALL] DAMAGE applied' : '[Z-FALL] damage skipped (iframes/dead)');
+            }
+            fallingRef.current = false;
+            peakZRef.current = 0;
+          }
+        }
         lastVzReason.current = 'floor-clamp';
       }
 
@@ -731,6 +849,10 @@ const floorTopY = useMemo(() => {
           consumeJump(jumpStateRef.current);
           
           if (__DEV__) {
+            console.log('[JUMP EXECUTION] Jump executed! vzRef:', prevVz, '->', vzRef.current, 'onGroundRef:', onGroundRef.current);
+          }
+          
+          if (__DEV__) {
             // Quick sanity log (do once when you press jump)
             console.log('JUMP start', {
               cx: Math.round(box.cx), 
@@ -760,6 +882,7 @@ const floorTopY = useMemo(() => {
         setX(xRef.current);
         setZ(zRef.current);
         
+        
         // Update parallax timing and camera
         setElapsedSec(t / 1000);
         // Keep background stable - no vertical camera movement to prevent jumping
@@ -773,6 +896,10 @@ const floorTopY = useMemo(() => {
           timestamp: Date.now()
         });
       }
+
+      // Track previous values for next frame
+      vzPrevRef.current = vzRef.current;
+      onGroundPrevRef.current = onGroundRef.current;
 
       raf = requestAnimationFrame(loop);
       } catch (error) {
@@ -922,6 +1049,8 @@ const floorTopY = useMemo(() => {
             lift={z}
             scale={SCALE}
             footOffset={FOOT_OFFSET}
+            isHurt={isHurt}  // Pass hurt state for damage animation
+            isDead={isDead}  // Pass death state for death animation
             input={{
               vx: vxRef.current,  // Use actual velocity for momentum preservation
               dirX,
@@ -932,6 +1061,16 @@ const floorTopY = useMemo(() => {
         </Canvas>
       </MapImageProvider>
       
+      {/* HP Bar - rendered outside Canvas as Skia component */}
+      {console.log("[GAMESCREEN HPBAR] About to render HPBar with hits=", hits, "maxHits=", maxHits)}
+      <HPBar hits={hits} maxHits={maxHits} />
+      
+      {/* Death modal */}
+      <DeathModal 
+        onRestart={handleRestart}
+        onMainMenu={handleMainMenu}
+      />
+      
       {/* Controls overlay: must be last and visible */}
       <View style={[StyleSheet.absoluteFill, { zIndex: 10 }]} pointerEvents="auto">
         <RNGHControls
@@ -940,7 +1079,7 @@ const floorTopY = useMemo(() => {
           onPad={onPad}
           onJump={requestJump}
         />
-
+        {/* Debug overlay removed to prevent crashes */}
       </View>
       
       {/* DISABLED: Debug overlay - was potentially causing crashes */}
@@ -981,6 +1120,16 @@ const floorTopY = useMemo(() => {
     </View>
   );
   }
+};
+
+// Main GameScreen component
+export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
+  return (
+    <InnerGameScreen 
+      levelData={levelData} 
+      onBack={onBack}
+    />
+  );
 };
 
 const styles = StyleSheet.create({
