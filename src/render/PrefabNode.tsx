@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo } from "react";
-import { Group, Image as SkImage, Rect, useImage, Atlas, Skia, rect } from "@shopify/react-native-skia";
+import React, { useMemo } from "react";
+import { Image as SkImage, rect } from "@shopify/react-native-skia";
 import { Image as RNImage } from "react-native";
-import { MAPS, MapName } from "../content/maps";
+import { MAPS, MapName, getTileSize } from "../content/maps";
 import { useMapSkImage } from "./MapImageContext";
 
 type Props = { map: MapName; name: string; x?: number; y?: number; scale?: number };
 
-// Compatibility helper: resolve a usable URI from a numeric RN asset
+// Resolve a URI for numeric RN asset IDs
 function resolveUri(source: number | string) {
   if (typeof source === "number") {
     const res = RNImage.resolveAssetSource(source);
@@ -15,73 +15,71 @@ function resolveUri(source: number | string) {
   return source || "";
 }
 
-export function PrefabNode({ map, name, x = 0, y = 0, scale = 1 }: Props) {
-  
-  const { grid, prefabs, image: tileset } = MAPS[map];
-  const pf = prefabs.prefabs[name];
-  
-
-  
+export function PrefabNode({ map, name, x = 0, y = 0, scale = 2 }: Props) {
+  const def = MAPS[map];
+  const pf = def.prefabs.prefabs[name];
   if (!pf) {
+    if (__DEV__) console.warn(`[PrefabNode] missing prefab "${name}" for map "${map}"`);
     return null;
   }
 
-  const tile = prefabs.meta.tileSize;
+  const tile = getTileSize(map) * scale;
 
-  // 1) Try the shared Skia image from context
-  const imgFromCtx = useMapSkImage();
+  // Prefer shared Skia image provided by <MapImageProvider>
+  const shared = useMapSkImage();
+  const uri = useMemo(() => resolveUri(def.image), [def.image]);
+  // If you ever want a local fallback: const img = useImage(uri);
+  const img = shared;
 
-  // 2) Fallback: load the tileset here (works even if provider isn't wrapping)
-  const uri = useMemo(() => resolveUri(tileset), [tileset]);
-  const imgLocal = useImage(typeof tileset === "number" ? (tileset as any) : uri);
+  if (!img) return null;
 
-  // 3) Final image we'll draw with
-  const skImage = imgFromCtx ?? imgLocal ?? null;
+  const frames = def.frames;
 
-
-
-  const draw = (f: any, rx: number, ry: number, key: string) => {
-    
-    if (!skImage) return null;
-
-    // source rect from the tilesheet (pixels)
-    const sx = f.x, sy = f.y, sw = f.w, sh = f.h;
-
-
-
-    // destination position on screen (pixels)
-    const dx = rx * tile * scale;
-    const dy = ry * tile * scale;
-
-    // Create sprite rect for Atlas
-    const spriteRect = rect(sx, sy, sw, sh);
-    
-    // Create transform for Atlas (scale and position)
-    const transform = Skia.RSXform(scale, 0, dx, dy);
-
+  const drawCell = (cellId: string, rx: number, ry: number, key: string) => {
+    const f = frames[cellId];
+    if (!f) {
+      if (__DEV__) console.warn(`[PrefabNode] unknown cell "${cellId}" for map "${map}"`);
+      return null;
+    }
+    const dx = x + rx * tile;
+    const dy = y + ry * tile;
     return (
-      <Atlas
+      <SkImage
         key={key}
-        image={skImage}
-        sprites={[spriteRect]}
-        transforms={[transform]}
+        image={img}
+        x={dx}
+        y={dy}
+        width={Math.round(f.w * scale)}
+        height={Math.round(f.h * scale)}
+        srcRect={rect(f.x, f.y, f.w, f.h)}
       />
     );
   };
 
-  const getFrame = (cell: string) => {
-    const frame = (grid as any)[cell] || (grid as any)?.frames?.[cell];
-    return frame;
+  const drawRect = (f: {x:number;y:number;w:number;h:number}, rx: number, ry: number, key: string) => {
+    const dx = x + rx * tile;
+    const dy = y + ry * tile;
+    return (
+      <SkImage
+        key={key}
+        image={img}
+        x={dx}
+        y={dy}
+        width={Math.round(f.w * scale)}
+        height={Math.round(f.h * scale)}
+        srcRect={rect(f.x, f.y, f.w, f.h)}
+      />
+    );
   };
 
   return (
-    <Group transform={[{ translateX: x }, { translateY: y }]}>
+    <>
       {pf.cells?.map((row, ry) =>
-        row.map((cell, rx) => (cell ? draw(getFrame(cell), rx, ry, `c-${rx}-${ry}`) : null))
+        row.map((cell, rx) => (cell ? drawCell(cell, rx, ry, `c-${rx}-${ry}`) : null))
       )}
       {pf.rects?.map((row, ry) =>
-        row.map((r, rx) => (r ? draw(r, rx, ry, `r-${rx}-${ry}`) : null))
+        row.map((r, rx) => (r ? drawRect(r, rx, ry, `r-${rx}-${ry}`) : null))
       )}
-    </Group>
+    </>
   );
 }

@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "image": "Tilemap_Super_Basic__atlas.png",
+    "size": {
+      "w": 164,
+      "h": 328
+    },
+    "tileSize": 160,
+    "padding": 2,
+    "type": "character",
+    "animation": "Tilemap (Super Basic)"
+  },
+  "frames": {
+    "Tilemap (Super Basic)_001": {
+      "x": 2,
+      "y": 2,
+      "w": 160,
+      "h": 160,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Tilemap (Super Basic)_002": {
+      "x": 2,
+      "y": 166,
+      "w": 160,
+      "h": 160,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

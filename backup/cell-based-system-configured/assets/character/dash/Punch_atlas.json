@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "image": "Punch_atlas.png",
+    "size": {
+      "w": 204,
+      "h": 204
+    },
+    "tileSize": 64,
+    "padding": 2,
+    "type": "character",
+    "animation": "Punch"
+  },
+  "frames": {
+    "Punch_1": {
+      "x": 2,
+      "y": 2,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Punch_2": {
+      "x": 70,
+      "y": 2,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Punch_3": {
+      "x": 138,
+      "y": 2,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Punch_4": {
+      "x": 2,
+      "y": 70,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Punch_5": {
+      "x": 70,
+      "y": 70,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Punch_6": {
+      "x": 138,
+      "y": 70,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Punch_7": {
+      "x": 2,
+      "y": 138,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Punch_8": {
+      "x": 70,
+      "y": 138,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

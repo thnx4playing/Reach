@@ -1,0 +1,191 @@
+import type { SkRect } from "@shopify/react-native-skia";
+
+// ---- Types ----
+export type CellName = `cell-${number}-${number}`;
+export type CellsRow = Array<CellName | null>;
+export type RectRow  = Array<({ x:number; y:number; w:number; h:number } | null)>;
+
+export type Prefab = {
+  cells?: CellsRow[];  // prefer cells that reference frames
+  rects?: RectRow[];   // fallback: absolute src rects on the atlas
+};
+
+export type PrefabCatalog = {
+  meta: {
+    map: string;
+    tileset_image: string;
+    tileSize: number;
+    margin?: number;
+    spacing?: number;
+    columns?: number;
+    rows?: number;
+  };
+  frames?: Record<string, {x:number;y:number;w:number;h:number}>;
+  prefabs: Record<string, Prefab>;
+};
+
+// ---- Imports per map (PNG + catalog JSON; frames come from catalog) ----
+import darkPrefs   from "../../assets/maps/dark/dark_prefabs.json";
+const darkImage    = require("../../assets/maps/dark/dark-tileset-final.png") as number;
+
+import desertPrefs from "../../assets/maps/desert/desert_prefabs.json";
+const desertImage  = require("../../assets/maps/desert/desert-tileset-final.png") as number;
+
+import dungeonPrefs from "../../assets/maps/dungeon/dungeon_prefabs.json";
+const dungeonImage  = require("../../assets/maps/dungeon/dungeon-tileset-final.png") as number;
+
+import frozenPrefs  from "../../assets/maps/frozen/frozen_prefabs.json";
+const frozenImage   = require("../../assets/maps/frozen/frozen-tileset-final.png") as number;
+
+import grassyCatalogJson from "../../assets/maps/grassy/grassy_prefabs.json";
+const grassyImage  = require("../../assets/maps/grassy/grassy_prefabs_final.png") as number;
+
+// ---- Registry ----
+export type MapDef = {
+  image: number | string;
+  prefabs: PrefabCatalog;
+  frames: Record<string, {x:number;y:number;w:number;h:number}>;
+};
+
+const grassyCatalog = grassyCatalogJson as PrefabCatalog;
+const darkCatalog   = darkPrefs       as PrefabCatalog;
+const desertCatalog = desertPrefs     as PrefabCatalog;
+const dungeonCatalog= dungeonPrefs    as PrefabCatalog;
+const frozenCatalog = frozenPrefs     as PrefabCatalog;
+
+export const MAPS = {
+  dark:    { image: darkImage,    prefabs: darkCatalog,    frames: (darkCatalog as any).frames || {} },
+  desert:  { image: desertImage,  prefabs: desertCatalog,  frames: (desertCatalog as any).frames || {} },
+  dungeon: { image: dungeonImage, prefabs: dungeonCatalog, frames: (dungeonCatalog as any).frames || {} },
+  frozen:  { image: frozenImage,  prefabs: frozenCatalog,  frames: (frozenCatalog as any).frames || {} },
+  grassy:  { image: grassyImage,  prefabs: grassyCatalog,  frames: (grassyCatalog as any).frames || {} },
+} as const;
+
+export type MapName = keyof typeof MAPS;
+
+// Utility
+export function getPrefab(map: MapName, name: string): Prefab | undefined {
+  return MAPS[map].prefabs.prefabs[name];
+}
+export function getTileSize(map: MapName) {
+  return MAPS[map].prefabs.meta.tileSize ?? 16;
+}
+export function getFrame(map: MapName, cell: string) {
+  return MAPS[map].frames[cell];
+}
+
+// ---------------------------------------------------------------------------
+// Sizing helpers
+export function prefabWidthPx(map: MapName, prefabName: string, scale = 2): number {
+  const p = getPrefab(map, prefabName);
+  const tile = getTileSize(map) * scale;
+  if (!p) return tile;
+  if (p.cells) {
+    const cols = Math.max(0, ...p.cells.map(row => row.length));
+    return Math.max(1, cols) * tile;
+  }
+  if (p.rects) {
+    let maxX = 0;
+    p.rects.forEach((row, ry) => row.forEach((r, rx) => { if (r) maxX = Math.max(maxX, rx+1); }));
+    return Math.max(1, maxX) * tile;
+  }
+  return tile;
+}
+
+export function prefabHeightPx(map: MapName, prefabName: string, scale = 2): number {
+  const p = getPrefab(map, prefabName);
+  const tile = getTileSize(map) * scale;
+  if (!p) return tile;
+  if (p.cells) return Math.max(1, p.cells.length) * tile;
+  if (p.rects) {
+    let maxY = 0;
+    p.rects.forEach((row, ry) => row.forEach((r, rx) => { if (r) maxY = Math.max(maxY, ry+1); }));
+    return Math.max(1, maxY) * tile;
+  }
+  return tile;
+}
+
+// Visual foot inset per prefab (px at scale=1)
+export const PREFAB_FOOT_INSET: Record<string, number> = {
+  'tree-large-final': 2.5,
+  'tree-medium-final': 2.5,
+  'tree-small-final': 2.5,
+  'floor-final': 2.5,
+  'platform-grass-3-final': 2.5,
+  'platform-grass-1-final': 2.5,
+  'platform-wood-3-final': 2.5,
+  'platform-wood-1-final': 2.5,
+  'platform-wood-2-left-final': 2.5,
+  'platform-wood-2-right-final': 2.5,
+  'mushroom-red-large-final': 2.5,
+  'mushroom-red-medium-final': 2.5,
+  'mushroom-red-small-final': 2.5,
+  'mushroom-green-large-final': 2.5,
+  'mushroom-green-medium-final': 2.5,
+  'mushroom-green-small-final': 2.5,
+  'grass-1-final': 2.5,
+  'grass-2-final': 2.5,
+  'grass-3-final': 2.5,
+  'grass-4-final': 2.5,
+  'grass-5-final': 2.5,
+  'grass-6-final': 2.5,
+};
+
+export function alignPrefabYToSurfaceTop(
+  map: MapName,
+  prefabName: string,
+  surfaceTopY: number,
+  scale = 2
+): number {
+  const footInset = (PREFAB_FOOT_INSET[prefabName] ?? 0) * scale;
+  const h = prefabHeightPx(map, prefabName, scale);
+  return Math.round(surfaceTopY - h + footInset);
+}
+
+export function prefabTopSolidSegmentsPx(
+  map: MapName,
+  prefabName: string,
+  scale = 2
+): Array<{ x:number; y:number; w:number; h:number }> {
+  const p = getPrefab(map, prefabName);
+  const tile = getTileSize(map) * scale;
+  const segs: Array<{x:number;y:number;w:number;h:number}> = [];
+  if (!p) return segs;
+  const rows = p.cells ?? p.rects?.map(row => row.map(r => (r ? 1 : null))) ?? [];
+  let topRowIdx = -1;
+  for (let r = 0; r < rows.length; r++) {
+    if (rows[r].some(Boolean)) { topRowIdx = r; break; }
+  }
+  if (topRowIdx < 0) return segs;
+  const row = rows[topRowIdx];
+  let start: number | null = null;
+  for (let c = 0; c <= row.length; c++) {
+    const solid = row[c] ? true : false;
+    if (solid && start === null) start = c;
+    if ((!solid || c === row.length) && start !== null) {
+      const cols = c - start;
+      segs.push({ x: start * tile, y: topRowIdx * tile, w: cols * tile, h: tile });
+      start = null;
+    }
+  }
+  return segs;
+}
+
+export type SlabPx = { x:number; yTop:number; w:number; h:number };
+
+export function prefabPlatformSlabsPx(map: MapName, prefabName: string, scale = 2): SlabPx[] {
+  const p = getPrefab(map, prefabName);
+  const tile = getTileSize(map) * scale;
+  const slabs: SlabPx[] = [];
+  if (!p) return slabs;
+  const rows = p.cells ?? p.rects?.map(row => row.map(r => (r ? 1 : null))) ?? [];
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    for (let c = 0; c < row.length; c++) {
+      if (row[c]) {
+        slabs.push({ x: c*tile, yTop: r*tile, w: tile, h: tile });
+      }
+    }
+  }
+  return slabs;
+}
