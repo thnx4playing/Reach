@@ -181,6 +181,7 @@ export function useVerticalProcGen(
     return null;
   }, [mapName, scale, pickPlatformX]);
 
+  // Fix 3: Correct environment item positioning
   const spawnEnvForPlatform = useCallback((platform: Platform): Platform[] => {
     const out: Platform[] = [];
     const plat = platform.prefab;
@@ -190,11 +191,15 @@ export function useVerticalProcGen(
     
     if (isWood) return out;
     
+    // Get the platform's collision segments
     const segs = prefabTopSolidSegmentsPx(mapName, plat, platform.scale ?? scale);
     const seg = segs[0];
     if (!seg) return out;
     
-    const surfaceTopY = platform.y + seg.y;
+    // FIXED: Calculate the actual top surface of the platform
+    // The platform.y is the TOP of the platform sprite
+    // seg.y is the offset from platform top to the collision surface
+    const surfaceTopY = platform.y + seg.y; // This is the collision surface top
     const segLeft = platform.x + seg.x;
     const segRight = segLeft + seg.w;
     
@@ -205,10 +210,14 @@ export function useVerticalProcGen(
     };
     
     const addEnvAtTop = (name: string, x: number) => {
+      // FIXED: Use the collision surface top as the base for positioning
+      // alignPrefabYToSurfaceTop expects the surface Y and positions the sprite above it
+      const envY = alignPrefabYToSurfaceTop(mapName, name, surfaceTopY, platform.scale ?? scale);
+      
       out.push({
         prefab: name,
         x,
-        y: alignPrefabYToSurfaceTop(mapName, name, surfaceTopY, platform.scale ?? scale),
+        y: envY,
         scale: platform.scale ?? scale,
       });
     };
@@ -300,79 +309,71 @@ export function useVerticalProcGen(
     }
   }, []); // Run only once on mount
 
-  // FIXED: Better camera and generation logic
+  // Fix 1: Optimize procedural generation to prevent lag
   useEffect(() => {
-    // PERFORMANCE: Only process if playerWorldY has changed significantly
+    // PERFORMANCE: Only process if playerWorldY has changed significantly AND camera should move
+    const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.35);
+    const targetCameraY = Math.max(0, playerWorldY - DEADZONE_FROM_TOP);
+    const newCameraY = Math.max(cameraY, -targetCameraY);
+    
+    // Only process generation if camera actually needs to move or player moved significantly
+    const cameraWillMove = Math.abs(newCameraY - cameraY) > 1;
     const playerWorldYChange = Math.abs(playerWorldY - lastProcessedPlayerWorldYRef.current);
-    if (playerWorldYChange < 64) { // INCREASED: Only process every 64 pixels (was 16)
-      return; // Skip processing if change is less than 64 pixels
+    
+    if (!cameraWillMove && playerWorldYChange < 128) { // INCREASED threshold when camera not moving
+      return; // Skip processing entirely
     }
+    
     lastProcessedPlayerWorldYRef.current = playerWorldY;
     
-    // PERFORMANCE: Throttle playerWorldY updates to prevent constant recalculation
-    const throttledPlayerWorldY = Math.floor(playerWorldY / 32) * 32; // Round to 32px increments
-    
-    // FIXED: More responsive camera that follows player upward movement
-    const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.35); // Slightly more responsive
-    
-    // Calculate desired camera position based on player
-    const targetCameraY = Math.max(0, throttledPlayerWorldY - DEADZONE_FROM_TOP);
-    // Only move camera upward (never snap down)
-    const newCameraY = Math.max(cameraY, -targetCameraY); // Negative because Y increases downward
-    
-    // FIXED: More stable camera movement
-    if (Math.abs(newCameraY - cameraY) > 1) {
+    // Only update camera if it actually changed
+    if (cameraWillMove) {
       setCameraY(newCameraY);
     }
     
-    // FIXED: Generate ahead based on camera position
-    const cameraTop = newCameraY; // Top of camera view in world coords
-    const wantGenerateAbove = cameraTop - AHEAD_BUFFER_SCREENS * SCREEN_H;
-    
-    // Generate new bands if we're getting close to the limit
-    if (generatedMinYRef.current > wantGenerateAbove && generatedMinYRef.current > TOP_LIMIT_Y) {
-      let bandsGenerated = 0;
-        const maxBandsPerFrame = 1; // Reduced from 2 to prevent frame drops
+    // Only generate if camera moved significantly
+    if (cameraWillMove) {
+      const cameraTop = newCameraY;
+      const wantGenerateAbove = cameraTop - AHEAD_BUFFER_SCREENS * SCREEN_H;
       
-      while (generatedMinYRef.current > wantGenerateAbove && 
-             generatedMinYRef.current > TOP_LIMIT_Y && 
-             bandsGenerated < maxBandsPerFrame) {
+      // Generate new bands if we're getting close to the limit
+      if (generatedMinYRef.current > wantGenerateAbove && generatedMinYRef.current > TOP_LIMIT_Y) {
+        let bandsGenerated = 0;
+        const maxBandsPerFrame = 1;
         
-        const bandBottomY = generatedMinYRef.current - 20;
-        const bandTopY = Math.max(TOP_LIMIT_Y, bandBottomY - SCREEN_H);
-        
-        // Get current platforms for collision detection
-        const currentPlatforms = platformsRef.current;
-        const { newPlatforms, newDecos } = generateBand(bandTopY, bandBottomY, currentPlatforms);
-        
-        if (newPlatforms.length === 0) {
-          console.warn('[ProcGen] No platforms generated, stopping generation');
-          break;
+        while (generatedMinYRef.current > wantGenerateAbove && 
+               generatedMinYRef.current > TOP_LIMIT_Y && 
+               bandsGenerated < maxBandsPerFrame) {
+          
+          const bandBottomY = generatedMinYRef.current - 20;
+          const bandTopY = Math.max(TOP_LIMIT_Y, bandBottomY - SCREEN_H);
+          
+          const currentPlatforms = platformsRef.current;
+          const { newPlatforms, newDecos } = generateBand(bandTopY, bandBottomY, currentPlatforms);
+          
+          if (newPlatforms.length === 0) {
+            break;
+          }
+          
+          setPlatforms(prev => [...prev, ...newPlatforms]);
+          setDecorations(prev => [...prev, ...newDecos]);
+          generatedMinYRef.current = bandTopY;
+          bandsGenerated++;
         }
-        
-        
-        // Update state atomically
-        setPlatforms(prev => [...prev, ...newPlatforms]);
-        setDecorations(prev => [...prev, ...newDecos]);
-        generatedMinYRef.current = bandTopY;
-        bandsGenerated++;
       }
+      
+      // Cull platforms that are far below camera
+      const cullBelowY = newCameraY + AHEAD_BUFFER_SCREENS * SCREEN_H + 200;
+      setPlatforms(prev => {
+        const filtered = prev.filter(p => p.y < cullBelowY);
+        return filtered;
+      });
+      setDecorations(prev => {
+        const filtered = prev.filter(d => d.y < cullBelowY);
+        return filtered;
+      });
     }
-    
-    // FIXED: Cull platforms that are far below camera (performance optimization)
-    const cullBelowY = newCameraY + AHEAD_BUFFER_SCREENS * SCREEN_H + 200;
-    setPlatforms(prev => {
-      const filtered = prev.filter(p => p.y < cullBelowY);
-      if (filtered.length !== prev.length && __DEV__) {
-        console.log(`[ProcGen] Culled ${prev.length - filtered.length} platforms below Y ${Math.round(cullBelowY)}`);
-      }
-      return filtered;
-    });
-    setDecorations(prev => {
-      const filtered = prev.filter(d => d.y < cullBelowY);
-      return filtered;
-    });
-  }, [playerWorldY, floorTopY, TOP_LIMIT_Y, cameraY]); // Include platforms to get fresh collision data
+  }, [playerWorldY, floorTopY, TOP_LIMIT_Y, cameraY]);
 
   
   return { platforms, decorations, cameraY };

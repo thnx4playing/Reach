@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Text, Pressable } from 'react-native';
 import { Canvas, Rect, Group } from '@shopify/react-native-skia';
@@ -227,9 +228,10 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   }, []);
 
 
-  // Only real platforms collide (both grass and wood)
+  // Fix 2: Correct platform collision detection
   const isSolidPrefab = (name: string) => {
-    const isPlatform = /platform/i.test(name);
+    // Check for any platform type (grass OR wood)
+    const isPlatform = /platform/i.test(name) || name === 'floor-final' || name === 'floor';
     return isPlatform;
   };
 
@@ -261,9 +263,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
 
       // Skip only if delta time is too large (lag spike)
       if (dt > 0.05) {
-        if (false && __DEV__) {
-          console.log(`[PERF] Skipping frame - dt: ${dt.toFixed(4)}`);
-        }
         raf = requestAnimationFrame(loop);
         return;
       }
@@ -375,7 +374,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         peakZRef.current = 0;
       }
       
-      // SIMPLE COLLISION: Only when falling
+      // Fix 5: Additional optimization for collision detection
       if (vzRef.current < 0) {
         // Fall session tracking
         if (!fallingRef.current) {
@@ -385,21 +384,33 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           peakZRef.current = Math.max(peakZRef.current, Math.max(0, zRef.current));
         }
         
-        // SIMPLE: Just check if player is above any platform
+        // OPTIMIZED COLLISION: Only check platforms near the player
         let landed = false;
-        let collisionChecks = 0;
-        const collisionStart = performance.now();
+        const playerCenterX = box.cx;
+        const playerBottom = currFeetY;
         
+        // Filter platforms to only those that could possibly be collided with
+        const nearbyPlatforms = platforms?.filter(platform => {
+          if (!platform || !isSolidPrefab(platform.prefab)) return false;
+          
+          const platformRight = platform.x + (prefabWidthPx(levelData.mapName, platform.prefab, platform.scale || SCALE));
+          const platformTop = platform.y;
+          const platformBottom = platform.y + 50; // Approximate platform height
+          
+          // Quick bounds check - only check platforms player could be near
+          const horizontalOverlap = box.left < platformRight && box.right > platform.x;
+          const verticalNear = Math.abs(playerBottom - platformTop) < 100; // Within 100px vertically
+          
+          return horizontalOverlap && verticalNear;
+        }) || [];
         
-        for (const platform of platforms || []) {
-          if (!isSolidPrefab(platform.prefab)) continue;
-          collisionChecks++;
-          
-          
+        // Only process a maximum of 5 nearby platforms per frame for performance
+        const platformsToCheck = nearbyPlatforms.slice(0, 5);
+        
+        for (const platform of platformsToCheck) {
           const platformTop = platform.y;
           const platformLeft = platform.x;
           const platformRight = platform.x + (prefabWidthPx(levelData.mapName, platform.prefab, platform.scale || SCALE));
-          
           
           // Check if player is horizontally over the platform
           if (box.left < platformRight && box.right > platformLeft) {
@@ -410,7 +421,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               vzRef.current = 0;
               onGroundRef.current = true;
               landed = true;
-              
               
               // Landing damage
               if (fallingRef.current) {
@@ -430,7 +440,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         if (!landed) {
           onGroundRef.current = false;
         }
-        
       }
 
       // ==== CEILING COLLISION (rising only) ====
@@ -475,10 +484,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         onGroundRef.current = false;
         consumeJump(jumpStateRef.current);
         playJumpSound();
-        
-        if (__DEV__) {
-          console.log(`[JUMP] Executed jump: velocity=${JUMP_VELOCITY}, playerZ=${Math.round(zRef.current)}, cameraY=${Math.round(cameraY)}`);
-        }
       }
 
       tickIgnoreCeil(jumpStateRef.current);
@@ -500,20 +505,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       maxLoopTime = Math.max(maxLoopTime, loopTime);
       minLoopTime = Math.min(minLoopTime, loopTime);
       
-      // Log performance stats every 10 seconds (further reduced for better performance)
+      // Reset performance counters every 10 seconds
       if (t - lastDebugTime > 10000) {
-        const avgLoopTime = totalLoopTime / frameCount;
-        const fps = frameCount / ((t - lastDebugTime) / 1000);
-        
-        console.log(`[PERF] Frame Stats (${frameCount} frames):`, {
-          avgLoopTime: avgLoopTime.toFixed(2) + 'ms',
-          maxLoopTime: maxLoopTime.toFixed(2) + 'ms',
-          minLoopTime: minLoopTime.toFixed(2) + 'ms',
-          fps: fps.toFixed(1),
-          platforms: platforms?.length || 0,
-          decorations: decorations?.length || 0
-        });
-        
         // Reset counters
         frameCount = 0;
         totalLoopTime = 0;

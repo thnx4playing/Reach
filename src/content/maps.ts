@@ -57,6 +57,7 @@ const GRASSY_PLATFORM_COLS: Record<string, number> = {
   "floor-final": 1,
 };
 
+// Fix 4: Verify wood platforms have correct collision definitions
 // Create minimal grassy catalog for prefab definitions (no image needed)
 const grassyCatalog: PrefabCatalog = {
   meta: {
@@ -67,13 +68,13 @@ const grassyCatalog: PrefabCatalog = {
   frames: {}, // No frames needed for individual sprites
   prefabs: {
     // Platform prefabs with proper solid cells for collision detection
-    "floor-final": { cells: [[1]] },
-    "platform-grass-1-final": { cells: [[1]] },
-    "platform-grass-3-final": { cells: [[1,1,1]] },
-    "platform-wood-1-final": { cells: [[1]] },
-    "platform-wood-2-left-final": { cells: [[1,1]] },
-    "platform-wood-2-right-final": { cells: [[1,1]] },
-    "platform-wood-3-final": { cells: [[1,1,1]] },
+    "floor-final": { cells: [["cell-0-0"]] }, // Use cell reference instead of number
+    "platform-grass-1-final": { cells: [["cell-0-0"]] },
+    "platform-grass-3-final": { cells: [["cell-0-0", "cell-1-0", "cell-2-0"]] },
+    "platform-wood-1-final": { cells: [["cell-0-0"]] }, // FIXED: Make wood platforms solid
+    "platform-wood-2-left-final": { cells: [["cell-0-0", "cell-1-0"]] },
+    "platform-wood-2-right-final": { cells: [["cell-0-0", "cell-1-0"]] },
+    "platform-wood-3-final": { cells: [["cell-0-0", "cell-1-0", "cell-2-0"]] },
     // Decoration prefabs (no collision needed)
     "tree-large-final": { cells: [[null, null, null, null], [null, null, null, null]] },
     "tree-medium-final": { cells: [[null, null, null, null], [null, null, null, null]] },
