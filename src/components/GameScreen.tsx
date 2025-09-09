@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Text, Pressable } from 'react-native';
-import { Canvas, Rect } from '@shopify/react-native-skia';
+import { Canvas, Rect, Group } from '@shopify/react-native-skia';
 
 import { makeStaticFloor } from '../content/floor';
 import { DashCharacter } from './DashCharacter';
@@ -11,6 +11,7 @@ import ParallaxBackground from '../render/ParallaxBackground';
 import { PARALLAX } from '../content/parallaxConfig';
 import type { LevelData } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, prefabWidthPx, prefabTopSolidSegmentsPx, prefabPlatformSlabsPx } from '../content/maps';
+import { useVerticalProcGen } from '../systems/useVerticalProcGen';
 import { MapImageProvider } from '../render/MapImageContext';
 // import TestTile from '../render/TestTile';
 import idleJson from '../../assets/character/dash/Idle_atlas.json';
@@ -23,6 +24,7 @@ import HealthBar from './HealthBar';
 import HealthBarDebugger from './HealthBarDebugger';
 import { DeathModal } from '../ui/DeathModal';
 import { useDamageAnimations } from '../systems/health/useDamageAnimations';
+
 
 // Audio system imports
 import { useSound } from '../audio/useSound';
@@ -70,6 +72,13 @@ interface GameScreenProps {
 
 // Inner game component that uses health hooks
 const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
+  // Quick smoke test for prefab catalog
+  useEffect(() => {
+    const cat = (MAPS as any).grassy?.prefabs?.prefabs;
+    console.log('[grassy] prefabs:', cat && Object.keys(cat).length);
+    console.log('[grassy] has floor-final:', !!cat?.['floor-final']);
+  }, []);
+
   // Handlers for death modal
   const handleRestart = useCallback(() => {
     // Reset health system
@@ -115,8 +124,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
     onBack();
   }, [onBack]);
 
-  const [cameraY, setCameraY] = useState(0);
   const [cameraX, setCameraX] = useState(0);
+  const [cameraY, setCameraY] = useState(0);
   const [currentPlayerBox, setCurrentPlayerBox] = useState<{left: number; right: number; top: number; bottom: number; cx: number; feetY: number; w: number; h: number} | null>(null);
   const [frameCount, setFrameCount] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
@@ -180,13 +189,13 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // Use proper floor calculation from floor.ts
   
 
-
 const floorTopY = useMemo(() => {
   // tile size + prefab rows from the active map
   const meta = (MAPS as any)[levelData.mapName]?.prefabs?.meta;
   const tile = meta?.tileSize ?? 16;
 
-  const pf = (MAPS as any)[levelData.mapName]?.prefabs?.prefabs?.floor;
+  const floorPrefabName = levelData.mapName === 'grassy' ? 'floor-final' : 'floor';
+  const pf = (MAPS as any)[levelData.mapName]?.prefabs?.prefabs?.[floorPrefabName];
   const rows = (pf?.cells?.length ?? pf?.rects?.length ?? 2);
 
   const floorHeight = rows * tile * SCALE; // rows * tile * SCALE
@@ -195,6 +204,23 @@ const floorTopY = useMemo(() => {
   
   return result;
 }, [levelData.mapName]);
+
+// Calculate player's world Y position
+const playerWorldY = floorTopY - zRef.current;
+
+// Use procedural generation for platforms and decorations
+const { platforms, decorations } = useVerticalProcGen(
+  {
+    mapName: levelData.mapName as any,
+    floorTopY,
+    initialPlatforms: levelData.platforms,     // just the floor
+    initialDecorations: levelData.decorations, // ground props if any
+    scale: 2,
+    maxScreens: 10,    // build ~10 screens up
+    initialBands: 1,   // pre-populate first screen
+  },
+  playerWorldY
+);
 
   const mapDef = MAPS[levelData.mapName];
 
@@ -263,7 +289,7 @@ const floorTopY = useMemo(() => {
   // Build platform slabs in world space (no camera)
   const platformSlabs: WorldSlab[] = useMemo(() => {
     const out: WorldSlab[] = [];
-    for (const p of (levelData.platforms ?? [])) {
+    for (const p of (platforms ?? [])) {
       if (!isSolidPrefab(p.prefab)) continue;         // process only solid platforms
       const scale = p.scale ?? SCALE;
       const slabs = prefabPlatformSlabsPx(levelData.mapName, p.prefab, scale);
@@ -278,7 +304,7 @@ const floorTopY = useMemo(() => {
     
     
     return out;
-  }, [levelData.mapName, levelData.platforms, SCALE]);
+  }, [levelData.mapName, platforms, SCALE]);
 
   // Memory leak detection for platformSlabs
   const platformSlabsRef = useRef<any[]>([]);
@@ -305,8 +331,6 @@ const floorTopY = useMemo(() => {
 
   //   return () => subscription?.remove();
   // }, []);
-
-
 
 
 
@@ -800,8 +824,19 @@ const floorTopY = useMemo(() => {
         
         // Update parallax timing and camera
         setElapsedSec(t / 1000);
-        // Keep background stable - no vertical camera movement to prevent jumping
-        setCameraY(0);
+        
+        // Camera rise logic - keep player ~60% down from top before scrolling
+        const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.40);
+        
+        // Convert world Z (upwards from floor) to screen Y (downwards)
+        const playerScreenY = zToY(floorTopY, zRef.current) - cameraY;
+        
+        // If player is getting too close to the top, move the world down
+        // IMPORTANT: cameraY must never go positive, otherwise world moves up and you see sky under floor
+        if (playerScreenY < DEADZONE_FROM_TOP) {
+          const target = playerScreenY - DEADZONE_FROM_TOP; // this is ≤ 0
+          if (target < cameraY) setCameraY(target);         // monotonic: only move further negative
+        }
       } catch (error) {
         crashCountRef.current++;
         console.error(`CRASH #${crashCountRef.current} in state updates:`, error, {
@@ -868,45 +903,48 @@ const floorTopY = useMemo(() => {
           {/* Test tile canary - shows instantly if image loading works */}
           {/* <TestTile /> */}
           
-          {/* Render all platforms (includes floor pieces) */}
-          {levelData.platforms?.filter(Boolean).map((platform, index) => {
-            // Defensive check for required properties
-            if (!platform || typeof platform.x !== 'number' || typeof platform.y !== 'number' || !platform.prefab) {
-              console.warn(`Invalid platform at index ${index}:`, platform);
-              return null;
-            }
+          {/* Render world under a vertical camera transform */}
+          <Group transform={[{ translateY: -cameraY }]}>
+            {platforms?.filter(Boolean).map((platform, index) => {
+              // Defensive check for required properties
+              if (!platform || typeof platform.x !== 'number' || typeof platform.y !== 'number' || !platform.prefab) {
+                console.warn(`Invalid platform at index ${index}:`, platform);
+                return null;
+              }
+              
+              
+              return (
+              <PrefabNode
+                key={`platform-${index}`}
+                map={levelData.mapName}
+                name={platform.prefab}
+                x={platform.x}
+                y={platform.y}
+                scale={platform.scale || 2}
+              />
+              );
+            })}
             
-            return (
-            <PrefabNode
-              key={`platform-${index}`}
-              map={levelData.mapName}
-              name={platform.prefab}
-              x={platform.x}
-              y={platform.y}
-              scale={platform.scale || 2}
-            />
-            );
-          })}
-          
-          {/* Render decorations (non-colliding) */}
-          {levelData.decorations?.filter(Boolean).map((decoration, index) => {
-            // Defensive check for required properties
-            if (!decoration || typeof decoration.x !== 'number' || typeof decoration.y !== 'number' || !decoration.prefab) {
-              console.warn(`Invalid decoration at index ${index}:`, decoration);
-              return null;
-            }
-            
-            return (
-            <PrefabNode
-              key={`decoration-${index}`}
-              map={levelData.mapName}
-              name={decoration.prefab}
-              x={decoration.x}
-              y={decoration.y}
-              scale={decoration.scale || 2}
-            />
-            );
-          })}
+            {/* Render decorations (non-colliding) */}
+            {decorations?.filter(Boolean).map((decoration, index) => {
+              // Defensive check for required properties
+              if (!decoration || typeof decoration.x !== 'number' || typeof decoration.y !== 'number' || !decoration.prefab) {
+                console.warn(`Invalid decoration at index ${index}:`, decoration);
+                return null;
+              }
+              
+              return (
+              <PrefabNode
+                key={`decoration-${index}`}
+                map={levelData.mapName}
+                name={decoration.prefab}
+                x={decoration.x}
+                y={decoration.y}
+                scale={decoration.scale || 2}
+              />
+              );
+            })}
+          </Group>
           
           {/* DISABLED: Collision debug rendering - was potentially causing crashes */}
           {/* {__DEV__ && platformSlabs.map((slab, index) => (
