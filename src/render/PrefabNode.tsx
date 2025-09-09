@@ -1,25 +1,28 @@
 import React from "react";
-import { Image as SkImage, useImage, Group } from "@shopify/react-native-skia";
+import { Image as SkImageComponent, useImage } from "@shopify/react-native-skia";
 import { MAPS, MapName } from "../content/maps";
-import { useMapSkImage } from "./MapImageContext";
+import { usePreloadedImage } from "./ImagePreloaderContext";
+import { grassyPrefabImages } from "../assets/grassyPrefabs";
 
 type Props = { map: MapName; name: string; x?: number; y?: number; scale?: number };
-
 
 export function PrefabNode({ map, name, x = 0, y = 0, scale = 2 }: Props) {
   const def = MAPS[map];
   const pf = def.prefabs?.prefabs?.[name];
-  if (!pf) {
-    if (__DEV__) console.warn(`[PrefabNode] missing prefab "${name}" in map "${map}"`);
-    return null;
+  if (!pf) { 
+    if (__DEV__) console.warn(`[PrefabNode] missing "${name}" in "${map}"`); 
+    return null; 
   }
-  const tile = (def.prefabs?.meta?.tileSize ?? 16) * scale;
 
-  // SIMPLIFIED: Use direct image loading only
-  const { skImage: ctxImg } = useMapSkImage();
-  const img = ctxImg || useImage(def.image);
-
-  if (!img) {
+  // Prefer preloaded (zero-jank). If not yet loaded, try direct useImage source from manifest.
+  const img = usePreloadedImage(map, name);
+  const fallbackImg = !img ? (() => {
+    const src = map === "grassy" ? grassyPrefabImages[name] : undefined;
+    return src ? useImage(src) : null;
+  })() : null;
+  
+  const finalImg = img || fallbackImg;
+  if (!finalImg) {
     // Only warn once per prefab type to reduce spam
     if (__DEV__ && !(PrefabNode as any)._warnedPrefabs) {
       (PrefabNode as any)._warnedPrefabs = new Set();
@@ -32,48 +35,42 @@ export function PrefabNode({ map, name, x = 0, y = 0, scale = 2 }: Props) {
     return null;
   }
 
-  const drawRect = (f: any, rx: number, ry: number, key: string) => {
-    if (!f) return null;
-    const sx = f.x, sy = f.y, sw = f.w, sh = f.h;
+  const tile = (def.prefabs?.meta?.tileSize ?? 16) * scale;
+  let cols = 1, rows = 1;
 
-    // Absolute, top-left placement
-    const dx = x + rx * tile;
-    const dy = y + ry * tile;
-    const dw = Math.round(sw * scale);
-    const dh = Math.round(sh * scale);
+  if (pf.cells?.length) {
+    rows = pf.cells.length;
+    cols = Math.max(...pf.cells.map(row => {
+      let maxCol = 0;
+      for (let i = row.length - 1; i >= 0; i--) if (row[i] != null) { maxCol = i + 1; break; }
+      return maxCol;
+    }));
+  } else if (pf.rects?.length) {
+    rows = pf.rects.length;
+    cols = Math.max(...pf.rects.map(row => {
+      let maxCol = 0;
+      for (let i = row.length - 1; i >= 0; i--) if (row[i] != null) { maxCol = i + 1; break; }
+      return maxCol;
+    }));
+  }
 
-    // FIXED: Use Group with clip instead of srcRect to avoid clipping issues
-    return (
-      <Group
-        key={key}
-        clip={{ x: dx, y: dy, width: dw, height: dh }}
-      >
-        <SkImage
-          image={img}
-          x={dx - sx * scale}
-          y={dy - sy * scale}
-          width={img.width() * scale}
-          height={img.height() * scale}
-          fit="fill"
-        />
-      </Group>
-    );
-  };
+  const width = cols * tile;
+  const height = rows * tile;
+
+  // optional foot inset (same idea as the other AI's version)
+  const footInset = (["tree-large-final","tree-medium-final","tree-small-final",
+                      "mushroom-red-large-final","mushroom-red-medium-final","mushroom-red-small-final",
+                      "mushroom-green-large-final","mushroom-green-medium-final","mushroom-green-small-final",
+                      "grass-1-final","grass-2-final","grass-3-final","grass-4-final","grass-5-final","grass-6-final"]
+                    .includes(name) ? 2.5*scale : 0);
 
   return (
-    <>
-      {pf.cells?.map((row: any[], ry: number) =>
-        row.map((cell: string | null, rx: number) => {
-          if (!cell) return null;
-          // Use correct frame lookup priority for grassy map
-          const frame = def.frames?.[cell] || (def as any).grid?.[cell] || (def as any).grid?.frames?.[cell];
-          return frame ? drawRect(frame, rx, ry, `c-${rx}-${ry}`) : null;
-        })
-      )}
-      {pf.rects?.map((row: any[], ry: number) =>
-        row.map((r: any, rx: number) => (r ? drawRect(r, rx, ry, `r-${rx}-${ry}`) : null))
-      )}
-    </>
+    <SkImageComponent
+      image={finalImg}
+      x={Math.round(x)} y={Math.round(y + footInset)}
+      width={Math.round(width)} height={Math.round(height)}
+      fit="fill"
+    />
   );
 }
 

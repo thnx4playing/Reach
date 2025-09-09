@@ -37,8 +37,7 @@ const dungeonImage  = require("../../assets/maps/dungeon/dungeon-tileset-final.p
 import frozenPrefs  from "../../assets/maps/frozen/frozen_prefabs.json";
 const frozenImage   = require("../../assets/maps/frozen/frozen-tileset-final.png") as number;
 
-import grassyCatalogJson from "../../assets/maps/grassy/grassy_prefabs.json";
-const grassyImage  = require("../../assets/maps/grassy/grassy_prefabs_final.png") as number;
+// Grassy map now uses individual sprites, no tilesheet needed
 
 // ---- Registry ----
 export type MapDef = {
@@ -47,7 +46,48 @@ export type MapDef = {
   frames: Record<string, {x:number;y:number;w:number;h:number}>;
 };
 
-const grassyCatalog = grassyCatalogJson as PrefabCatalog;
+// Create minimal grassy catalog for prefab definitions (no image needed)
+const grassyCatalog: PrefabCatalog = {
+  meta: {
+    map: "grassy",
+    tileset_image: "individual_sprites",
+    tileSize: 16,
+  },
+  frames: {}, // No frames needed for individual sprites
+  prefabs: {
+    // We'll need to define the prefab structures here or import them from somewhere
+    // For now, create a minimal structure
+    "floor-final": { cells: [[null, null, null, null], [null, null, null, null]] },
+    "platform-grass-1-final": { cells: [[null, null, null, null]] },
+    "platform-grass-3-final": { cells: [[null, null, null, null]] },
+    "platform-wood-1-final": { cells: [[null, null, null, null]] },
+    "platform-wood-2-left-final": { cells: [[null, null, null, null]] },
+    "platform-wood-2-right-final": { cells: [[null, null, null, null]] },
+    "platform-wood-3-final": { cells: [[null, null, null, null]] },
+    "tree-large-final": { cells: [[null, null, null, null], [null, null, null, null]] },
+    "tree-medium-final": { cells: [[null, null, null, null], [null, null, null, null]] },
+    "tree-small-final": { cells: [[null, null, null, null]] },
+    "mushroom-red-large-final": { cells: [[null, null, null, null]] },
+    "mushroom-red-medium-final": { cells: [[null, null, null, null]] },
+    "mushroom-red-small-final": { cells: [[null, null, null, null]] },
+    "mushroom-green-large-final": { cells: [[null, null, null, null]] },
+    "mushroom-green-medium-final": { cells: [[null, null, null, null]] },
+    "mushroom-green-small-final": { cells: [[null, null, null, null]] },
+    "grass-1-final": { cells: [[null, null, null, null]] },
+    "grass-2-final": { cells: [[null, null, null, null]] },
+    "grass-3-final": { cells: [[null, null, null, null]] },
+    "grass-4-final": { cells: [[null, null, null, null]] },
+    "grass-5-final": { cells: [[null, null, null, null]] },
+    "grass-6-final": { cells: [[null, null, null, null]] },
+    "heart-potion-final": { cells: [[null, null, null, null]] },
+    "blue-potion-final": { cells: [[null, null, null, null]] },
+    "key-final": { cells: [[null, null, null, null]] },
+    "bow-final": { cells: [[null, null, null, null]] },
+    "sword-final": { cells: [[null, null, null, null]] },
+    "wand-final": { cells: [[null, null, null, null]] },
+    "boot-final": { cells: [[null, null, null, null]] },
+  }
+};
 const darkCatalog   = darkPrefs       as PrefabCatalog;
 const desertCatalog = desertPrefs     as PrefabCatalog;
 const dungeonCatalog= dungeonPrefs    as PrefabCatalog;
@@ -58,7 +98,7 @@ export const MAPS = {
   desert:  { image: desertImage,  prefabs: desertCatalog,  frames: (desertCatalog as any).frames || {} },
   dungeon: { image: dungeonImage, prefabs: dungeonCatalog, frames: (dungeonCatalog as any).frames || {} },
   frozen:  { image: frozenImage,  prefabs: frozenCatalog,  frames: (frozenCatalog as any).frames || {} },
-  grassy:  { image: grassyImage,  prefabs: grassyCatalog,  frames: (grassyCatalog as any).frames || {} },
+  grassy:  { image: undefined,  prefabs: grassyCatalog,  frames: {} },
 } as const;
 
 export type MapName = keyof typeof MAPS;

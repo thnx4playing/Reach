@@ -12,7 +12,7 @@ import { PARALLAX } from '../content/parallaxConfig';
 import type { LevelData } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, prefabWidthPx, prefabTopSolidSegmentsPx, prefabPlatformSlabsPx } from '../content/maps';
 import { useVerticalProcGen } from '../systems/useVerticalProcGen';
-import { MapImageProvider } from '../render/MapImageContext';
+import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
 import idleJson from '../../assets/character/dash/Idle_atlas.json';
 import { dbg } from '../utils/dbg';
 
@@ -589,7 +589,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   return (
     <SafeTouchBoundary>
       <View style={styles.root}>
-       <MapImageProvider source={(MAPS as any)[levelData.mapName].image}>
       <Canvas 
         style={styles.canvas}
         pointerEvents="none"
@@ -670,7 +669,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
             }}
           />
          </Canvas>
-       </MapImageProvider>
       
       {/* Health Bar */}
       <HealthBar 
@@ -705,10 +703,12 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
 // Main GameScreen component
 export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   return (
-    <InnerGameScreen 
-      levelData={levelData} 
-      onBack={onBack}
-    />
+    <ImagePreloaderProvider maps={[levelData.mapName]}>
+      <InnerGameScreen 
+        levelData={levelData} 
+        onBack={onBack}
+      />
+    </ImagePreloaderProvider>
   );
 };
 
