@@ -10,7 +10,7 @@ import { PrefabNode } from '../render/PrefabNode';
 import ParallaxBackground from '../render/ParallaxBackground';
 import { PARALLAX } from '../content/parallaxConfig';
 import type { LevelData } from '../content/levels';
-import { MAPS, getPrefab, getTileSize, prefabWidthPx, prefabTopSolidSegmentsPx, prefabPlatformSlabsPx } from '../content/maps';
+import { MAPS, getPrefab, getTileSize, prefabWidthPx } from '../content/maps';
 import { useVerticalProcGen } from '../systems/useVerticalProcGen';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
 import idleJson from '../../assets/character/dash/Idle_atlas.json';
@@ -52,7 +52,7 @@ function zToY(floorTopY: number, zWorld: number) {
 const SCALE      = 2;
 const RUN_SPEED  = 220;   // INCREASED back to original feel
 const GRAVITY    = 1500;  // RESTORED: Better balance between responsive and floaty
-const JUMP_VEL   = 650;   // RESTORED: Good jump height that feels responsive
+const JUMP_VEL   = 780;   // INCREASED: 20% higher jump for testing (was 650)
 const JUMP_VELOCITY = JUMP_VEL;
 const ACCEL = 1200;  // INCREASED: Faster acceleration
 const DECEL = 800;   // INCREASED: Faster deceleration  
@@ -184,6 +184,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
     },
     playerWorldY
   );
+  
+
 
   const mapDef = MAPS[levelData.mapName];
 
@@ -224,63 +226,14 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
     noteJumpPressed(jumpStateRef.current);
   }, []);
 
-  // Slab type used by physics in world-Y units (screen coordinates)
-  type WorldSlab = {
-    left: number;
-    right: number;
-    yTop: number;
-    yBottom: number;
+
+  // Only real platforms collide (both grass and wood)
+  const isSolidPrefab = (name: string) => {
+    const isPlatform = /platform/i.test(name);
+    return isPlatform;
   };
 
-  // Only real platforms collide
-  const isSolidPrefab = (name: string) => /platform/i.test(name);
-
-  // PERFORMANCE: Memoize platform slabs and update less frequently
-  const platformSlabs: WorldSlab[] = useMemo(() => {
-    const start = performance.now();
-    const out: WorldSlab[] = [];
-    let platformCount = 0;
-    let slabCount = 0;
-    
-    for (const p of (platforms ?? [])) {
-      if (!isSolidPrefab(p.prefab)) continue;
-      platformCount++;
-      const scale = p.scale ?? SCALE;
-      const slabs = prefabPlatformSlabsPx(levelData.mapName, p.prefab, scale);
-      for (const s of slabs) {
-        slabCount++;
-        const left  = p.x + s.x;
-        const right = left + s.w;
-        const yTop  = p.y + s.yTop;
-        const yBottom = yTop + s.h;
-        out.push({ left, right, yTop, yBottom });
-      }
-    }
-    
-    const time = performance.now() - start;
-    if (__DEV__ && time > 8) {
-      console.log(`[PERF] PlatformSlabs generation: ${time.toFixed(2)}ms for ${platformCount} platforms, ${slabCount} slabs`);
-    }
-    
-    return out;
-  }, [levelData.mapName, platforms, SCALE]);
-   // Build a simple vertical bucket index for slabs to reduce per-frame collision checks
-   const slabBuckets = useMemo(() => {
-     const CELL_H = 64; // pixels per vertical bucket
-     const buckets = new Map<number, WorldSlab[]>();
-     
-     for (const s of platformSlabs) {
-       const topBucket = Math.floor(s.yTop / CELL_H);
-       const bottomBucket = Math.floor((s.yTop + (s.yBottom - s.yTop)) / CELL_H);
-       for (let b = topBucket; b <= bottomBucket; b++) {
-         const arr = buckets.get(b) || [];
-         arr.push(s);
-         buckets.set(b, arr);
-       }
-     }
-     return { buckets, CELL_H };
-   }, [platformSlabs]);
- // Removed frameCount dependency for performance
+  // SIMPLIFIED: No more complex platform slabs - just use platforms directly
 
   // One-time spawn on floor
   useEffect(() => {
@@ -319,22 +272,29 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
 
       // PERFORMANCE: Removed extensive validation - trust the refs
       
-      // PERFORMANCE DEBUG: Track getPlayerBox timing
-      const boxStart = performance.now();
-      const box = getPlayerBox({
-        xRefIsLeftEdge: true,
-        x: xRef.current,
-        z: zRef.current,
-        floorTopY,
-        charW: CHAR_W,
-        colW: COL_W,
-        colH: COL_H,
-      });
-      const boxTime = performance.now() - boxStart;
+      // PERFORMANCE: Cache getPlayerBox result and only recalculate when needed
+      let box = currentPlayerBox;
+      if (!box || frameCount % 2 === 0) { // Only recalculate every 2nd frame
+        const boxStart = performance.now();
+        box = getPlayerBox({
+          xRefIsLeftEdge: true,
+          x: xRef.current,
+          z: zRef.current,
+          floorTopY,
+          charW: CHAR_W,
+          colW: COL_W,
+          colH: COL_H,
+        });
+        const boxTime = performance.now() - boxStart;
+        setCurrentPlayerBox(box);
+      }
       
-      // Increment frame counter (throttled)
-      if (frameCount % 4 === 0) {
+      // PERFORMANCE: Balanced state update frequency for smooth animation
+      if (frameCount % 2 === 0) { // Every 2 frames for smooth animation
         setFrameCount(prev => prev + 1);
+        setX(xRef.current);
+        setZ(zRef.current);
+        setElapsedSec(t / 1000);
       }
 
       // PERFORMANCE: Simplified horizontal movement
@@ -407,11 +367,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       const headLeft = newBox.cx - HEAD_W * 0.5;
       const headRight = newBox.cx + HEAD_W * 0.5;
 
-      // ==== ONE-WAY PLATFORM COLLISION: LANDING ONLY (falling only) ====
-      
-      // Initialize collision tracking variables
-      let collisionTime = 0;
-      let collisionChecks = 0;
+      // ==== SIMPLIFIED PLATFORM COLLISION: Just check if above platform and falling ====
       
       // Reset fall session when not falling
       if (vzRef.current >= 0 && fallingRef.current) {
@@ -419,9 +375,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         peakZRef.current = 0;
       }
       
-      // FIXED: Only check platform collision when falling (vzRef.current < 0)
+      // SIMPLE COLLISION: Only when falling
       if (vzRef.current < 0) {
-        
         // Fall session tracking
         if (!fallingRef.current) {
           fallingRef.current = true;
@@ -430,58 +385,52 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           peakZRef.current = Math.max(peakZRef.current, Math.max(0, zRef.current));
         }
         
-        let bestTop: number | null = null;
-        
-        // PERFORMANCE DEBUG: Track collision detection timing
+        // SIMPLE: Just check if player is above any platform
+        let landed = false;
+        let collisionChecks = 0;
         const collisionStart = performance.now();
         
-         // Use bucketed collision detection for better performance
-         const yMin = Math.min(prevFeetY, currFeetY) - 48;
-         const yMax = Math.max(prevFeetY, currFeetY) + 4;
-         const bMin = Math.floor(yMin / slabBuckets.CELL_H);
-         const bMax = Math.floor(yMax / slabBuckets.CELL_H);
-         const candidates: WorldSlab[] = [];
-         for (let b = bMin; b <= bMax; b++) {
-           const arr = slabBuckets.buckets.get(b);
-           if (arr) candidates.push(...arr);
-         }
-         for (const s of candidates) {
+        
+        for (const platform of platforms || []) {
+          if (!isSolidPrefab(platform.prefab)) continue;
           collisionChecks++;
-          // Check horizontal overlap
-          if (newBox.right <= s.left || newBox.left >= s.right) continue;
           
-          // FIXED: One-way platform collision - only land on top when falling
-          // Player's feet must cross the platform top from above
-          const crossedFromAbove = prevFeetY <= s.yTop && currFeetY >= s.yTop - CROSS_PAD;
           
-          if (crossedFromAbove) {
-            if (bestTop === null || s.yTop < bestTop) {
-              bestTop = s.yTop;
+          const platformTop = platform.y;
+          const platformLeft = platform.x;
+          const platformRight = platform.x + (prefabWidthPx(levelData.mapName, platform.prefab, platform.scale || SCALE));
+          
+          
+          // Check if player is horizontally over the platform
+          if (box.left < platformRight && box.right > platformLeft) {
+            // Check if player's feet are at or below the platform top
+            if (currFeetY >= platformTop - 5 && currFeetY <= platformTop + 10) {
+              // Land on the platform
+              zRef.current = Math.max(0, floorTopY - platformTop);
+              vzRef.current = 0;
+              onGroundRef.current = true;
+              landed = true;
+              
+              
+              // Landing damage
+              if (fallingRef.current) {
+                const dropPx = Math.max(0, peakZRef.current - zRef.current);
+                if (dropPx >= FALL_THRESHOLD) {
+                  takeDamage(1);
+                  playDamageSound();
+                }
+                fallingRef.current = false;
+                peakZRef.current = 0;
+              }
+              break;
             }
           }
         }
         
-        collisionTime = performance.now() - collisionStart;
-        
-        if (bestTop !== null) {
-          zRef.current = Math.max(0, floorTopY - bestTop);
-          vzRef.current = 0;
-          onGroundRef.current = true;
-          lastVzReason.current = 'land-top';
-
-          // Fall damage
-          if (fallingRef.current) {
-            const dropPx = Math.max(0, peakZRef.current - zRef.current);
-            if (dropPx >= FALL_THRESHOLD) {
-              takeDamage(1);
-              playDamageSound();
-            }
-            fallingRef.current = false;
-            peakZRef.current = 0;
-          }
-        } else {
+        if (!landed) {
           onGroundRef.current = false;
         }
+        
       }
 
       // ==== CEILING COLLISION (rising only) ====
@@ -526,17 +475,16 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         onGroundRef.current = false;
         consumeJump(jumpStateRef.current);
         playJumpSound();
+        
+        if (__DEV__) {
+          console.log(`[JUMP] Executed jump: velocity=${JUMP_VELOCITY}, playerZ=${Math.round(zRef.current)}, cameraY=${Math.round(cameraY)}`);
+        }
       }
 
       tickIgnoreCeil(jumpStateRef.current);
 
-      // PERFORMANCE: Throttled state updates
+      // PERFORMANCE: Camera logic only (state updates moved to earlier in loop)
       if (frameCount % 2 === 0) {
-        setX(xRef.current);
-        setZ(zRef.current);
-        setElapsedSec(t / 1000);
-        
-        // Camera logic
         const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.40);
         const playerScreenY = zToY(floorTopY, zRef.current) - cameraY;
         
@@ -552,8 +500,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       maxLoopTime = Math.max(maxLoopTime, loopTime);
       minLoopTime = Math.min(minLoopTime, loopTime);
       
-      // Log performance stats every 2 seconds
-      if (t - lastDebugTime > 2000) {
+      // Log performance stats every 10 seconds (further reduced for better performance)
+      if (t - lastDebugTime > 10000) {
         const avgLoopTime = totalLoopTime / frameCount;
         const fps = frameCount / ((t - lastDebugTime) / 1000);
         
@@ -562,11 +510,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           maxLoopTime: maxLoopTime.toFixed(2) + 'ms',
           minLoopTime: minLoopTime.toFixed(2) + 'ms',
           fps: fps.toFixed(1),
-          boxTime: boxTime.toFixed(2) + 'ms',
-          newBoxTime: newBoxTime.toFixed(2) + 'ms',
-          collisionTime: collisionTime.toFixed(2) + 'ms',
-          collisionChecks: collisionChecks,
-          platformSlabs: platformSlabs.length,
           platforms: platforms?.length || 0,
           decorations: decorations?.length || 0
         });
@@ -636,21 +579,9 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               />
               );
             })}
+            
           </Group>
           
-          {/* Debug collision visualization - uncomment to debug */}
-          {/*__DEV__ && false && platformSlabs.slice(0, 20).map((slab, index) => (
-            <Group key={`collision-debug-${index}`} transform={[{ translateY: -cameraY }]}>
-              <Rect
-                x={slab.left}
-                y={slab.yTop}
-                width={slab.right - slab.left}
-                height={slab.yBottom - slab.yTop}
-                color="rgba(255,0,255,0.3)"
-                style="fill"
-              />
-            </Group>
-          ))*/}
           
           {/* Character renders in screen space */}
           <DashCharacter

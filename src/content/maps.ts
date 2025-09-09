@@ -46,6 +46,17 @@ export type MapDef = {
   frames: Record<string, {x:number;y:number;w:number;h:number}>;
 };
 
+// Helper map for grassy platform column counts
+const GRASSY_PLATFORM_COLS: Record<string, number> = {
+  "platform-grass-1-final": 1,
+  "platform-grass-3-final": 3,
+  "platform-wood-1-final": 1,
+  "platform-wood-2-left-final": 2,
+  "platform-wood-2-right-final": 2,
+  "platform-wood-3-final": 3,
+  "floor-final": 1,
+};
+
 // Create minimal grassy catalog for prefab definitions (no image needed)
 const grassyCatalog: PrefabCatalog = {
   meta: {
@@ -55,15 +66,15 @@ const grassyCatalog: PrefabCatalog = {
   },
   frames: {}, // No frames needed for individual sprites
   prefabs: {
-    // We'll need to define the prefab structures here or import them from somewhere
-    // For now, create a minimal structure
-    "floor-final": { cells: [[null, null, null, null], [null, null, null, null]] },
-    "platform-grass-1-final": { cells: [[null, null, null, null]] },
-    "platform-grass-3-final": { cells: [[null, null, null, null]] },
-    "platform-wood-1-final": { cells: [[null, null, null, null]] },
-    "platform-wood-2-left-final": { cells: [[null, null, null, null]] },
-    "platform-wood-2-right-final": { cells: [[null, null, null, null]] },
-    "platform-wood-3-final": { cells: [[null, null, null, null]] },
+    // Platform prefabs with proper solid cells for collision detection
+    "floor-final": { cells: [[1]] },
+    "platform-grass-1-final": { cells: [[1]] },
+    "platform-grass-3-final": { cells: [[1,1,1]] },
+    "platform-wood-1-final": { cells: [[1]] },
+    "platform-wood-2-left-final": { cells: [[1,1]] },
+    "platform-wood-2-right-final": { cells: [[1,1]] },
+    "platform-wood-3-final": { cells: [[1,1,1]] },
+    // Decoration prefabs (no collision needed)
     "tree-large-final": { cells: [[null, null, null, null], [null, null, null, null]] },
     "tree-medium-final": { cells: [[null, null, null, null], [null, null, null, null]] },
     "tree-small-final": { cells: [[null, null, null, null]] },
@@ -122,6 +133,11 @@ export function prefabWidthPx(map: MapName, prefabName: string, scale = 2): numb
   if (!p) return tile;
   if (p.cells) {
     const cols = Math.max(0, ...p.cells.map(row => row.length));
+    // Fallback for grassy map if cols is 0 (all null cells)
+    if (map === "grassy" && cols === 0) {
+      const fallbackCols = GRASSY_PLATFORM_COLS[prefabName] ?? 1;
+      return fallbackCols * tile;
+    }
     return Math.max(1, cols) * tile;
   }
   if (p.rects) {
@@ -136,7 +152,14 @@ export function prefabHeightPx(map: MapName, prefabName: string, scale = 2): num
   const p = getPrefab(map, prefabName);
   const tile = getTileSize(map) * scale;
   if (!p) return tile;
-  if (p.cells) return Math.max(1, p.cells.length) * tile;
+  if (p.cells) {
+    const rows = p.cells.length;
+    // Fallback for grassy map if rows is 0 (empty cells array)
+    if (map === "grassy" && rows === 0) {
+      return tile; // platforms are 1 tile tall for collision/top-solid purposes
+    }
+    return Math.max(1, rows) * tile;
+  }
   if (p.rects) {
     let maxY = 0;
     p.rects.forEach((row, ry) => row.forEach((r, rx) => { if (r) maxY = Math.max(maxY, ry+1); }));
@@ -196,7 +219,14 @@ export function prefabTopSolidSegmentsPx(
   for (let r = 0; r < rows.length; r++) {
     if (rows[r].some(Boolean)) { topRowIdx = r; break; }
   }
-  if (topRowIdx < 0) return segs;
+  if (topRowIdx < 0) {
+    // Fallback for grassy map if no truthy cells found
+    if (map === "grassy") {
+      const cols = GRASSY_PLATFORM_COLS[prefabName] ?? 1;
+      return [{ x: 0, y: 0, w: cols * tile, h: tile }];
+    }
+    return segs;
+  }
   const row = rows[topRowIdx];
   let start: number | null = null;
   for (let c = 0; c <= row.length; c++) {
@@ -226,6 +256,17 @@ export function prefabPlatformSlabsPx(map: MapName, prefabName: string, scale = 
         slabs.push({ x: c*tile, yTop: r*tile, w: tile, h: tile });
       }
     }
+  }
+  // Fallback for grassy map if no slabs found (empty rows array)
+  if (slabs.length === 0 && map === "grassy") {
+    const cols = GRASSY_PLATFORM_COLS[prefabName] ?? 1;
+    const fallbackSlabs = Array.from({ length: cols }, (_, c) => ({ 
+      x: c * tile, 
+      yTop: 0, 
+      w: tile, 
+      h: tile 
+    }));
+    return fallbackSlabs;
   }
   return slabs;
 }
