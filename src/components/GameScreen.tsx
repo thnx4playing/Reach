@@ -24,6 +24,9 @@ import HealthBarDebugger from './HealthBarDebugger';
 import { DeathModal } from '../ui/DeathModal';
 import { useDamageAnimations } from '../systems/health/useDamageAnimations';
 
+// Audio system imports
+import { useSound } from '../audio/useSound';
+
 // debug flag
 const VCOLLECT = __DEV__;
 import { getPlayerBox } from '../physics/playerBox';
@@ -69,9 +72,44 @@ interface GameScreenProps {
 const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // Handlers for death modal
   const handleRestart = useCallback(() => {
-    // Reset health and restart level
-    // TODO: Implement level restart logic
-  }, []);
+    // Reset health system
+    resetHealth();
+    
+    // Reset player position to spawn point
+    xRef.current = SCREEN_W * 0.5;
+    zRef.current = 0;
+    vxRef.current = 0;
+    vzRef.current = 0;
+    dirXRef.current = 0;
+    speedRef.current = 'idle';
+    onGroundRef.current = true;
+    
+    // Reset fall damage state
+    peakZRef.current = 0;
+    fallingRef.current = false;
+    vzPrevRef.current = 0;
+    onGroundPrevRef.current = true;
+    
+    // Reset jump state
+    if (jumpStateRef.current) {
+      jumpStateRef.current = initJumpState();
+    }
+    
+    // Update state variables to trigger re-render
+    setX(SCREEN_W * 0.5);
+    setZ(0);
+    setDirX(0);
+    setSpeedLevel('idle');
+    setCameraY(0);
+    setCameraX(0);
+    setFrameCount(0);
+    setElapsedSec(0);
+    
+    // Reset crash counter
+    crashCountRef.current = 0;
+    
+    console.log('[GameScreen] Level restarted - player reset to spawn point');
+  }, [resetHealth]);
 
   const handleMainMenu = useCallback(() => {
     onBack();
@@ -119,7 +157,10 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const FALL_THRESHOLD = SCREEN_H / 5;
 
   // Health system integration
-  const { isDead, bars, takeDamage, hits, sys } = useHealth();
+  const { isDead, bars, takeDamage, hits, sys, reset: resetHealth } = useHealth();
+  
+  // Audio system integration
+  const { playJumpSound, playDamageSound } = useSound();
   const maxHits = sys.state.maxHits;
   const { isHurt } = useDamageAnimations();
   
@@ -566,6 +607,7 @@ const floorTopY = useMemo(() => {
             const threshold = Dimensions.get('window').height / 5; // tune: /5 to test, /3 later
             if (dropPx >= threshold) {
               takeDamage(1);
+              playDamageSound();
             }
             fallingRef.current = false;
             peakZRef.current = 0;
@@ -645,6 +687,7 @@ const floorTopY = useMemo(() => {
             const threshold = Dimensions.get('window').height / 5;
             if (dropPx >= threshold) {
               takeDamage(1);
+              playDamageSound();
             }
             fallingRef.current = false;
             peakZRef.current = 0;
@@ -738,6 +781,9 @@ const floorTopY = useMemo(() => {
           vzRef.current = JUMP_VELOCITY;        // e.g., 632
           onGroundRef.current = false;
           consumeJump(jumpStateRef.current);
+          
+          // Play jump sound
+          playJumpSound();
         }
       } catch (error) {
         console.error('CRASH in jump system:', error);
@@ -932,10 +978,10 @@ const floorTopY = useMemo(() => {
       {/* Health Bar - rendered outside Canvas as Skia component */}
       <HealthBar 
         health={((maxHits - hits) / maxHits) * 100} 
-        width={120} 
-        height={20} 
-        x={20} 
-        y={20} 
+        width={160} 
+        height={28} 
+        x={SCREEN_W - 160 + 20} 
+        y={50} 
       />
       
       {/* Death modal */}
@@ -951,6 +997,7 @@ const floorTopY = useMemo(() => {
           margin={20}
           onPad={onPad}
           onJump={requestJump}
+          disabled={isDead}
         />
         {/* Debug overlay removed to prevent crashes */}
       </View>

@@ -22,24 +22,24 @@ export type PrefabCatalog = {
 
 // ---- Imports per map (static so Metro bundles them) ----
 // DARK
-import darkGrid   from "../../assets/maps/dark/dark-tileset_grid.json";
+import darkGrid   from "../../assets/maps/dark/dark-tileset-final.json";
 import darkPrefs  from "../../assets/maps/dark/dark_prefabs.json";
-const darkImage   = require("../../assets/maps/dark/dark-tileset.png") as number;
+const darkImage   = require("../../assets/maps/dark/dark-tileset-final.png") as number;
 
 // DESERT
-import desertGrid  from "../../assets/maps/desert/desert-tileset_grid.json";
+import desertGrid  from "../../assets/maps/desert/desert-tileset-final.json";
 import desertPrefs from "../../assets/maps/desert/desert_prefabs.json";
-const desertImage  = require("../../assets/maps/desert/desert-tileset.png") as number;
+const desertImage  = require("../../assets/maps/desert/desert-tileset-final.png") as number;
 
 // DUNGEON
-import dungeonGrid  from "../../assets/maps/dungeon/dungeon-tileset_grid.json";
+import dungeonGrid  from "../../assets/maps/dungeon/dungeon-tileset-final.json";
 import dungeonPrefs from "../../assets/maps/dungeon/dungeon_prefabs.json";
-const dungeonImage  = require("../../assets/maps/dungeon/dungeon-tileset.png") as number;
+const dungeonImage  = require("../../assets/maps/dungeon/dungeon-tileset-final.png") as number;
 
 // FROZEN
-import frozenGrid  from "../../assets/maps/frozen/frozen-tileset_grid.json";
+import frozenGrid  from "../../assets/maps/frozen/frozen-tileset-final.json";
 import frozenPrefs from "../../assets/maps/frozen/frozen_prefabs.json";
-const frozenImage  = require("../../assets/maps/frozen/frozen-tileset.png") as number;
+const frozenImage  = require("../../assets/maps/frozen/frozen-tileset-final.png") as number;
 
 // GRASSY
 import grassyGrid  from "../../assets/maps/grassy/grassy_prefabs_final.json";

@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "react";
 import { Dimensions } from "react-native";
 import { useHealth } from "./HealthContext";
+import { useSound } from "../audio/useSound";
 
 export function useFallDamage(onGroundRef: React.RefObject<boolean>, feetYRef: React.RefObject<number>) {
   const { takeDamage } = useHealth();
+  const { playDamageSound } = useSound();
   const prevGrounded = useRef<boolean>(true);
   const peakFeetY = useRef<number>(0);
   const screenH = Dimensions.get("window").height;
@@ -30,6 +32,7 @@ export function useFallDamage(onGroundRef: React.RefObject<boolean>, feetYRef: R
         const drop = feetY - peakFeetY.current; // Y grows downward in screen space
         if (drop >= threshold) {
           takeDamage(1);
+          playDamageSound();
         }
       }
       prevGrounded.current = true;

@@ -9,6 +9,7 @@ type Props = {
   margin?: number;         // inset from edges
   onPad: (o: PadOut) => void;
   onJump: () => void;
+  disabled?: boolean;      // disable controls during death animation
 };
 
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
@@ -18,6 +19,7 @@ export default React.memo(function RNGHControls({
   margin = 20,
   onPad,
   onJump,
+  disabled = false,
 }: Props) {
   const [layout, setLayout] = useState({ w: 0, h: 0 });
   const onLayout = (e: LayoutChangeEvent) => {
@@ -49,6 +51,9 @@ export default React.memo(function RNGHControls({
   };
 
   const emitPadFromLocal = (x: number, y: number) => {
+    // Skip input if controls are disabled
+    if (disabled) return;
+    
     // x,y are local to the PAD view (0..size)
     let nx = clamp((x - r) / r, -1, 1); // left/right
     let ny = clamp((y - r) / r, -1, 1); // only for knob visual
@@ -70,6 +75,9 @@ export default React.memo(function RNGHControls({
   };
 
   const resetPad = () => {
+    // Skip input if controls are disabled
+    if (disabled) return;
+    
     setKnob({ x: 0, y: 0 });
     magXRef.current = 0;
     onPad({ dirX: 0, magX: 0 });
@@ -96,7 +104,9 @@ export default React.memo(function RNGHControls({
     .hitSlop(12)
     .onStart(() => { 
       'worklet'; 
-      runOnJS(onJump)(); 
+      if (!disabled) {
+        runOnJS(onJump)(); 
+      }
     });
 
   // ---- RENDER ----
@@ -115,9 +125,27 @@ export default React.memo(function RNGHControls({
         <GestureDetector gesture={padPan}>
           <View style={[styles.touchArea, { width: size, height: size, borderRadius: r }]}>
             {/* small inner dot only */}
-            <View style={[styles.innerDot, { width: Math.round(size*0.38), height: Math.round(size*0.38), borderRadius: Math.round(size*0.19) }]} />
+            <View style={[
+              styles.innerDot, 
+              { 
+                width: Math.round(size*0.38), 
+                height: Math.round(size*0.38), 
+                borderRadius: Math.round(size*0.19),
+                opacity: disabled ? 0.3 : 1
+              }
+            ]} />
             {/* moving knob */}
-            <View style={[styles.knob, { width: knobSize, height: knobSize, left: knobLeft - (centers.pad.x - r), top: knobTop - (centers.pad.y - r), borderRadius: knobSize / 2 }]} />
+            <View style={[
+              styles.knob, 
+              { 
+                width: knobSize, 
+                height: knobSize, 
+                left: knobLeft - (centers.pad.x - r), 
+                top: knobTop - (centers.pad.y - r), 
+                borderRadius: knobSize / 2,
+                opacity: disabled ? 0.3 : 1
+              }
+            ]} />
           </View>
         </GestureDetector>
       </View>
@@ -127,7 +155,15 @@ export default React.memo(function RNGHControls({
         <GestureDetector gesture={jumpTap}>
           <View style={[styles.touchArea, { width: size, height: size, borderRadius: r }]}>
             {/* small inner dot only */}
-            <View style={[styles.innerDot, { width: Math.round(size*0.38), height: Math.round(size*0.38), borderRadius: Math.round(size*0.19) }]} />
+            <View style={[
+              styles.innerDot, 
+              { 
+                width: Math.round(size*0.38), 
+                height: Math.round(size*0.38), 
+                borderRadius: Math.round(size*0.19),
+                opacity: disabled ? 0.3 : 1
+              }
+            ]} />
           </View>
         </GestureDetector>
       </View>

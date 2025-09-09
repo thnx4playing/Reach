@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Pressable, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, Pressable, Dimensions, Image } from 'react-native';
 import { Canvas } from '@shopify/react-native-skia';
 import { PrefabNode } from '../render/PrefabNode';
 import type { MapName } from '../content/maps';
@@ -35,10 +35,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onMapSelect, onPlay }) =
 
   return (
     <View style={styles.container}>
-      <Canvas style={styles.canvas}>
-        {/* Background gradient effect */}
-        <View style={[styles.background, { backgroundColor: selectedMap ? maps.find(m => m.name === selectedMap)?.color : '#87CEEB' }]} />
-      </Canvas>
+      {/* Background image */}
+      <Image 
+        source={require('../../assets/background.png')} 
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      />
       
       <View style={styles.content}>
         <Text style={styles.title}>Reach!</Text>
@@ -88,28 +90,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onMapSelect, onPlay }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    width: '100%',
+    height: '100%',
   },
-  canvas: {
+  backgroundImage: {
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  background: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0.3,
+    width: '100%',
+    height: '100%',
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    padding: 20,
+    paddingTop: 60,
+    paddingHorizontal: 20,
   },
   title: {
     fontSize: 48,
@@ -130,30 +126,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    marginBottom: 40,
-    gap: 15,
+    marginBottom: 30,
+    gap: 8,
   },
   mapButton: {
-    width: 120,
-    height: 80,
-    borderRadius: 12,
+    width: 80,
+    height: 50,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 5,
-    borderWidth: 3,
+    margin: 3,
+    borderWidth: 2,
     borderColor: 'transparent',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   selectedMapButton: {
     borderColor: '#FFD700',
     transform: [{ scale: 1.05 }],
   },
   mapButtonText: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#FFFFFF',
     textShadowColor: 'rgba(0, 0, 0, 0.8)',

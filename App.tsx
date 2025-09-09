@@ -3,9 +3,10 @@ import 'react-native-reanimated';
 
 
 import React, { useState, useEffect } from 'react';
+import { View } from 'react-native';
 
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { HomeScreen } from './src/components/HomeScreen';
@@ -42,13 +43,13 @@ export default function App() {
       <SafeAreaProvider>
         <HealthProvider>
           {currentScreen === 'home' && (
-            <SafeAreaView style={{ flex: 1 }}>
+            <View style={{ flex: 1 }}>
               <HomeScreen
                 onMapSelect={handleMapSelect}
                 onPlay={handlePlay}
               />
-              <StatusBar style="auto" />
-            </SafeAreaView>
+              <StatusBar hidden={true} />
+            </View>
           )}
           
           {currentScreen === 'game' && currentLevel && (
