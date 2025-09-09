@@ -29,6 +29,11 @@ import { useDamageAnimations } from '../systems/health/useDamageAnimations';
 // Audio system imports
 import { useSound } from '../audio/useSound';
 
+// Debug imports
+import { PlatformDebugger, PlatformCollisionDebug } from '../debug/PlatformDebugger';
+import { TilesetDebugger } from '../debug/TilesetDebugger';
+import { TestFloorTile } from '../render/TestFloorTile';
+
 // debug flag
 const VCOLLECT = __DEV__;
 import { getPlayerBox } from '../physics/playerBox';
@@ -73,11 +78,7 @@ interface GameScreenProps {
 // Inner game component that uses health hooks
 const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // Quick smoke test for prefab catalog
-  useEffect(() => {
-    const cat = (MAPS as any).grassy?.prefabs?.prefabs;
-    console.log('[grassy] prefabs:', cat && Object.keys(cat).length);
-    console.log('[grassy] has floor-final:', !!cat?.['floor-final']);
-  }, []);
+  // Debug logging removed for performance
 
   // Handlers for death modal
   const handleRestart = useCallback(() => {
@@ -221,6 +222,9 @@ const { platforms, decorations } = useVerticalProcGen(
   },
   playerWorldY
 );
+
+// Debug logging for procedural generation
+// Debug logging removed for performance
 
   const mapDef = MAPS[levelData.mapName];
 
@@ -886,12 +890,11 @@ const { platforms, decorations } = useVerticalProcGen(
   return (
     <SafeTouchBoundary>
       <View style={styles.root}>
-      <MapImageProvider source={mapDef.image} tag={`MIP:${levelData.mapName}`}>
-        <Canvas 
-          style={styles.canvas}
-          // CRITICAL: Disable all touch handling on Canvas to prevent conflicts
-          pointerEvents="none"
-        >
+      <Canvas 
+        style={styles.canvas}
+        // CRITICAL: Disable all touch handling on Canvas to prevent conflicts
+        pointerEvents="none"
+      >
           {/* Parallax Background */}
             <ParallaxBackground
             variant={PARALLAX[levelData.mapName]}
@@ -903,8 +906,18 @@ const { platforms, decorations } = useVerticalProcGen(
           {/* Test tile canary - shows instantly if image loading works */}
           {/* <TestTile /> */}
           
+          {/* Add these inside your Canvas for testing */}
+          {/* <TestFloorTile x={50} y={50} /> */}
+          
           {/* Render world under a vertical camera transform */}
           <Group transform={[{ translateY: -cameraY }]}>
+            {/* Debug: Show platform collision boxes */}
+            {/* <PlatformCollisionDebug 
+              platforms={platforms || []} 
+              scale={SCALE} 
+              mapName={levelData.mapName} 
+            /> */}
+            
             {platforms?.filter(Boolean).map((platform, index) => {
               // Defensive check for required properties
               if (!platform || typeof platform.x !== 'number' || typeof platform.y !== 'number' || !platform.prefab) {
@@ -912,6 +925,12 @@ const { platforms, decorations } = useVerticalProcGen(
                 return null;
               }
               
+        // console.log(`Rendering platform ${index}:`, {
+        //   name: platform.prefab,
+        //   x: platform.x,
+        //   y: platform.y,
+        //   scale: platform.scale || 2
+        // });
               
               return (
               <PrefabNode
@@ -932,6 +951,13 @@ const { platforms, decorations } = useVerticalProcGen(
                 console.warn(`Invalid decoration at index ${index}:`, decoration);
                 return null;
               }
+              
+        // console.log(`Rendering decoration ${index}:`, {
+        //   name: decoration.prefab,
+        //   x: decoration.x,
+        //   y: decoration.y,
+        //   scale: decoration.scale || 2
+        // });
               
               return (
               <PrefabNode
@@ -1009,9 +1035,8 @@ const { platforms, decorations } = useVerticalProcGen(
               crouch: false,  // Always false - no crouch functionality
               onGround: onGroundRef.current,
             }}
-          />
-        </Canvas>
-      </MapImageProvider>
+        />
+      </Canvas>
       
       {/* Health Bar - rendered outside Canvas as Skia component */}
       <HealthBar 
@@ -1039,6 +1064,12 @@ const { platforms, decorations } = useVerticalProcGen(
         />
         {/* Debug overlay removed to prevent crashes */}
       </View>
+      
+      {/* Debug: Platform information overlay */}
+      {/* <PlatformDebugger platforms={platforms || []} cameraY={cameraY} /> */}
+      
+      {/* Debug: Tileset structure verification */}
+      {/* <TilesetDebugger /> */}
       
       {/* DISABLED: Debug overlay - was potentially causing crashes */}
       {/* {__DEV__ && (

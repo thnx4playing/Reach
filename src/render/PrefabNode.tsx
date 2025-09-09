@@ -1,84 +1,79 @@
-import React, { useMemo } from "react";
-import { Image as SkImage, rect } from "@shopify/react-native-skia";
-import { Image as RNImage } from "react-native";
-import { MAPS, MapName, getTileSize } from "../content/maps";
-import { useMapSkImage } from "./MapImageContext";
+import React from "react";
+import { Image as SkImage, Group, useImage } from "@shopify/react-native-skia";
+import { MAPS, MapName } from "../content/maps";
 
 type Props = { map: MapName; name: string; x?: number; y?: number; scale?: number };
 
-// Resolve a URI for numeric RN asset IDs
-function resolveUri(source: number | string) {
-  if (typeof source === "number") {
-    const res = RNImage.resolveAssetSource(source);
-    return res?.uri ?? "";
-  }
-  return source || "";
-}
-
 export function PrefabNode({ map, name, x = 0, y = 0, scale = 2 }: Props) {
   const def = MAPS[map];
-  const pf = def.prefabs.prefabs[name];
+  const pf = def.prefabs?.prefabs?.[name];
   if (!pf) {
-    if (__DEV__) console.warn(`[PrefabNode] missing prefab "${name}" for map "${map}"`);
+    if (__DEV__) console.warn(`[PrefabNode] missing prefab "${name}" in map "${map}"`);
+    return null;
+  }
+  
+  const tileSize = def.prefabs?.meta?.tileSize ?? 16;
+  const tile = tileSize * scale;
+
+  // SIMPLIFIED: Only use direct image loading to avoid crashes
+  const img = useImage(def.image);
+
+  if (!img) {
+    if (__DEV__) console.warn(`[PrefabNode] No image loaded for map "${map}", prefab "${name}"`);
     return null;
   }
 
-  const tile = getTileSize(map) * scale;
+  const renderTile = (tileRect: any, rx: number, ry: number, key: string) => {
+    if (!tileRect) return null;
 
-  // Prefer shared Skia image provided by <MapImageProvider>
-  const shared = useMapSkImage();
-  const uri = useMemo(() => resolveUri(def.image), [def.image]);
-  // If you ever want a local fallback: const img = useImage(uri);
-  const img = shared;
+    // Source coordinates (where the tile is in the tileset)
+    const sx = tileRect.x;
+    const sy = tileRect.y;
+    const sw = tileRect.w;
+    const sh = tileRect.h;
 
-  if (!img) return null;
-
-  const frames = def.frames;
-
-  const drawCell = (cellId: string, rx: number, ry: number, key: string) => {
-    const f = frames[cellId];
-    if (!f) {
-      if (__DEV__) console.warn(`[PrefabNode] unknown cell "${cellId}" for map "${map}"`);
-      return null;
-    }
+    // Destination coordinates (where to draw the tile)
     const dx = x + rx * tile;
     const dy = y + ry * tile;
-    return (
-      <SkImage
-        key={key}
-        image={img}
-        x={dx}
-        y={dy}
-        width={Math.round(f.w * scale)}
-        height={Math.round(f.h * scale)}
-        srcRect={rect(f.x, f.y, f.w, f.h)}
-      />
-    );
-  };
+    const dw = sw * scale;
+    const dh = sh * scale;
 
-  const drawRect = (f: {x:number;y:number;w:number;h:number}, rx: number, ry: number, key: string) => {
-    const dx = x + rx * tile;
-    const dy = y + ry * tile;
+
+    // Use Group clipping approach that worked before
     return (
-      <SkImage
+      <Group
         key={key}
-        image={img}
-        x={dx}
-        y={dy}
-        width={Math.round(f.w * scale)}
-        height={Math.round(f.h * scale)}
-        srcRect={rect(f.x, f.y, f.w, f.h)}
-      />
+        clip={{ x: dx, y: dy, width: dw, height: dh }}
+      >
+        <SkImage
+          image={img}
+          x={dx - sx * scale}
+          y={dy - sy * scale}
+          width={img.width() * scale}
+          height={img.height() * scale}
+          filterMode="nearest"
+        />
+      </Group>
     );
   };
 
   return (
     <>
-      {pf.cells?.map((row, ry) =>
-        row.map((cell, rx) => (cell ? drawCell(cell, rx, ry, `c-${rx}-${ry}`) : null))
+      {/* Handle rects format (grassy map direct rectangles) */}
+      {pf.rects?.map((row: any[], ry: number) =>
+        row.map((r: any, rx: number) =>
+          r ? renderTile(r, rx, ry, `r-${rx}-${ry}`) : null
+        )
       )}
-      {pf.rects?.map((row, ry) =>
-        row.map((r, rx) => (r ? drawRect(r, rx, ry, `r-${rx}-${ry}`) : null))
+      
+      {/* Handle cells format (other maps with frame references) */}
+      {pf.cells?.map((row: any[], ry: number) =>
+        row.map((cell: string | null, rx: number) => {
+          if (!cell) return null;
+          // Use Cursor's corrected frame lookup
+          const frame = def.frames?.[cell] || (def.grid as any)?.[cell] || (def.grid as any)?.frames?.[cell];
+          return frame ? renderTile(frame, rx, ry, `c-${rx}-${ry}`) : null;
+        })
       )}
     </>
   );
