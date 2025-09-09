@@ -1,8 +1,10 @@
 import React from "react";
-import { Image as SkImage, Group, useImage } from "@shopify/react-native-skia";
+import { Image as SkImage, useImage, Group } from "@shopify/react-native-skia";
 import { MAPS, MapName } from "../content/maps";
+import { useMapSkImage } from "./MapImageContext";
 
 type Props = { map: MapName; name: string; x?: number; y?: number; scale?: number };
+
 
 export function PrefabNode({ map, name, x = 0, y = 0, scale = 2 }: Props) {
   const def = MAPS[map];
@@ -11,35 +13,36 @@ export function PrefabNode({ map, name, x = 0, y = 0, scale = 2 }: Props) {
     if (__DEV__) console.warn(`[PrefabNode] missing prefab "${name}" in map "${map}"`);
     return null;
   }
-  
-  const tileSize = def.prefabs?.meta?.tileSize ?? 16;
-  const tile = tileSize * scale;
+  const tile = (def.prefabs?.meta?.tileSize ?? 16) * scale;
 
-  // SIMPLIFIED: Only use direct image loading to avoid crashes
-  const img = useImage(def.image);
+  // SIMPLIFIED: Use direct image loading only
+  const { skImage: ctxImg } = useMapSkImage();
+  const img = ctxImg || useImage(def.image);
 
   if (!img) {
-    if (__DEV__) console.warn(`[PrefabNode] No image loaded for map "${map}", prefab "${name}"`);
+    // Only warn once per prefab type to reduce spam
+    if (__DEV__ && !(PrefabNode as any)._warnedPrefabs) {
+      (PrefabNode as any)._warnedPrefabs = new Set();
+    }
+    const warnKey = `${map}-${name}`;
+    if (__DEV__ && !(PrefabNode as any)._warnedPrefabs.has(warnKey)) {
+      console.warn(`[PrefabNode] No image loaded for map "${map}", prefab "${name}"`);
+      (PrefabNode as any)._warnedPrefabs.add(warnKey);
+    }
     return null;
   }
 
-  const renderTile = (tileRect: any, rx: number, ry: number, key: string) => {
-    if (!tileRect) return null;
+  const drawRect = (f: any, rx: number, ry: number, key: string) => {
+    if (!f) return null;
+    const sx = f.x, sy = f.y, sw = f.w, sh = f.h;
 
-    // Source coordinates (where the tile is in the tileset)
-    const sx = tileRect.x;
-    const sy = tileRect.y;
-    const sw = tileRect.w;
-    const sh = tileRect.h;
-
-    // Destination coordinates (where to draw the tile)
+    // Absolute, top-left placement
     const dx = x + rx * tile;
     const dy = y + ry * tile;
-    const dw = sw * scale;
-    const dh = sh * scale;
+    const dw = Math.round(sw * scale);
+    const dh = Math.round(sh * scale);
 
-
-    // Use Group clipping approach that worked before
+    // FIXED: Use Group with clip instead of srcRect to avoid clipping issues
     return (
       <Group
         key={key}
@@ -51,7 +54,7 @@ export function PrefabNode({ map, name, x = 0, y = 0, scale = 2 }: Props) {
           y={dy - sy * scale}
           width={img.width() * scale}
           height={img.height() * scale}
-          filterMode="nearest"
+          fit="fill"
         />
       </Group>
     );
@@ -59,22 +62,20 @@ export function PrefabNode({ map, name, x = 0, y = 0, scale = 2 }: Props) {
 
   return (
     <>
-      {/* Handle rects format (grassy map direct rectangles) */}
-      {pf.rects?.map((row: any[], ry: number) =>
-        row.map((r: any, rx: number) =>
-          r ? renderTile(r, rx, ry, `r-${rx}-${ry}`) : null
-        )
-      )}
-      
-      {/* Handle cells format (other maps with frame references) */}
       {pf.cells?.map((row: any[], ry: number) =>
         row.map((cell: string | null, rx: number) => {
           if (!cell) return null;
-          // Use Cursor's corrected frame lookup
-          const frame = def.frames?.[cell] || (def.grid as any)?.[cell] || (def.grid as any)?.frames?.[cell];
-          return frame ? renderTile(frame, rx, ry, `c-${rx}-${ry}`) : null;
+          // Use correct frame lookup priority for grassy map
+          const frame = def.frames?.[cell] || (def as any).grid?.[cell] || (def as any).grid?.frames?.[cell];
+          return frame ? drawRect(frame, rx, ry, `c-${rx}-${ry}`) : null;
         })
+      )}
+      {pf.rects?.map((row: any[], ry: number) =>
+        row.map((r: any, rx: number) => (r ? drawRect(r, rx, ry, `r-${rx}-${ry}`) : null))
       )}
     </>
   );
 }
+
+// Static property to track warned prefabs
+(PrefabNode as any)._warnedPrefabs = new Set();

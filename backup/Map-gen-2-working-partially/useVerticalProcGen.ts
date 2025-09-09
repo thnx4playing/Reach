@@ -284,8 +284,6 @@ export function useVerticalProcGen(
 
   // FIXED: Better camera and generation logic
   useEffect(() => {
-    const start = performance.now();
-    
     // FIXED: More responsive camera that follows player upward movement
     const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.35); // Slightly more responsive
     
@@ -350,11 +348,6 @@ export function useVerticalProcGen(
       const filtered = prev.filter(d => d.y < cullBelowY);
       return filtered;
     });
-    
-    const time = performance.now() - start;
-    if (__DEV__ && time > 5) {
-      console.log(`[PERF] useVerticalProcGen effect: ${time.toFixed(2)}ms`);
-    }
     
   }, [playerWorldY, floorTopY, TOP_LIMIT_Y, cameraY]); // Removed platforms to prevent infinite loop
 

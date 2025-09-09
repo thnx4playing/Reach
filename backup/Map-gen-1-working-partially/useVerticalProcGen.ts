@@ -17,11 +17,11 @@ export type ProcGenState = {
 type Opts = {
   mapName: MapName;
   floorTopY: number;
-  initialPlatforms: Platform[];
-  initialDecorations: Platform[];
+  initialPlatforms: Platform[];    // typically just the floor pieces now
+  initialDecorations: Platform[];  // optional ground props
   scale?: number;
-  maxScreens?: number;
-  initialBands?: number;
+  maxScreens?: number;             // default 10 screens
+  initialBands?: number;           // NEW: how many bands to pre-generate on load (default 1)
 };
 
 const PROCGEN_DEFAULTS = {
@@ -47,7 +47,7 @@ const PROCGEN_DEFAULTS = {
   MAX_GRASS_GRASS1: 1,
 };
 
-const AHEAD_BUFFER_SCREENS = 1.5; // INCREASED: Generate more ahead for smoother experience
+const AHEAD_BUFFER_SCREENS = 1; // how many screens we generate ahead of camera
 
 const pickWeighted = (pairs: Array<[string, number]>) => {
   const total = pairs.reduce((s, [,w]) => s + w, 0);
@@ -58,7 +58,7 @@ const pickWeighted = (pairs: Array<[string, number]>) => {
 
 export function useVerticalProcGen(
   opts: Opts,
-  playerWorldY: number,
+  playerWorldY: number,     // <<— wire this to your player's Y (world coords)
 ): ProcGenState {
   const {
     mapName,
@@ -67,51 +67,27 @@ export function useVerticalProcGen(
     initialDecorations,
     scale = 2,
     maxScreens = PROCGEN_DEFAULTS.MAX_SCREENS,
-    initialBands = 1,
+    initialBands = 1,   // NEW: prime 1 band of platforms at start by default
   } = opts;
 
-  // FIXED: Initialize state more carefully
-  const [platforms, setPlatforms] = useState<Platform[]>(() => {
-    // Deep copy to prevent mutations
-    return initialPlatforms.map(p => ({ ...p }));
-  });
-  
-  const [decorations, setDecorations] = useState<Platform[]>(() => {
-    return initialDecorations.map(d => ({ ...d }));
-  });
-  
+  const [platforms, setPlatforms] = useState<Platform[]>(() => initialPlatforms.slice());
+  const [decorations, setDecorations] = useState<Platform[]>(() => initialDecorations.slice());
   const [cameraY, setCameraY] = useState(0);
 
-  // How high we will ever build this run
+  // how high we will ever build this run
   const TOP_LIMIT_Y = useMemo(
     () => Math.round(floorTopY - maxScreens * SCREEN_H),
     [floorTopY, maxScreens]
   );
 
-  // FIXED: Track generated bounds more precisely
-  const generatedMinYRef = useRef<number>(() => {
-    if (initialPlatforms.length === 0) return floorTopY;
-    return Math.min(floorTopY, ...initialPlatforms.map(p => p.y));
-  });
+  // track how far we've generated upwards (smaller y = higher on screen)
+  const generatedMinYRef = useRef<number>(Math.min(floorTopY, ...initialPlatforms.map(p => p.y)));
 
-  // Ref to track current platforms for collision detection
-  const platformsRef = useRef<Platform[]>([]);
-  useEffect(() => {
-    platformsRef.current = platforms;
-  }, [platforms]);
+  const rectOverlap = (a: {x:number;y:number;w:number;h:number}, b:{x:number;y:number;w:number;h:number}) =>
+    (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
 
-  // FIXED: Better overlap detection
-  const rectOverlap = (a: {x:number;y:number;w:number;h:number}, b:{x:number;y:number;w:number;h:number}) => {
-    const MARGIN = 8; // Small margin to prevent tight overlaps
-    return (a.x < b.x + b.w + MARGIN && 
-            a.x + a.w + MARGIN > b.x && 
-            a.y < b.y + b.h + MARGIN && 
-            a.y + a.h + MARGIN > b.y);
-  };
-
-  // FIXED: More generous spacing requirements
   const farEnough = (a:{x:number;y:number}, b:{x:number;y:number}, dx=PROCGEN_DEFAULTS.MIN_DX, dy=PROCGEN_DEFAULTS.MIN_DY) =>
-    (Math.abs(a.x - b.x) >= dx || Math.abs(a.y - b.y) >= dy); // Changed && to || for more flexibility
+    (Math.abs(a.x - b.x) >= dx && Math.abs(a.y - b.y) >= dy);
 
   const pickPlatformX = useCallback((name: string, wPx: number) => {
     if (name === 'platform-wood-2-left-final')  return 0;
@@ -121,7 +97,6 @@ export function useVerticalProcGen(
     return Math.round(minX + Math.random() * (maxX - minX));
   }, []);
 
-  // FIXED: Better platform placement algorithm
   const tryPlacePlatform = useCallback((
     name: string,
     bandTopY: number,
@@ -130,34 +105,17 @@ export function useVerticalProcGen(
   ): Platform | null => {
     const wPx = prefabWidthPx(mapName, name, scale);
     const hPx = prefabHeightPx(mapName, name, scale);
-    
-    // More attempts for better distribution
-    for (let k = 0; k < 50; k++) {
+    for (let k=0; k<40; k++) {
       const x = pickPlatformX(name, wPx);
-      // Better Y distribution - avoid clustering at band edges
-      const bandHeight = Math.max(hPx, bandBottomY - bandTopY);
-      const yRange = Math.max(0, bandHeight - hPx);
-      const y = Math.round(bandTopY + (yRange * 0.2) + Math.random() * (yRange * 0.6));
-      
+      const y = Math.round(bandTopY + Math.random() * Math.max(0, bandBottomY - bandTopY - hPx));
       const rect = { x, y, w: wPx, h: hPx };
       let ok = true;
-      
       for (const p of existing) {
         const pw = prefabWidthPx(mapName, p.prefab, p.scale ?? scale);
         const ph = prefabHeightPx(mapName, p.prefab, p.scale ?? scale);
         const prect = { x: p.x, y: p.y, w: pw, h: ph };
-        
-        if (rectOverlap(rect, prect)) {
-          ok = false; 
-          break;
-        }
-        
-        // FIXED: More flexible spacing check
-        const centerA = { x: x + wPx/2, y: y + hPx/2 };
-        const centerB = { x: p.x + pw/2, y: p.y + ph/2 };
-        if (!farEnough(centerA, centerB, PROCGEN_DEFAULTS.MIN_DX * 0.7, PROCGEN_DEFAULTS.MIN_DY * 0.7)) {
-          ok = false; 
-          break;
+        if (rectOverlap(rect, prect) || !farEnough({x: x+wPx/2, y: y+hPx/2}, {x: p.x+pw/2, y: p.y+ph/2})) {
+          ok = false; break;
         }
       }
       if (ok) return { prefab: name, x, y, scale };
@@ -196,7 +154,7 @@ export function useVerticalProcGen(
       });
     };
 
-    // Trees: max 1 on grass-3
+    // Trees: max 1 on grass-3 (20% large, else 40% medium, else 60% small)
     if (isGrass3) {
       const r = Math.random();
       if (r < PROCGEN_DEFAULTS.TREE_TRY.large)       addEnvAtTop('tree-large-final',  randomXFor('tree-large-final'));
@@ -211,7 +169,7 @@ export function useVerticalProcGen(
       'mushroom-red-large-final','mushroom-red-medium-final','mushroom-red-small-final',
       'mushroom-green-large-final','mushroom-green-medium-final','mushroom-green-small-final'
     ];
-    for (let i = 0; i < mushSlots; i++) {
+    for (let i=0; i<mushSlots; i++) {
       if (Math.random() < PROCGEN_DEFAULTS.MUSHROOM_P) {
         const name = mushNames[(Math.random() * mushNames.length) | 0];
         addEnvAtTop(name, randomXFor(name));
@@ -222,7 +180,7 @@ export function useVerticalProcGen(
     const grassSlots = isGrass3 ? PROCGEN_DEFAULTS.MAX_GRASS_GRASS3
                        : isGrass1 ? PROCGEN_DEFAULTS.MAX_GRASS_GRASS1 : 0;
     const grassNames = ['grass-1-final','grass-2-final','grass-3-final','grass-4-final','grass-5-final','grass-6-final'];
-    for (let i = 0; i < grassSlots; i++) {
+    for (let i=0; i<grassSlots; i++) {
       if (Math.random() < PROCGEN_DEFAULTS.GRASS_P) {
         const name = grassNames[(Math.random() * grassNames.length) | 0];
         addEnvAtTop(name, randomXFor(name));
@@ -232,39 +190,41 @@ export function useVerticalProcGen(
     return out;
   }, [mapName, scale]);
 
-  // FIXED: Improved generation function that's more reliable
-  const generateBand = useCallback((bandTopY: number, bandBottomY: number, existingPlatforms: Platform[]) => {
+  const generateBand = useCallback((bandTopY: number, bandBottomY: number) => {
     const newPlatforms: Platform[] = [];
-    
-    // Use all existing platforms (including new ones from this session)
-    const allExisting = existingPlatforms.slice();
-    
-    for (let i = 0; i < PROCGEN_DEFAULTS.ATTEMPTS_PER_BAND; i++) {
+    const snapshot = platforms.concat(); // existing at this moment
+    for (let i=0; i<PROCGEN_DEFAULTS.ATTEMPTS_PER_BAND; i++) {
       const name = pickWeighted(PROCGEN_DEFAULTS.PLATFORM_WEIGHTS);
-      const placed = tryPlacePlatform(name, bandTopY, bandBottomY, allExisting.concat(newPlatforms));
-      if (placed) {
-        newPlatforms.push(placed);
-      }
+      const placed = tryPlacePlatform(name, bandTopY, bandBottomY, snapshot.concat(newPlatforms));
+      if (placed) newPlatforms.push(placed);
     }
-    
     const newDecos = newPlatforms.flatMap(spawnEnvForPlatform);
     return { newPlatforms, newDecos };
-  }, [tryPlacePlatform, spawnEnvForPlatform]);
+  }, [platforms, tryPlacePlatform, spawnEnvForPlatform]);
 
-  // FIXED: Better initial generation
+  // NEW: Prime initial bands so platforms are visible on first screen
   useEffect(() => {
+    // Start just above the floor and build upward by whole screens
     let bandBottomY = floorTopY - 20;
     let minY = generatedMinYRef.current;
     const collectedP: Platform[] = [];
     const collectedD: Platform[] = [];
     
+    // Use initial platforms as the base for collision detection
     const basePlatforms = initialPlatforms.slice();
     
     for (let b = 0; b < Math.max(0, initialBands); b++) {
       const bandTopY = Math.max(TOP_LIMIT_Y, bandBottomY - SCREEN_H);
       
-      // Use the improved generation function
-      const { newPlatforms, newDecos } = generateBand(bandTopY, bandBottomY, basePlatforms.concat(collectedP));
+      // Generate platforms for this band without depending on current state
+      const newPlatforms: Platform[] = [];
+      for (let i=0; i<PROCGEN_DEFAULTS.ATTEMPTS_PER_BAND; i++) {
+        const name = pickWeighted(PROCGEN_DEFAULTS.PLATFORM_WEIGHTS);
+        const placed = tryPlacePlatform(name, bandTopY, bandBottomY, basePlatforms.concat(collectedP, newPlatforms));
+        if (placed) newPlatforms.push(placed);
+      }
+      
+      const newDecos = newPlatforms.flatMap(spawnEnvForPlatform);
       
       if (newPlatforms.length) {
         collectedP.push(...newPlatforms);
@@ -275,88 +235,60 @@ export function useVerticalProcGen(
     }
     
     if (collectedP.length) {
-      console.log(`[ProcGen] Initial generation: ${collectedP.length} platforms, ${collectedD.length} decorations`);
-      setPlatforms(prev => [...prev, ...collectedP]);
-      setDecorations(prev => [...prev, ...collectedD]);
+      setPlatforms(prev => prev.concat(collectedP));
+      setDecorations(prev => prev.concat(collectedD));
       generatedMinYRef.current = minY;
     }
-  }, []); // Run only once on mount
+    // one-time prime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // FIXED: Better camera and generation logic
+  // Camera follow upward (only rises; no downward snap)
   useEffect(() => {
-    const start = performance.now();
-    
-    // FIXED: More responsive camera that follows player upward movement
-    const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.35); // Slightly more responsive
-    
-    // Calculate desired camera position based on player
-    const targetCameraY = Math.max(0, playerWorldY - DEADZONE_FROM_TOP);
-    
-    // Only move camera upward (never snap down)
-    const newCameraY = Math.max(cameraY, -targetCameraY); // Negative because Y increases downward
-    
-    // FIXED: More stable camera movement
-    if (Math.abs(newCameraY - cameraY) > 1) {
-      setCameraY(newCameraY);
-    }
+    // Keep player around 60% from bottom; start scrolling after ~40% from top
+    const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.40);
+    // We treat y increasing downward. When player goes up (y decreases),
+    // raise camera so that player is never above the deadzone line.
+    const targetCam = Math.max(0, Math.min(
+      // never exceed built range
+      (floorTopY - TOP_LIMIT_Y),
+      // only rise if player is above deadzone
+      cameraY < playerWorldY - DEADZONE_FROM_TOP ? cameraY : (playerWorldY - DEADZONE_FROM_TOP)
+    ));
+    // Ensure monotonic rise
+    const nextCam = Math.max(cameraY, -targetCam); // negative because playerWorldY decreases upward
+    // Simpler, robust version: just keep camera so that (playerWorldY - cameraY) >= DEADZONE_FROM_TOP
+    const desired = Math.max(0, cameraY, playerWorldY - DEADZONE_FROM_TOP);
+    setCameraY(desired);
 
-    // FIXED: Generate ahead based on camera position
-    const cameraTop = newCameraY; // Top of camera view in world coords
-    const wantGenerateAbove = cameraTop - AHEAD_BUFFER_SCREENS * SCREEN_H;
-    
-    // Generate new bands if we're getting close to the limit
-    if (generatedMinYRef.current > wantGenerateAbove && generatedMinYRef.current > TOP_LIMIT_Y) {
-      let bandsGenerated = 0;
-      const maxBandsPerFrame = 2; // Limit to prevent frame drops
+    // Generate ahead (buffer) up to TOP_LIMIT_Y
+    const wantTop = Math.max(TOP_LIMIT_Y, desired - AHEAD_BUFFER_SCREENS * SCREEN_H);
+    while (generatedMinYRef.current > wantTop) {
+      const bandBottomY = generatedMinYRef.current - 20;
+      const bandTopY = Math.max(TOP_LIMIT_Y, bandBottomY - SCREEN_H);
       
-      while (generatedMinYRef.current > wantGenerateAbove && 
-             generatedMinYRef.current > TOP_LIMIT_Y && 
-             bandsGenerated < maxBandsPerFrame) {
-        
-        const bandBottomY = generatedMinYRef.current - 20;
-        const bandTopY = Math.max(TOP_LIMIT_Y, bandBottomY - SCREEN_H);
-        
-        // Get current platforms for collision detection
-        const currentPlatforms = platformsRef.current.slice();
-        const { newPlatforms, newDecos } = generateBand(bandTopY, bandBottomY, currentPlatforms);
-        
-        if (newPlatforms.length === 0) {
-          console.warn('[ProcGen] No platforms generated, stopping generation');
-          break;
-        }
-        
-        console.log(`[ProcGen] Generated band: ${newPlatforms.length} platforms at Y ${Math.round(bandTopY)} to ${Math.round(bandBottomY)}`);
-        
-        // Update state atomically
-        setPlatforms(prev => [...prev, ...newPlatforms]);
-        setDecorations(prev => [...prev, ...newDecos]);
-        generatedMinYRef.current = bandTopY;
-        bandsGenerated++;
+      // Inline generation to avoid dependency on generateBand
+      const newPlatforms: Platform[] = [];
+      for (let i=0; i<PROCGEN_DEFAULTS.ATTEMPTS_PER_BAND; i++) {
+        const name = pickWeighted(PROCGEN_DEFAULTS.PLATFORM_WEIGHTS);
+        const placed = tryPlacePlatform(name, bandTopY, bandBottomY, []);
+        if (placed) newPlatforms.push(placed);
       }
+      
+      const newDecos = newPlatforms.flatMap(spawnEnvForPlatform);
+      
+      if (!newPlatforms.length) break;
+      setPlatforms(prev => prev.concat(newPlatforms));
+      setDecorations(prev => prev.concat(newDecos));
+      generatedMinYRef.current = bandTopY;
     }
 
-    // FIXED: Cull platforms that are far below camera (performance optimization)
-    const cullBelowY = newCameraY + AHEAD_BUFFER_SCREENS * SCREEN_H + 200;
-    
-    setPlatforms(prev => {
-      const filtered = prev.filter(p => p.y < cullBelowY);
-      if (filtered.length !== prev.length) {
-        console.log(`[ProcGen] Culled ${prev.length - filtered.length} platforms below Y ${Math.round(cullBelowY)}`);
-      }
-      return filtered;
-    });
-    
-    setDecorations(prev => {
-      const filtered = prev.filter(d => d.y < cullBelowY);
-      return filtered;
-    });
-    
-    const time = performance.now() - start;
-    if (__DEV__ && time > 5) {
-      console.log(`[PERF] useVerticalProcGen effect: ${time.toFixed(2)}ms`);
-    }
-    
-  }, [playerWorldY, floorTopY, TOP_LIMIT_Y, cameraY]); // Removed platforms to prevent infinite loop
+    // Cull far below (keep ~2 screens below camera)
+    const cullBelow = desired + AHEAD_BUFFER_SCREENS * SCREEN_H + 800;
+    setPlatforms(prev => prev.filter(p => p.y < cullBelow));
+    setDecorations(prev => prev.filter(d => d.y < cullBelow));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerWorldY, floorTopY, TOP_LIMIT_Y]);
 
   return { platforms, decorations, cameraY };
 }
