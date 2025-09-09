@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "map": "dungeon",
+    "tileset_image": "dungeon-tileset-final.png",
+    "tileset_grid_json": "dungeon-tileset-final.json",
+    "tileSize": 16
+  },
+  "prefabs": {}
+}

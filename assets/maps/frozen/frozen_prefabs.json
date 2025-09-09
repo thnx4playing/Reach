@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "map": "frozen",
+    "tileset_image": "frozen-tileset-final.png",
+    "tileset_grid_json": "frozen-tileset-final.json",
+    "tileSize": 16
+  },
+  "prefabs": {}
+}

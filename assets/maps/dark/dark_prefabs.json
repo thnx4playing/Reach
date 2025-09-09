@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "map": "dark",
+    "tileset_image": "dark-tileset-final.png",
+    "tileset_grid_json": "dark-tileset-final.json",
+    "tileSize": 16
+  },
+  "prefabs": {}
+}

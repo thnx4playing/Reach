@@ -41,9 +41,9 @@ import frozenGrid  from "../../assets/maps/frozen/frozen-tileset-final.json";
 import frozenPrefs from "../../assets/maps/frozen/frozen_prefabs.json";
 const frozenImage  = require("../../assets/maps/frozen/frozen-tileset-final.png") as number;
 
-// GRASSY
+// GRASSY (unified: grid + prefabs in one JSON)
 import grassyGrid  from "../../assets/maps/grassy/grassy_prefabs_final.json";
-import grassyPrefs from "../../assets/maps/grassy/grassy_prefabs.json";
+import grassyPrefs from "../../assets/maps/grassy/grassy_prefabs_final.json";
 const grassyImage  = require("../../assets/maps/grassy/grassy_prefabs_final.png") as number;
 
 // ---- Registry ----
@@ -62,7 +62,9 @@ export function getPrefab(map: MapName, name: string): Prefab | undefined {
   return MAPS[map].prefabs.prefabs[name];
 }
 export function getTileSize(map: MapName) {
-  return MAPS[map].prefabs.meta.tileSize;
+  const p: any = MAPS[map]?.prefabs;
+  const g: any = MAPS[map]?.grid;
+  return p?.meta?.tileSize ?? g?.meta?.tileSize ?? 16;
 }
 
 // Helper functions for level generation
@@ -161,20 +163,10 @@ export function prefabHeightPx(map: MapName, prefabName: string, scale = 2) {
  * caused by transparent pixels at the bottom of the art.
  */
 const PREFAB_FOOT_INSET: Record<string, number> = {
-  // 2.5px @ scale=1 => 5px @ scale=2 (raised by additional 5px)
+  // Props: small sink to avoid hairline gaps
   'tree-large-final': 2.5,
   'tree-medium-final': 2.5,
   'tree-small-final': 2.5,
-  // Floor and platform prefabs that use the same top block
-  'floor': 2.5,
-  'floor-final': 2.5,
-  'platform-grass-3-final': 2.5,
-  'platform-grass-1-final': 2.5,
-  'platform-wood-3-final': 2.5,
-  'platform-wood-1-final': 2.5,
-  'platform-wood-2-left-final': 2.5,
-  'platform-wood-2-right-final': 2.5,
-  // Mushrooms and grass decorations
   'mushroom-red-large-final': 2.5,
   'mushroom-red-medium-final': 2.5,
   'mushroom-red-small-final': 2.5,
@@ -187,6 +179,16 @@ const PREFAB_FOOT_INSET: Record<string, number> = {
   'grass-4-final': 2.5,
   'grass-5-final': 2.5,
   'grass-6-final': 2.5,
+
+  // Floor/platforms: no sink (clean collision/top surface)
+  'floor': 0,
+  'floor-final': 0,
+  'platform-grass-3-final': 0,
+  'platform-grass-1-final': 0,
+  'platform-wood-3-final': 0,
+  'platform-wood-1-final': 0,
+  'platform-wood-2-left-final': 0,
+  'platform-wood-2-right-final': 0,
   // add others here if you notice a gap: e.g. 'lamp-post': 2
 };
 

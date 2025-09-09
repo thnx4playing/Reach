@@ -24,75 +24,17 @@ function buildLevel(mapName: MapName, w: number, h: number): LevelData {
   const staticFloor = makeStaticFloor(mapName, w, h, FLOOR_SCALE);
   const decorations = getMapDecorations(mapName, w, h);
   
-  // For grassy map, use the special platform generation
+  // For grassy map, only generate floor (no other prefabs)
   if (mapName === 'grassy') {
     const floorTopY = Math.round(h - prefabHeightPx(mapName, 'floor-final', 2));
-    
-    // Generate random platforms
-    const platforms: Platform[] = [];
-    
-    // Generate fewer platforms to reduce memory pressure
-    // Generate 5 platform-grass-1-final (reduced from 10)
-    for (let i = 0; i < 5; i++) {
-      const platform = generateRandomPlatform(mapName, 'platform-grass-1-final', w, h, floorTopY, platforms);
-      if (platform) {
-        platforms.push(platform);
-      }
-    }
-    
-    // Generate 3 platform-grass-3-final (reduced from 5)
-    for (let i = 0; i < 3; i++) {
-      const platform = generateRandomPlatform(mapName, 'platform-grass-3-final', w, h, floorTopY, platforms);
-      if (platform) {
-        platforms.push(platform);
-      }
-    }
-    
-    // Add the tree decoration (separate from platforms)
-    const treeDecoration: Platform = {
-      prefab: 'tree-large-final',
-      x: w - 100,
-      y: alignPrefabYToSurfaceTop(mapName, 'tree-large-final', floorTopY, 2) - 4, // Move up by 2px (4px at scale=2)
-      scale: 2
-    };
-    
-    // Add mushrooms on the left side of the screen
-    const leftMushroom: Platform = {
-      prefab: 'mushroom-red-large-final',
-      x: 20, // Closer to left side of screen
-      y: alignPrefabYToSurfaceTop(mapName, 'mushroom-red-large-final', floorTopY, 2) - 4, // Same alignment as tree
-      scale: 2
-    };
-    
-    const rightMushroom: Platform = {
-      prefab: 'mushroom-red-small-final',
-      x: 35, // 15px to the right of the large mushroom
-      y: alignPrefabYToSurfaceTop(mapName, 'mushroom-red-small-final', floorTopY, 2) - 4, // Same alignment as tree
-      scale: 2
-    };
-    
-    // Add grass prefabs randomly on the floor
-    const grassPrefabs: Platform[] = [
-      { prefab: 'grass-1-final', x: 50, y: alignPrefabYToSurfaceTop(mapName, 'grass-1-final', floorTopY, 2) - 4, scale: 2 },
-      { prefab: 'grass-2-final', x: 150, y: alignPrefabYToSurfaceTop(mapName, 'grass-2-final', floorTopY, 2) - 4, scale: 2 },
-      { prefab: 'grass-3-final', x: 250, y: alignPrefabYToSurfaceTop(mapName, 'grass-3-final', floorTopY, 2) - 4, scale: 2 },
-      { prefab: 'grass-4-final', x: 350, y: alignPrefabYToSurfaceTop(mapName, 'grass-4-final', floorTopY, 2) - 4, scale: 2 },
-      { prefab: 'grass-5-final', x: 450, y: alignPrefabYToSurfaceTop(mapName, 'grass-5-final', floorTopY, 2) - 4, scale: 2 },
-      { prefab: 'grass-6-final', x: 550, y: alignPrefabYToSurfaceTop(mapName, 'grass-6-final', floorTopY, 2) - 4, scale: 2 }
-    ];
     
     return {
       mapName,
       platforms: [
-        ...staticFloor,               // Floor pieces
-        ...platforms                  // Generated platforms
+        ...staticFloor               // Floor pieces only
       ],
       decorations: [
-        ...decorations,               // Map decorations
-        treeDecoration,               // Tree decoration
-        leftMushroom,                 // Left mushroom
-        rightMushroom,                // Right mushroom
-        ...grassPrefabs               // Grass prefabs
+        ...decorations               // Map decorations only
       ],
       characterSpawn: { x: w * 0.5, y: h - 100 },
       floorTopY,
