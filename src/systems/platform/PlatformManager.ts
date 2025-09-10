@@ -16,8 +16,8 @@ const MAP_PLATFORM_CONFIGS: Record<MapName, {
 }> = {
   grassy: {
     platformTypes: [
-      ['platform-grass-1-final', 3],           // 30% (3/10)
-      ['platform-grass-3-final', 2],           // 20% (2/10) 
+      ['platform-grass-1-final', 1],           // 10% (1/10)
+      ['platform-grass-3-final', 4],           // 40% (4/10) 
       ['platform-wood-1-final', 2],            // 20% (2/10)
       ['platform-wood-3-final', 1],            // 10% (1/10)
       ['platform-wood-2-left-final', 1],       // 10% (1/10)
@@ -194,8 +194,8 @@ export class PlatformManager {
   }
 
   private generateBand(bandTopWorldY: number, bandBottomWorldY: number): void {
-    // Increased platform count by 30%: was 4-7, now 5-9
-    const basePlatformCount = 5;
+    // Increased platform density: was 5-9, now 9-13
+    const basePlatformCount = 9;
     const variablePlatformCount = 4;
     const platformCount = basePlatformCount + Math.floor(Math.random() * variablePlatformCount);
     
