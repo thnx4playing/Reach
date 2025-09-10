@@ -17,8 +17,8 @@ const MAP_PLATFORM_CONFIGS: Record<MapName, {
   grassy: {
     platformTypes: [
       ['platform-grass-1-final', 1],           // 10% (1/10)
-      ['platform-grass-3-final', 4],           // 40% (4/10) 
-      ['platform-wood-1-final', 2],            // 20% (2/10)
+      ['platform-grass-3-final', 5],           // 50% (5/10) 
+      ['platform-wood-1-final', 1],            // 10% (1/10)
       ['platform-wood-3-final', 1],            // 10% (1/10)
       ['platform-wood-2-left-final', 1],       // 10% (1/10)
       ['platform-wood-2-right-final', 1],      // 10% (1/10)
