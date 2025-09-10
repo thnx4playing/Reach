@@ -727,6 +727,63 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               />
             ))}
             
+            {/* DEBUG: Show platform collision boxes and character collision box */}
+            {__DEV__ && (
+              <>
+                {/* Platform collision visualization */}
+                {allPlatforms.filter(p => p.collision?.solid).slice(0, 5).map(platform => (
+                  <Rect
+                    key={`debug-${platform.id}`}
+                    x={platform.collision!.left}
+                    y={platform.collision!.topY - 2} // Slightly above surface
+                    width={platform.collision!.width}
+                    height={4} // Thin line showing walkable surface
+                    color="rgba(0, 255, 0, 0.8)" // Bright green
+                  />
+                ))}
+                
+                {/* Character collision box */}
+                {currentPlayerBox && (
+                  <>
+                    {/* Character feet position */}
+                    <Rect
+                      x={currentPlayerBox.cx - 2}
+                      y={currentPlayerBox.feetY - 2}
+                      width={4}
+                      height={4}
+                      color="rgba(255, 0, 0, 1)" // Red dot for feet
+                    />
+                    
+                    {/* Character collision box */}
+                    <Rect
+                      x={currentPlayerBox.left}
+                      y={currentPlayerBox.top}
+                      width={currentPlayerBox.w}
+                      height={currentPlayerBox.h}
+                      color="rgba(255, 255, 0, 0.3)" // Yellow collision box
+                      style="stroke"
+                      strokeWidth={1}
+                    />
+                  </>
+                )}
+                
+                {/* World coordinate grid lines */}
+                {Array.from({length: 10}, (_, i) => {
+                  const worldY = floorTopY - (i * 100);
+                  return (
+                    <Rect
+                      key={`grid-${i}`}
+                      x={0}
+                      y={worldY}
+                      width={SCREEN_W}
+                      height={1}
+                      color={`rgba(255, 255, 255, ${i === 0 ? 0.8 : 0.2})`} // Floor line brighter
+                    />
+                  );
+                })}
+              </>
+            )}
+            
             {/* Character now renders in WORLD space with camera transform */}
             <DashCharacter
               floorTopY={floorTopY}
@@ -745,6 +802,34 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
             />
           </Group>
          </Canvas>
+      
+      {/* DEBUG: Coordinate system debug text */}
+      {__DEV__ && (
+        <View style={{
+          position: 'absolute',
+          top: 100,
+          left: 10,
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          padding: 8,
+          borderRadius: 4,
+        }}>
+          <Text style={{ color: 'white', fontSize: 10, fontFamily: 'monospace' }}>
+            Camera Y: {cameraY.toFixed(1)}
+          </Text>
+          <Text style={{ color: 'white', fontSize: 10, fontFamily: 'monospace' }}>
+            Player Z: {zRef.current.toFixed(1)}
+          </Text>
+          <Text style={{ color: 'white', fontSize: 10, fontFamily: 'monospace' }}>
+            Player World Y: {(floorTopY - zRef.current).toFixed(1)}
+          </Text>
+          <Text style={{ color: 'white', fontSize: 10, fontFamily: 'monospace' }}>
+            Player Screen Y: {(floorTopY - zRef.current - cameraY).toFixed(1)}
+          </Text>
+          <Text style={{ color: 'white', fontSize: 10, fontFamily: 'monospace' }}>
+            On Ground: {onGroundRef.current ? 'Yes' : 'No'}
+          </Text>
+        </View>
+      )}
       
       {/* Health Bar */}
       <HealthBar 
