@@ -182,12 +182,12 @@ export const PREFAB_FOOT_INSET: Record<string, number> = {
   'tree-small-final': -2,
   'mushroom-red-small-final': 9,   // 14px - 5px = 9px (moved up 5px)
   'mushroom-green-small-final': 9,
-  'grass-1-final': 12,  // 16px - 4px = 12px (moved up another 4px)
-  'grass-2-final': 12,
-  'grass-3-final': 12,
-  'grass-4-final': 12,
-  'grass-5-final': 12,
-  'grass-6-final': 12,
+  'grass-1-final': 11,  // 12px - 1px = 11px (moved up 1px more)
+  'grass-2-final': 11,
+  'grass-3-final': 11,
+  'grass-4-final': 11,
+  'grass-5-final': 11,
+  'grass-6-final': 11,
 };
 
 export function alignPrefabYToSurfaceTop(
