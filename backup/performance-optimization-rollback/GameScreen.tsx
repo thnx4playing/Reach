@@ -299,20 +299,12 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         setCurrentPlayerBox(box);
       }
       
-      // PERFORMANCE: Optimized state update frequency for smooth animation
+      // PERFORMANCE: Balanced state update frequency for smooth animation
       if (frameCount % 2 === 0) { // Every 2 frames for smooth animation
         setFrameCount(prev => prev + 1);
-        
-        // Only update state if values have changed significantly to reduce re-renders
-        const newX = Math.round(xRef.current);
-        const newZ = Math.round(zRef.current);
-        const newElapsed = Math.round((t / 1000) * 100) / 100; // Round to 2 decimal places
-        
-        if (Math.abs(newX - x) > 0.5 || Math.abs(newZ - z) > 0.5 || Math.abs(newElapsed - elapsedSec) > 0.01) {
-          setX(newX);
-          setZ(newZ);
-          setElapsedSec(newElapsed);
-        }
+        setX(xRef.current);
+        setZ(zRef.current);
+        setElapsedSec(t / 1000);
       }
 
       // PERFORMANCE: Simplified horizontal movement
@@ -521,10 +513,10 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
 
       tickIgnoreCeil(jumpStateRef.current);
 
-      // ==== OPTIMIZED CAMERA LOGIC ====
-      // Smoother camera movement with throttled platform generation
+      // ==== WORKING CAMERA LOGIC (Add this back) ====
+      // Only check camera movement occasionally to avoid performance issues
 
-      if (frameCount % 2 === 0) { // Every 2 frames for smoother movement (was 5)
+      if (frameCount % 5 === 0) { // Every 5 frames
         const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.25); // 25% from top
         const playerScreenY = floorTopY - zRef.current - cameraY;
         
@@ -535,9 +527,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           if (Math.abs(newCameraY - cameraY) > 1) { // Only update if significant change
             setCameraY(newCameraY);
             
-            // Throttle platform generation to prevent frame drops
-            // Only update platforms every 3 camera movements to reduce performance impact
-            if (platformManager.current && frameCount % 6 === 0) { // Every 6 frames (3 camera updates)
+            // Update platform generation when camera moves
+            if (platformManager.current) {
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
               if (platformsChanged) {

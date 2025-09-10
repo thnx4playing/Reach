@@ -281,6 +281,7 @@ export class PlatformManager {
             // WORLD coordinates: alignPrefabYToSurfaceTop returns the correct WORLD Y
             const treeWorldY = alignPrefabYToSurfaceTop(this.mapName, treeType, surfaceWorldY, this.scale);
             
+            console.log(`[PlatformManager] Tree placed at WORLD coords: (${treeWorldX}, ${treeWorldY}), surfaceWorldY: ${surfaceWorldY}`);
             
             const tree = this.createPlatform(treeType, treeWorldX, treeWorldY, 'decoration');
             this.platforms.set(tree.id, tree);
@@ -407,5 +408,6 @@ export class PlatformManager {
       Math.abs(p.y - worldY) < range
     );
     
+    console.log(`[PlatformManager] ${nearby.length} platforms near Y=${worldY} (±${range}px)`);
   }
 }
