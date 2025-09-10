@@ -715,6 +715,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           
           {/* Render world under camera transform */}
           <Group transform={[{ translateY: -cameraY }]}>
+            {/* Platforms */}
             {allPlatforms.map((platform) => (
               <PrefabNode
                 key={platform.id}
@@ -726,25 +727,23 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               />
             ))}
             
+            {/* Character now renders in WORLD space with camera transform */}
+            <DashCharacter
+              floorTopY={floorTopY}
+              posX={xRef.current}
+              lift={z}
+              scale={SCALE}
+              footOffset={FOOT_OFFSET}
+              isHurt={isHurt}
+              isDead={isDead}
+              input={{
+                vx: vxRef.current,
+                dirX: dirX as -1 | 0 | 1,
+                crouch: false,
+                onGround: onGroundRef.current,
+              }}
+            />
           </Group>
-          
-          
-          {/* Character renders in screen space */}
-          <DashCharacter
-            floorTopY={floorTopY}
-            posX={xRef.current}
-            lift={z}
-            scale={SCALE}
-            footOffset={FOOT_OFFSET}
-            isHurt={isHurt}
-            isDead={isDead}
-            input={{
-              vx: vxRef.current,
-              dirX: dirX as -1 | 0 | 1,
-              crouch: false,
-              onGround: onGroundRef.current,
-            }}
-          />
          </Canvas>
       
       {/* Health Bar */}
