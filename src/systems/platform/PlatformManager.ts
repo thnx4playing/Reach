@@ -218,9 +218,9 @@ export class PlatformManager {
           const leftX = 0;
           const leftY = bandTopWorldY + 50 + Math.random() * (bandBottomWorldY - bandTopWorldY - height - 100);
           
-          // Place right platform 50px above and at right edge
+          // Place right platform 150px above and at right edge
           const rightX = Math.max(0, SCREEN_W - rightWidth);
-          const rightY = leftY - 50;
+          const rightY = leftY - 150;
           
           // Check if both positions are clear
           if (this.isPositionClear(leftX, leftY, leftWidth, height) && 
