@@ -30,8 +30,8 @@ const MAP_PLATFORM_CONFIGS: Record<MapName, {
       },
       mushrooms: {
         types: [
-          'mushroom-red-large-final', 'mushroom-red-medium-final', 'mushroom-red-small-final',
-          'mushroom-green-large-final', 'mushroom-green-medium-final', 'mushroom-green-small-final'
+          'mushroom-red-small-final',
+          'mushroom-green-small-final'
         ],
         probability: 0.6, // 60% chance per available tile
         maxPerTile: 1, // Only one item per tile

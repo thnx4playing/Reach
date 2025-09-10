@@ -79,11 +79,7 @@ const grassyCatalog: PrefabCatalog = {
     "tree-large-final": { cells: [[null, null, null, null], [null, null, null, null]] },
     "tree-medium-final": { cells: [[null, null, null, null], [null, null, null, null]] },
     "tree-small-final": { cells: [[null, null, null, null]] },
-    "mushroom-red-large-final": { cells: [[null, null, null, null]] },
-    "mushroom-red-medium-final": { cells: [[null, null, null, null]] },
     "mushroom-red-small-final": { cells: [[null, null, null, null]] },
-    "mushroom-green-large-final": { cells: [[null, null, null, null]] },
-    "mushroom-green-medium-final": { cells: [[null, null, null, null]] },
     "mushroom-green-small-final": { cells: [[null, null, null, null]] },
     "grass-1-final": { cells: [[null, null, null, null]] },
     "grass-2-final": { cells: [[null, null, null, null]] },
@@ -184,11 +180,7 @@ export const PREFAB_FOOT_INSET: Record<string, number> = {
   'tree-large-final': -2,
   'tree-medium-final': -2,
   'tree-small-final': -2,
-  'mushroom-red-large-final': 9,   // 14px - 5px = 9px (moved up 5px)
-  'mushroom-red-medium-final': 9,
-  'mushroom-red-small-final': 9,
-  'mushroom-green-large-final': 9,
-  'mushroom-green-medium-final': 9,
+  'mushroom-red-small-final': 9,   // 14px - 5px = 9px (moved up 5px)
   'mushroom-green-small-final': 9,
   'grass-1-final': 19,  // 29px - 10px = 19px (moved up 10px)
   'grass-2-final': 19,

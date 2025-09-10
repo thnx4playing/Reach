@@ -46,8 +46,8 @@ function getMapDecorations(mapName: MapName, width: number, height: number, floo
         { prefab: 'grass-1-final', x: 50, y: floorTopY - 16, scale: 2 },
         { prefab: 'grass-2-final', x: 150, y: floorTopY - 16, scale: 2 },
         { prefab: 'grass-3-final', x: 250, y: floorTopY - 16, scale: 2 },
-        { prefab: 'mushroom-red-large-final', x: 20, y: floorTopY - 32, scale: 2 },
-        { prefab: 'mushroom-red-small-final', x: 320, y: floorTopY - 16, scale: 2 },
+        { prefab: 'mushroom-red-small-final', x: 20, y: floorTopY - 16, scale: 2 },
+        { prefab: 'mushroom-green-small-final', x: 320, y: floorTopY - 16, scale: 2 },
       ];
     
     case 'dark':
