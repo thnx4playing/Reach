@@ -20,7 +20,6 @@ export class PlatformManager {
     this.floorWorldY = floorScreenY; // Treat the initial floor screen Y as world Y=floorScreenY
     this.generatedMinWorldY = this.floorWorldY;
     
-    console.log('[PlatformManager] Initialized with floor at world Y:', this.floorWorldY);
     
     // Generate initial content
     this.generateFloor();
@@ -79,7 +78,6 @@ export class PlatformManager {
       this.platforms.set(platform.id, platform);
     }
     
-    console.log('[PlatformManager] Generated floor at world Y:', this.floorWorldY);
   }
 
   private generateInitialPlatforms(): void {
@@ -93,7 +91,6 @@ export class PlatformManager {
       this.generatedMinWorldY = bandTopWorldY;
     }
     
-    console.log('[PlatformManager] Generated initial platforms, min world Y:', this.generatedMinWorldY);
   }
 
   private generateBand(bandTopWorldY: number, bandBottomWorldY: number): void {
@@ -202,11 +199,6 @@ export class PlatformManager {
 
   // CRITICAL FIX: Update for camera should use WORLD coordinates
   updateForCamera(cameraY: number, playerWorldY: number): boolean {
-    console.log('PlatformManager.updateForCamera called:', {
-      cameraY: cameraY.toFixed(2),
-      playerWorldY: playerWorldY.toFixed(2),
-      generatedMinWorldY: this.generatedMinWorldY.toFixed(2)
-    });
     
     // Generate ahead of where the player is going
     const generateAheadWorldY = playerWorldY - SCREEN_H * 2;
@@ -215,14 +207,12 @@ export class PlatformManager {
     
     // Generate if we need more content above
     if (this.generatedMinWorldY > generateAheadWorldY) {
-      console.log('Need to generate more platforms above');
       
       while (this.generatedMinWorldY > generateAheadWorldY) {
         const bandHeight = SCREEN_H * 0.8;
         const bandBottomWorldY = this.generatedMinWorldY - 50;
         const bandTopWorldY = bandBottomWorldY - bandHeight;
         
-        console.log('Generating band from', bandTopWorldY, 'to', bandBottomWorldY);
         this.generateBand(bandTopWorldY, bandBottomWorldY);
         this.generatedMinWorldY = bandTopWorldY;
         generated = true;
@@ -242,7 +232,6 @@ export class PlatformManager {
     
     if (toRemove.length > 0) {
       toRemove.forEach(id => this.platforms.delete(id));
-      console.log('Culled', toRemove.length, 'platforms, remaining:', this.platforms.size);
       generated = true;
     }
     
@@ -281,9 +270,5 @@ export class PlatformManager {
       Math.abs(p.y - worldY) < range
     );
     
-    console.log(`Platforms within ${range}px of world Y ${worldY}:`);
-    nearby.forEach(p => {
-      console.log(`  ${p.id}: ${p.prefab} at (${p.x}, ${p.y}) collision:`, p.collision);
-    });
   }
 }
