@@ -153,7 +153,9 @@ export class PlatformManager {
     // Generate platforms ABOVE the floor
     for (let i = 0; i < 3; i++) {
       const bandHeight = SCREEN_H * 0.8;
-      const bandBottomWorldY = this.generatedMinWorldY - 50 - (i * 50);
+      // Small 24px overlap to guarantee coverage
+      const SEAM_OVERLAP = 24;
+      const bandBottomWorldY = this.generatedMinWorldY + SEAM_OVERLAP;
       const bandTopWorldY = bandBottomWorldY - bandHeight;
       
       this.generateBand(bandTopWorldY, bandBottomWorldY);
@@ -202,6 +204,11 @@ export class PlatformManager {
     // Track if we've placed a paired platform set in this band
     let pairedPlatformPlaced = false;
     
+    // Much smaller guard bands - let platforms spawn to the band edges
+    const EDGE_MARGIN = 8; // was 50
+    const minY = bandTopWorldY + EDGE_MARGIN;
+    const maxY = bandBottomWorldY - 32 - EDGE_MARGIN; // 32 is typical platform height
+    
     for (let i = 0; i < platformCount; i++) {
       let platformType = this.pickPlatformType();
       
@@ -216,11 +223,11 @@ export class PlatformManager {
         for (let attempt = 0; attempt < 50; attempt++) {
           // Place left platform at left edge
           const leftX = 0;
-          const leftY = bandTopWorldY + 50 + Math.random() * (bandBottomWorldY - bandTopWorldY - height - 100);
+          const leftY = minY + Math.random() * Math.max(1, (maxY - minY));
           
           // Place right platform 150px above and at right edge
           const rightX = Math.max(0, SCREEN_W - rightWidth);
-          const rightY = leftY - 150;
+          const rightY = Math.min(maxY, leftY - 150); // keep the vertical offset intent but clamp into band
           
           // Check if both positions are clear
           if (this.isPositionClear(leftX, leftY, leftWidth, height) && 
@@ -262,12 +269,6 @@ export class PlatformManager {
       for (let attempt = 0; attempt < 50; attempt++) {
         const worldX = this.getValidXPosition(platformType, width);
         
-        // IMPROVED: Better Y positioning to ensure coverage throughout the band
-        // Use a more even distribution to avoid gaps at the bottom
-        const bandHeight = bandBottomWorldY - bandTopWorldY;
-        const minY = bandTopWorldY + 50;
-        const maxY = bandBottomWorldY - height - 50;
-        
         // Use weighted random to favor lower positions (closer to bottom of band)
         // This helps ensure platforms are available in the bottom 20% of the band
         const weight = Math.random();
@@ -282,10 +283,40 @@ export class PlatformManager {
         }
       }
     }
+    
+    // Ensure at least one platform near the top seam to bridge bands
+    (() => {
+      const seamBandTop = bandTopWorldY;
+      const seamBandBottom = bandTopWorldY + 32; // 32px near the top
+
+      const hasSeamBridge = Array.from(this.platforms.values()).some(p =>
+        p.type === 'platform' &&
+        p.y >= seamBandTop &&
+        p.y <= seamBandBottom
+      );
+
+      if (!hasSeamBridge) {
+        // pick a small/medium prefab from config
+        const fallbackType = this.config.platformTypes[0]?.[0] ?? 'platform-wood-1-final';
+        const width  = prefabWidthPx(this.mapName, fallbackType, this.scale);
+        const height = prefabHeightPx(this.mapName, fallbackType, this.scale);
+
+        // try a few positions near the seam
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const worldX = this.getValidXPosition(fallbackType, width);
+          const worldY = seamBandTop + 8 + Math.random() * Math.max(1, (seamBandBottom - seamBandTop - height - 8));
+          if (this.isPositionClear(worldX, worldY, width, height)) {
+            const platform = this.createPlatform(fallbackType, worldX, worldY, 'platform');
+            this.platforms.set(platform.id, platform);
+            break;
+          }
+        }
+      }
+    })();
   }
 
   private isPositionClear(worldX: number, worldY: number, width: number, height: number): boolean {
-    const margin = 80;
+    const margin = 40; // a bit denser packing
     
     for (const platform of this.platforms.values()) {
       const pWidth = prefabWidthPx(this.mapName, platform.prefab, platform.scale);
@@ -412,7 +443,9 @@ export class PlatformManager {
     if (this.generatedMinWorldY > generateAheadWorldY) {
       while (this.generatedMinWorldY > generateAheadWorldY) {
         const bandHeight = SCREEN_H * 0.8;
-        const bandBottomWorldY = this.generatedMinWorldY - 50;
+        // Small 24px overlap to guarantee coverage
+        const SEAM_OVERLAP = 24;
+        const bandBottomWorldY = this.generatedMinWorldY + SEAM_OVERLAP;
         const bandTopWorldY = bandBottomWorldY - bandHeight;
         
         this.generateBand(bandTopWorldY, bandBottomWorldY);
