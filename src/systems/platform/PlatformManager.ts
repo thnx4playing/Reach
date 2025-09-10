@@ -252,6 +252,8 @@ export class PlatformManager {
     const segment = segments[0];
     if (!segment) return;
     
+    // CRITICAL FIX: Use WORLD coordinates for decoration positioning
+    // surfaceWorldY is the Y coordinate of the walkable surface in WORLD space
     const surfaceWorldY = platform.collision.topY;
     const tileSize = getTileSize(this.mapName) * this.scale;
     const numTiles = Math.floor(segment.w / tileSize);
@@ -274,10 +276,14 @@ export class PlatformManager {
           // Check if tree fits in this tile
           const treeWidth = prefabWidthPx(this.mapName, treeType, this.scale);
           if (treeWidth <= tileSize) {
-            const treeX = platform.x + segment.x + (tileIndex * tileSize);
-            const treeY = alignPrefabYToSurfaceTop(this.mapName, treeType, surfaceWorldY, this.scale);
+            // WORLD coordinates: platform world X + segment offset + tile position
+            const treeWorldX = platform.x + segment.x + (tileIndex * tileSize);
+            // WORLD coordinates: alignPrefabYToSurfaceTop returns the correct WORLD Y
+            const treeWorldY = alignPrefabYToSurfaceTop(this.mapName, treeType, surfaceWorldY, this.scale);
             
-            const tree = this.createPlatform(treeType, treeX, treeY, 'decoration');
+            console.log(`[PlatformManager] Tree placed at WORLD coords: (${treeWorldX}, ${treeWorldY}), surfaceWorldY: ${surfaceWorldY}`);
+            
+            const tree = this.createPlatform(treeType, treeWorldX, treeWorldY, 'decoration');
             this.platforms.set(tree.id, tree);
             occupiedTiles.add(tileIndex);
           }
@@ -299,10 +305,12 @@ export class PlatformManager {
             const tileIndex = availableTiles[Math.floor(Math.random() * availableTiles.length)];
             const mushroomType = mushroomConfig.types[Math.floor(Math.random() * mushroomConfig.types.length)];
             
-            const mushroomX = platform.x + segment.x + (tileIndex * tileSize);
-            const mushroomY = alignPrefabYToSurfaceTop(this.mapName, mushroomType, surfaceWorldY, this.scale);
+            // WORLD coordinates: platform world X + segment offset + tile position
+            const mushroomWorldX = platform.x + segment.x + (tileIndex * tileSize);
+            // WORLD coordinates: alignPrefabYToSurfaceTop returns the correct WORLD Y
+            const mushroomWorldY = alignPrefabYToSurfaceTop(this.mapName, mushroomType, surfaceWorldY, this.scale);
             
-            const mushroom = this.createPlatform(mushroomType, mushroomX, mushroomY, 'decoration');
+            const mushroom = this.createPlatform(mushroomType, mushroomWorldX, mushroomWorldY, 'decoration');
             this.platforms.set(mushroom.id, mushroom);
             occupiedTiles.add(tileIndex);
           }
@@ -324,10 +332,12 @@ export class PlatformManager {
             const tileIndex = availableTiles[Math.floor(Math.random() * availableTiles.length)];
             const grassType = grassConfig.types[Math.floor(Math.random() * grassConfig.types.length)];
             
-            const grassX = platform.x + segment.x + (tileIndex * tileSize);
-            const grassY = alignPrefabYToSurfaceTop(this.mapName, grassType, surfaceWorldY, this.scale);
+            // WORLD coordinates: platform world X + segment offset + tile position
+            const grassWorldX = platform.x + segment.x + (tileIndex * tileSize);
+            // WORLD coordinates: alignPrefabYToSurfaceTop returns the correct WORLD Y
+            const grassWorldY = alignPrefabYToSurfaceTop(this.mapName, grassType, surfaceWorldY, this.scale);
             
-            const grass = this.createPlatform(grassType, grassX, grassY, 'decoration');
+            const grass = this.createPlatform(grassType, grassWorldX, grassWorldY, 'decoration');
             this.platforms.set(grass.id, grass);
             occupiedTiles.add(tileIndex);
           }
