@@ -393,11 +393,102 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       const headLeft = newBox.cx - HEAD_W * 0.5;
       const headRight = newBox.cx + HEAD_W * 0.5;
 
-      // ==== TEMPORARY: DISABLE PLATFORM COLLISION FOR TESTING ====
-      // Comment out or remove ALL platform collision code temporarily
-      // Just keep the basic floor collision:
+      // ==== SIMPLE PLATFORM COLLISION (Add this to your physics loop) ====
+      // This goes AFTER vertical physics (gravity/velocity) but BEFORE floor collision
 
-      // TEMPORARY: Just basic floor collision
+      // Only check collisions when falling at reasonable speed
+      if (vzRef.current < -50) { // Only when falling meaningfully fast
+        
+        // Get player position in world coordinates
+        const playerWorldX = xRef.current + CHAR_W / 2;
+        const playerWorldY = floorTopY - zRef.current; // Current position
+        const playerNextWorldY = floorTopY - (zRef.current + vzRef.current * dt); // Where player will be next frame
+        
+        // Get platforms that could be relevant
+        const nearbyPlatforms = platformManager.current?.getPlatformsNearPlayer(
+          playerWorldX,
+          playerWorldY,
+          150 // Search radius
+        ) || [];
+        
+        // ==== COLLISION DEBUG LOGGING (Add this temporarily) ====
+        if (nearbyPlatforms.length > 0) {
+          console.log('COLLISION CHECK:', {
+            playerWorldY: playerWorldY.toFixed(2),
+            playerNextWorldY: playerNextWorldY.toFixed(2),
+            fallSpeed: vzRef.current.toFixed(2),
+            platformsToCheck: nearbyPlatforms.length,
+            platforms: nearbyPlatforms.map(p => ({
+              id: p.id,
+              topY: p.collision?.topY,
+              left: p.collision?.left,
+              right: p.collision?.right
+            }))
+          });
+        }
+        
+        // Check each platform for collision
+        for (const platform of nearbyPlatforms) {
+          if (!platform.collision?.solid) continue;
+          
+          const collision = platform.collision;
+          
+          // Skip floor platforms (we handle floor separately)
+          if (collision.topY >= floorTopY - 5) continue;
+          
+          // Check horizontal overlap with some margin
+          const playerLeft = playerWorldX - COL_W / 2;
+          const playerRight = playerWorldX + COL_W / 2;
+          const hasHorizontalOverlap = playerLeft < collision.right - 5 && 
+                                      playerRight > collision.left + 5;
+          
+          if (hasHorizontalOverlap) {
+            // Check if player is crossing the platform surface this frame
+            const platformTop = collision.topY;
+            const isAbovePlatform = playerWorldY <= platformTop;
+            const willCrossPlatform = playerNextWorldY >= platformTop - 3;
+            
+            if (isAbovePlatform && willCrossPlatform) {
+              // Land on the platform
+              const newPlayerZ = Math.max(0, floorTopY - platformTop);
+              zRef.current = newPlayerZ;
+              vzRef.current = 0;
+              onGroundRef.current = true;
+              
+              console.log(`LANDED ON PLATFORM: ${platform.id} at world Y ${platformTop}, player Z now ${newPlayerZ}`);
+              
+              // Handle fall damage if falling from height
+              if (fallingRef.current) {
+                const dropPx = Math.max(0, peakZRef.current - zRef.current);
+                if (dropPx >= FALL_THRESHOLD) {
+                  takeDamage(1);
+                  playDamageSound();
+                  console.log(`Fall damage: dropped ${dropPx}px`);
+                }
+                fallingRef.current = false;
+                peakZRef.current = 0;
+              }
+              
+              break; // Stop checking other platforms once we land
+            }
+          }
+        }
+      }
+
+      // Fall damage tracking (separate from collision detection)
+      if (vzRef.current < 0) {
+        if (!fallingRef.current) {
+          fallingRef.current = true;
+          peakZRef.current = Math.max(0, zRef.current);
+        } else {
+          peakZRef.current = Math.max(peakZRef.current, Math.max(0, zRef.current));
+        }
+      } else if (vzRef.current > 0) {
+        // Reset fall tracking when moving upward
+        fallingRef.current = false;
+      }
+
+      // ==== SIMPLIFIED FLOOR COLLISION ====
       if (zRef.current < 0) {
         zRef.current = 0;
         if (vzRef.current < 0) vzRef.current = 0;
@@ -439,16 +530,36 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
 
       tickIgnoreCeil(jumpStateRef.current);
 
-      // ==== BASIC CAMERA LOGIC (for testing) ====
-      // Only update camera occasionally to avoid interference
-      if (frameCount % 10 === 0) { // Only every 10 frames
-        const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.3);
+      // ==== WORKING CAMERA LOGIC (Add this back) ====
+      // Only check camera movement occasionally to avoid performance issues
+
+      if (frameCount % 5 === 0) { // Every 5 frames
+        const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.25); // 25% from top
         const playerScreenY = floorTopY - zRef.current - cameraY;
         
-        if (playerScreenY < DEADZONE_FROM_TOP && zRef.current > 100) { // Only when player is high enough
-          const newCameraY = cameraY + (playerScreenY - DEADZONE_FROM_TOP);
-          setCameraY(Math.round(newCameraY));
-          console.log('Camera moved to:', newCameraY, 'Player Z:', zRef.current);
+        if (playerScreenY < DEADZONE_FROM_TOP) {
+          const targetCameraY = cameraY + (playerScreenY - DEADZONE_FROM_TOP);
+          const newCameraY = Math.round(targetCameraY);
+          
+          if (Math.abs(newCameraY - cameraY) > 1) { // Only update if significant change
+            setCameraY(newCameraY);
+            console.log('Camera moved:', {
+              from: cameraY,
+              to: newCameraY,
+              playerZ: zRef.current.toFixed(2),
+              playerScreenY: playerScreenY.toFixed(2)
+            });
+            
+            // Update platform generation when camera moves
+            if (platformManager.current) {
+              const playerWorldY = floorTopY - zRef.current;
+              const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
+              if (platformsChanged) {
+                setAllPlatforms(platformManager.current.getAllPlatforms());
+                console.log('Platforms updated due to camera movement');
+              }
+            }
+          }
         }
       }
 
