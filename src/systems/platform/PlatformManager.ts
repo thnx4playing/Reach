@@ -199,16 +199,79 @@ export class PlatformManager {
     const variablePlatformCount = 4;
     const platformCount = basePlatformCount + Math.floor(Math.random() * variablePlatformCount);
     
+    // Track if we've placed a paired platform set in this band
+    let pairedPlatformPlaced = false;
+    
     for (let i = 0; i < platformCount; i++) {
-      const platformType = this.pickPlatformType();
+      let platformType = this.pickPlatformType();
       
-      // Try to place platform
+      // Handle paired platform requirements
+      if ((platformType === 'platform-wood-2-left-final' || platformType === 'platform-wood-2-right-final') && !pairedPlatformPlaced) {
+        // Place both platforms as a pair
+        const leftWidth = prefabWidthPx(this.mapName, 'platform-wood-2-left-final', this.scale);
+        const rightWidth = prefabWidthPx(this.mapName, 'platform-wood-2-right-final', this.scale);
+        const height = prefabHeightPx(this.mapName, 'platform-wood-2-left-final', this.scale);
+        
+        // Try to place the pair
+        for (let attempt = 0; attempt < 50; attempt++) {
+          // Place left platform at left edge
+          const leftX = 0;
+          const leftY = bandTopWorldY + 50 + Math.random() * (bandBottomWorldY - bandTopWorldY - height - 100);
+          
+          // Place right platform 50px above and at right edge
+          const rightX = Math.max(0, SCREEN_W - rightWidth);
+          const rightY = leftY - 50;
+          
+          // Check if both positions are clear
+          if (this.isPositionClear(leftX, leftY, leftWidth, height) && 
+              this.isPositionClear(rightX, rightY, rightWidth, height)) {
+            
+            // Create both platforms
+            const leftPlatform = this.createPlatform('platform-wood-2-left-final', leftX, leftY, 'platform');
+            const rightPlatform = this.createPlatform('platform-wood-2-right-final', rightX, rightY, 'platform');
+            
+            this.platforms.set(leftPlatform.id, leftPlatform);
+            this.platforms.set(rightPlatform.id, rightPlatform);
+            
+            this.generateDecorationsFor(leftPlatform);
+            this.generateDecorationsFor(rightPlatform);
+            
+            pairedPlatformPlaced = true;
+            break;
+          }
+        }
+        
+        // Skip the normal platform placement for this iteration
+        continue;
+      }
+      
+      // Skip individual wood-2 platforms if we've already placed a pair
+      if ((platformType === 'platform-wood-2-left-final' || platformType === 'platform-wood-2-right-final') && pairedPlatformPlaced) {
+        // Pick a different platform type
+        platformType = this.pickPlatformType();
+        // If we get another wood-2 platform, skip this iteration
+        if (platformType === 'platform-wood-2-left-final' || platformType === 'platform-wood-2-right-final') {
+          continue;
+        }
+      }
+      
+      // Try to place platform with improved positioning to avoid gaps
       const width = prefabWidthPx(this.mapName, platformType, this.scale);
       const height = prefabHeightPx(this.mapName, platformType, this.scale);
       
       for (let attempt = 0; attempt < 50; attempt++) {
         const worldX = this.getValidXPosition(platformType, width);
-        const worldY = bandTopWorldY + 50 + Math.random() * (bandBottomWorldY - bandTopWorldY - height - 100);
+        
+        // IMPROVED: Better Y positioning to ensure coverage throughout the band
+        // Use a more even distribution to avoid gaps at the bottom
+        const bandHeight = bandBottomWorldY - bandTopWorldY;
+        const minY = bandTopWorldY + 50;
+        const maxY = bandBottomWorldY - height - 50;
+        
+        // Use weighted random to favor lower positions (closer to bottom of band)
+        // This helps ensure platforms are available in the bottom 20% of the band
+        const weight = Math.random();
+        const worldY = minY + weight * weight * (maxY - minY);
         
         if (this.isPositionClear(worldX, worldY, width, height)) {
           const platform = this.createPlatform(platformType, worldX, worldY, 'platform');
