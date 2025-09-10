@@ -767,20 +767,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
                   </>
                 )}
                 
-                {/* World coordinate grid lines */}
-                {Array.from({length: 10}, (_, i) => {
-                  const worldY = floorTopY - (i * 100);
-                  return (
-                    <Rect
-                      key={`grid-${i}`}
-                      x={0}
-                      y={worldY}
-                      width={SCREEN_W}
-                      height={1}
-                      color={`rgba(255, 255, 255, ${i === 0 ? 0.8 : 0.2})`} // Floor line brighter
-                    />
-                  );
-                })}
               </>
             )}
             
