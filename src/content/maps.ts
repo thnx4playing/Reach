@@ -180,22 +180,22 @@ export const PREFAB_FOOT_INSET: Record<string, number> = {
   'platform-wood-2-right-final': 0,
   'platform-wood-3-final': 0,
   
-  // Decorations (small inset so they sit properly on surface)
-  'tree-large-final': 4,
-  'tree-medium-final': 4,
-  'tree-small-final': 4,
-  'mushroom-red-large-final': 2,
-  'mushroom-red-medium-final': 2,
-  'mushroom-red-small-final': 2,
-  'mushroom-green-large-final': 2,
-  'mushroom-green-medium-final': 2,
-  'mushroom-green-small-final': 2,
-  'grass-1-final': 1,
-  'grass-2-final': 1,
-  'grass-3-final': 1,
-  'grass-4-final': 1,
-  'grass-5-final': 1,
-  'grass-6-final': 1,
+  // Decorations (negative inset so they sit ON TOP of surface, not above it)
+  'tree-large-final': -2,
+  'tree-medium-final': -2,
+  'tree-small-final': -2,
+  'mushroom-red-large-final': -1,
+  'mushroom-red-medium-final': -1,
+  'mushroom-red-small-final': -1,
+  'mushroom-green-large-final': -1,
+  'mushroom-green-medium-final': -1,
+  'mushroom-green-small-final': -1,
+  'grass-1-final': -1,
+  'grass-2-final': -1,
+  'grass-3-final': -1,
+  'grass-4-final': -1,
+  'grass-5-final': -1,
+  'grass-6-final': -1,
 };
 
 export function alignPrefabYToSurfaceTop(
@@ -207,10 +207,11 @@ export function alignPrefabYToSurfaceTop(
   const footInset = (PREFAB_FOOT_INSET[prefabName] ?? 0) * scale;
   const h = prefabHeightPx(map, prefabName, scale);
   
-  // FIXED: Ensure decorations sit ON TOP of the surface, not inside it
+  // FIXED: Ensure decorations sit ON TOP of the surface, not above it
   // surfaceTopY is the Y coordinate of the walkable surface
-  // We want the bottom of the decoration sprite to align with this surface
+  // We want the bottom of the decoration sprite to sit ON the surface
   // So decoration Y = surfaceTopY - decorationHeight + footInset
+  // The footInset should be positive to move the decoration down onto the surface
   return Math.round(surfaceTopY - h + footInset);
 }
 

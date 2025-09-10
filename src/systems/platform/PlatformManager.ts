@@ -290,29 +290,26 @@ export class PlatformManager {
       }
     }
     
-    // Add mushrooms with tile-based restrictions
+    // Add mushrooms - ONE PER PLATFORM (not per tile)
     if (decorationConfig.mushrooms) {
       const mushroomConfig = decorationConfig.mushrooms;
-      const maxMushrooms = isGrass3 ? 2 : isGrass1 ? 1 : 0;
-      
-      for (let i = 0; i < maxMushrooms; i++) {
-        if (Math.random() < mushroomConfig.probability) {
-          const availableTiles = Array.from({length: numTiles}, (_, i) => i)
-            .filter(tileIndex => !occupiedTiles.has(tileIndex));
+      // Only spawn one mushroom per platform, regardless of platform size
+      if (Math.random() < mushroomConfig.probability) {
+        const availableTiles = Array.from({length: numTiles}, (_, i) => i)
+          .filter(tileIndex => !occupiedTiles.has(tileIndex));
+        
+        if (availableTiles.length > 0) {
+          const tileIndex = availableTiles[Math.floor(Math.random() * availableTiles.length)];
+          const mushroomType = mushroomConfig.types[Math.floor(Math.random() * mushroomConfig.types.length)];
           
-          if (availableTiles.length > 0) {
-            const tileIndex = availableTiles[Math.floor(Math.random() * availableTiles.length)];
-            const mushroomType = mushroomConfig.types[Math.floor(Math.random() * mushroomConfig.types.length)];
-            
-            // WORLD coordinates: platform world X + segment offset + tile position
-            const mushroomWorldX = platform.x + segment.x + (tileIndex * tileSize);
-            // WORLD coordinates: alignPrefabYToSurfaceTop returns the correct WORLD Y
-            const mushroomWorldY = alignPrefabYToSurfaceTop(this.mapName, mushroomType, surfaceWorldY, this.scale);
-            
-            const mushroom = this.createPlatform(mushroomType, mushroomWorldX, mushroomWorldY, 'decoration');
-            this.platforms.set(mushroom.id, mushroom);
-            occupiedTiles.add(tileIndex);
-          }
+          // WORLD coordinates: platform world X + segment offset + tile position
+          const mushroomWorldX = platform.x + segment.x + (tileIndex * tileSize);
+          // WORLD coordinates: alignPrefabYToSurfaceTop returns the correct WORLD Y
+          const mushroomWorldY = alignPrefabYToSurfaceTop(this.mapName, mushroomType, surfaceWorldY, this.scale);
+          
+          const mushroom = this.createPlatform(mushroomType, mushroomWorldX, mushroomWorldY, 'decoration');
+          this.platforms.set(mushroom.id, mushroom);
+          occupiedTiles.add(tileIndex);
         }
       }
     }
