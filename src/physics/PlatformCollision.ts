@@ -2,11 +2,11 @@ import type { PlatformDef } from '../systems/platform/types';
 
 export interface CollisionResult {
   landed: boolean;
-  platformY?: number;
+  platformWorldY?: number; // Return world Y coordinate
 }
 
 export function checkPlatformCollision(
-  playerBox: { left: number; right: number; bottom: number },
+  playerWorldBox: { left: number; right: number; bottom: number }, // Player box in WORLD coordinates
   platforms: PlatformDef[],
   fallingVelocity: number
 ): CollisionResult {
@@ -17,17 +17,18 @@ export function checkPlatformCollision(
     
     const collision = platform.collision;
     
+    // All collision detection in WORLD coordinates
     // Check horizontal overlap
-    if (playerBox.left >= collision.right || playerBox.right <= collision.left) {
+    if (playerWorldBox.left >= collision.right || playerWorldBox.right <= collision.left) {
       continue; // No horizontal overlap
     }
     
     // Check if player is at or just below the platform surface
-    const distanceToSurface = playerBox.bottom - collision.topY;
+    const distanceToSurface = playerWorldBox.bottom - collision.topY;
     if (distanceToSurface >= -5 && distanceToSurface <= 15) {
       return {
         landed: true,
-        platformY: collision.topY
+        platformWorldY: collision.topY // Return world Y coordinate
       };
     }
   }

@@ -361,7 +361,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       const headLeft = newBox.cx - HEAD_W * 0.5;
       const headRight = newBox.cx + HEAD_W * 0.5;
 
-      // ==== SIMPLIFIED PLATFORM COLLISION (REPLACES OLD COLLISION CODE) ====
+      // ==== FIXED PLATFORM COLLISION (WORLD COORDINATES) ====
       if (vzRef.current < 0) { // Only when falling
         // Fall session tracking
         if (!fallingRef.current) {
@@ -371,23 +371,42 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           peakZRef.current = Math.max(peakZRef.current, Math.max(0, zRef.current));
         }
         
-        // Get nearby platforms for collision - MUCH more efficient
+        // CRITICAL: Convert player position to WORLD coordinates for collision detection
+        const playerWorldX = xRef.current + CHAR_W / 2; // Player center X (no camera offset needed for X)
+        const playerWorldY = floorTopY - zRef.current;  // Player world Y position
+        
+        // Create player collision box in WORLD coordinates
+        const playerWorldBox = {
+          left: playerWorldX - COL_W / 2,
+          right: playerWorldX + COL_W / 2,
+          bottom: playerWorldY  // Player's feet position in world coordinates
+        };
+        
+        // Get nearby platforms for collision (using world coordinates)
         const nearbyPlatforms = platformManager.current?.getPlatformsNearPlayer(
-          xRef.current + CHAR_W/2, // Player center X
-          floorTopY - zRef.current, // Player world Y
-          150 // Search radius
+          playerWorldX,
+          playerWorldY,
+          150
         ) || [];
         
-        // Simple, reliable collision check
+        // Debug logging to verify coordinates are working
+        if (frameCount % 60 === 0) { // Log every 60 frames to avoid spam
+          console.log('Player world Y:', playerWorldY);
+          console.log('Camera Y:', cameraY);
+          console.log('Platform count:', nearbyPlatforms.length);
+        }
+        
+        // Collision detection using world coordinates
         const collisionResult = checkPlatformCollision(
-          { left: newBox.left, right: newBox.right, bottom: newBox.feetY },
+          playerWorldBox,
           nearbyPlatforms,
           vzRef.current
         );
         
-        if (collisionResult.landed && collisionResult.platformY !== undefined) {
-          // Land on platform
-          zRef.current = Math.max(0, floorTopY - collisionResult.platformY);
+        if (collisionResult.landed && collisionResult.platformWorldY !== undefined) {
+          // Convert platform world Y back to player Z coordinate
+          const newPlayerZ = Math.max(0, floorTopY - collisionResult.platformWorldY);
+          zRef.current = newPlayerZ;
           vzRef.current = 0;
           onGroundRef.current = true;
           
@@ -410,8 +429,9 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       // NOTE: No ceiling collision with platforms - they're one-way
       // Only check ceiling collision with solid blocks if you have them
       
-      // ==== FLOOR CLAMP ====
+      // ==== FIXED FLOOR COLLISION (WORLD COORDINATES) ====
       if (!lastVzReason.current && zRef.current < 0) {
+        // Player hit the actual floor (world Y = floorTopY)
         zRef.current = 0;
         if (vzRef.current < 0) vzRef.current = 0;
         
@@ -452,8 +472,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
 
       tickIgnoreCeil(jumpStateRef.current);
 
-      // ==== CAMERA AND PLATFORM GENERATION (REPLACES OLD CAMERA LOGIC) ====
-      if (frameCount % 4 === 0) { // Only update every 4 frames for performance
+      // ==== FIXED CAMERA AND PLATFORM GENERATION ====
+      if (frameCount % 4 === 0) {
         const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.40);
         const playerScreenY = zToY(floorTopY, zRef.current) - cameraY;
         
@@ -462,9 +482,10 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           if (newCameraY < cameraY) {
             setCameraY(Math.round(newCameraY));
             
-            // Update platform manager - this handles all generation efficiently
+            // Update platform manager with WORLD coordinates
             if (platformManager.current) {
-              const platformsChanged = platformManager.current.updateForCamera(newCameraY);
+              const playerWorldY = floorTopY - zRef.current; // Convert player Z to world Y
+              const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
               if (platformsChanged) {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
               }
