@@ -510,7 +510,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       tickJumpTimers(jumpStateRef.current, dt * 1000, onGroundRef.current);
 
       if (shouldExecuteJump(jumpStateRef.current)) {
-        const JUMP_VELOCITY = 1200; // Increased from 780 for testing
         vzRef.current = JUMP_VELOCITY;
         onGroundRef.current = false;
         consumeJump(jumpStateRef.current);
