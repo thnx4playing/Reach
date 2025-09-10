@@ -12,8 +12,10 @@ import ParallaxBackground from '../render/ParallaxBackground';
 import { PARALLAX } from '../content/parallaxConfig';
 import type { LevelData } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, prefabWidthPx } from '../content/maps';
-import { useVerticalProcGen } from '../systems/useVerticalProcGen';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
+import { PlatformManager } from '../systems/platform/PlatformManager';
+import { checkPlatformCollision } from '../physics/PlatformCollision';
+import type { PlatformDef } from '../systems/platform/types';
 import idleJson from '../../assets/character/dash/Idle_atlas.json';
 import { dbg } from '../utils/dbg';
 
@@ -172,19 +174,18 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // Calculate player's world Y position
   const playerWorldY = floorTopY - zRef.current;
 
-  // Use procedural generation with consistent coordinate system
-  const { platforms, decorations } = useVerticalProcGen(
-    {
-      mapName: levelData.mapName as any,
-      floorTopY,
-      initialPlatforms: levelData.platforms,
-      initialDecorations: levelData.decorations,
-      scale: 2,
-      maxScreens: 10,
-      initialBands: 1,
-    },
-    playerWorldY
-  );
+  // NEW UNIFIED PLATFORM SYSTEM
+  const platformManager = useRef<PlatformManager | null>(null);
+  const [allPlatforms, setAllPlatforms] = useState<PlatformDef[]>([]);
+
+  // Initialize platform manager
+  useEffect(() => {
+    if (!platformManager.current) {
+      platformManager.current = new PlatformManager(levelData.mapName as any, floorTopY, 2);
+      setAllPlatforms(platformManager.current.getAllPlatforms());
+      console.log('[GameScreen] Platform manager initialized with', platformManager.current.getAllPlatforms().length, 'platforms');
+    }
+  }, [levelData.mapName, floorTopY]);
   
 
 
@@ -228,12 +229,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   }, []);
 
 
-  // Fix 2: Correct platform collision detection
-  const isSolidPrefab = (name: string) => {
-    // Check for any platform type (grass OR wood)
-    const isPlatform = /platform/i.test(name) || name === 'floor-final' || name === 'floor';
-    return isPlatform;
-  };
 
   // SIMPLIFIED: No more complex platform slabs - just use platforms directly
 
@@ -366,16 +361,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       const headLeft = newBox.cx - HEAD_W * 0.5;
       const headRight = newBox.cx + HEAD_W * 0.5;
 
-      // ==== SIMPLIFIED PLATFORM COLLISION: Just check if above platform and falling ====
-      
-      // Reset fall session when not falling
-      if (vzRef.current >= 0 && fallingRef.current) {
-        fallingRef.current = false;
-        peakZRef.current = 0;
-      }
-      
-      // Fix 5: Additional optimization for collision detection
-      if (vzRef.current < 0) {
+      // ==== SIMPLIFIED PLATFORM COLLISION (REPLACES OLD COLLISION CODE) ====
+      if (vzRef.current < 0) { // Only when falling
         // Fall session tracking
         if (!fallingRef.current) {
           fallingRef.current = true;
@@ -384,60 +371,37 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           peakZRef.current = Math.max(peakZRef.current, Math.max(0, zRef.current));
         }
         
-        // OPTIMIZED COLLISION: Only check platforms near the player
-        let landed = false;
-        const playerCenterX = box.cx;
-        const playerBottom = currFeetY;
+        // Get nearby platforms for collision - MUCH more efficient
+        const nearbyPlatforms = platformManager.current?.getPlatformsNearPlayer(
+          xRef.current + CHAR_W/2, // Player center X
+          floorTopY - zRef.current, // Player world Y
+          150 // Search radius
+        ) || [];
         
-        // Filter platforms to only those that could possibly be collided with
-        const nearbyPlatforms = platforms?.filter(platform => {
-          if (!platform || !isSolidPrefab(platform.prefab)) return false;
-          
-          const platformRight = platform.x + (prefabWidthPx(levelData.mapName, platform.prefab, platform.scale || SCALE));
-          const platformTop = platform.y;
-          const platformBottom = platform.y + 50; // Approximate platform height
-          
-          // Quick bounds check - only check platforms player could be near
-          const horizontalOverlap = box.left < platformRight && box.right > platform.x;
-          const verticalNear = Math.abs(playerBottom - platformTop) < 100; // Within 100px vertically
-          
-          return horizontalOverlap && verticalNear;
-        }) || [];
+        // Simple, reliable collision check
+        const collisionResult = checkPlatformCollision(
+          { left: newBox.left, right: newBox.right, bottom: newBox.feetY },
+          nearbyPlatforms,
+          vzRef.current
+        );
         
-        // Only process a maximum of 5 nearby platforms per frame for performance
-        const platformsToCheck = nearbyPlatforms.slice(0, 5);
-        
-        for (const platform of platformsToCheck) {
-          const platformTop = platform.y;
-          const platformLeft = platform.x;
-          const platformRight = platform.x + (prefabWidthPx(levelData.mapName, platform.prefab, platform.scale || SCALE));
+        if (collisionResult.landed && collisionResult.platformY !== undefined) {
+          // Land on platform
+          zRef.current = Math.max(0, floorTopY - collisionResult.platformY);
+          vzRef.current = 0;
+          onGroundRef.current = true;
           
-          // Check if player is horizontally over the platform
-          if (box.left < platformRight && box.right > platformLeft) {
-            // Check if player's feet are at or below the platform top
-            if (currFeetY >= platformTop - 5 && currFeetY <= platformTop + 10) {
-              // Land on the platform
-              zRef.current = Math.max(0, floorTopY - platformTop);
-              vzRef.current = 0;
-              onGroundRef.current = true;
-              landed = true;
-              
-              // Landing damage
-              if (fallingRef.current) {
-                const dropPx = Math.max(0, peakZRef.current - zRef.current);
-                if (dropPx >= FALL_THRESHOLD) {
-                  takeDamage(1);
-                  playDamageSound();
-                }
-                fallingRef.current = false;
-                peakZRef.current = 0;
-              }
-              break;
+          // Landing damage
+          if (fallingRef.current) {
+            const dropPx = Math.max(0, peakZRef.current - zRef.current);
+            if (dropPx >= FALL_THRESHOLD) {
+              takeDamage(1);
+              playDamageSound();
             }
+            fallingRef.current = false;
+            peakZRef.current = 0;
           }
-        }
-        
-        if (!landed) {
+        } else {
           onGroundRef.current = false;
         }
       }
@@ -488,14 +452,24 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
 
       tickIgnoreCeil(jumpStateRef.current);
 
-      // PERFORMANCE: Camera logic only (state updates moved to earlier in loop)
-      if (frameCount % 2 === 0) {
+      // ==== CAMERA AND PLATFORM GENERATION (REPLACES OLD CAMERA LOGIC) ====
+      if (frameCount % 4 === 0) { // Only update every 4 frames for performance
         const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.40);
         const playerScreenY = zToY(floorTopY, zRef.current) - cameraY;
         
         if (playerScreenY < DEADZONE_FROM_TOP) {
-          const target = playerScreenY - DEADZONE_FROM_TOP;
-          if (target < cameraY) setCameraY(Math.round(target));
+          const newCameraY = playerScreenY - DEADZONE_FROM_TOP;
+          if (newCameraY < cameraY) {
+            setCameraY(Math.round(newCameraY));
+            
+            // Update platform manager - this handles all generation efficiently
+            if (platformManager.current) {
+              const platformsChanged = platformManager.current.updateForCamera(newCameraY);
+              if (platformsChanged) {
+                setAllPlatforms(platformManager.current.getAllPlatforms());
+              }
+            }
+          }
         }
       }
 
@@ -539,39 +513,16 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           
           {/* Render world under camera transform */}
           <Group transform={[{ translateY: -cameraY }]}>
-            {platforms?.filter(Boolean).map((platform, index) => {
-              if (!platform?.prefab || typeof platform.x !== 'number' || typeof platform.y !== 'number') {
-                return null;
-              }
-              
-              return (
+            {allPlatforms.map((platform) => (
               <PrefabNode
-                key={`platform-${index}`}
+                key={platform.id}
                 map={levelData.mapName}
                 name={platform.prefab}
                 x={platform.x}
                 y={platform.y}
-                scale={platform.scale || 2}
+                scale={platform.scale}
               />
-              );
-            })}
-            
-            {decorations?.filter(Boolean).map((decoration, index) => {
-              if (!decoration?.prefab || typeof decoration.x !== 'number' || typeof decoration.y !== 'number') {
-                return null;
-              }
-              
-              return (
-              <PrefabNode
-                key={`decoration-${index}`}
-                map={levelData.mapName}
-                name={decoration.prefab}
-                x={decoration.x}
-                y={decoration.y}
-                scale={decoration.scale || 2}
-              />
-              );
-            })}
+            ))}
             
           </Group>
           

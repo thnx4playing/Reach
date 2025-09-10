@@ -171,28 +171,31 @@ export function prefabHeightPx(map: MapName, prefabName: string, scale = 2): num
 
 // Visual foot inset per prefab (px at scale=1)
 export const PREFAB_FOOT_INSET: Record<string, number> = {
-  'tree-large-final': 2.5,
-  'tree-medium-final': 2.5,
-  'tree-small-final': 2.5,
-  'floor-final': 2.5,
-  'platform-grass-3-final': 2.5,
-  'platform-grass-1-final': 2.5,
-  'platform-wood-3-final': 2.5,
-  'platform-wood-1-final': 2.5,
-  'platform-wood-2-left-final': 2.5,
-  'platform-wood-2-right-final': 2.5,
-  'mushroom-red-large-final': 2.5,
-  'mushroom-red-medium-final': 2.5,
-  'mushroom-red-small-final': 2.5,
-  'mushroom-green-large-final': 2.5,
-  'mushroom-green-medium-final': 2.5,
-  'mushroom-green-small-final': 2.5,
-  'grass-1-final': 2.5,
-  'grass-2-final': 2.5,
-  'grass-3-final': 2.5,
-  'grass-4-final': 2.5,
-  'grass-5-final': 2.5,
-  'grass-6-final': 2.5,
+  // Platforms (no inset needed - they ARE the surface)
+  'floor-final': 0,
+  'platform-grass-1-final': 0,
+  'platform-grass-3-final': 0,
+  'platform-wood-1-final': 0,
+  'platform-wood-2-left-final': 0,
+  'platform-wood-2-right-final': 0,
+  'platform-wood-3-final': 0,
+  
+  // Decorations (small inset so they sit properly on surface)
+  'tree-large-final': 4,
+  'tree-medium-final': 4,
+  'tree-small-final': 4,
+  'mushroom-red-large-final': 2,
+  'mushroom-red-medium-final': 2,
+  'mushroom-red-small-final': 2,
+  'mushroom-green-large-final': 2,
+  'mushroom-green-medium-final': 2,
+  'mushroom-green-small-final': 2,
+  'grass-1-final': 1,
+  'grass-2-final': 1,
+  'grass-3-final': 1,
+  'grass-4-final': 1,
+  'grass-5-final': 1,
+  'grass-6-final': 1,
 };
 
 export function alignPrefabYToSurfaceTop(
@@ -203,6 +206,11 @@ export function alignPrefabYToSurfaceTop(
 ): number {
   const footInset = (PREFAB_FOOT_INSET[prefabName] ?? 0) * scale;
   const h = prefabHeightPx(map, prefabName, scale);
+  
+  // FIXED: Ensure decorations sit ON TOP of the surface, not inside it
+  // surfaceTopY is the Y coordinate of the walkable surface
+  // We want the bottom of the decoration sprite to align with this surface
+  // So decoration Y = surfaceTopY - decorationHeight + footInset
   return Math.round(surfaceTopY - h + footInset);
 }
 

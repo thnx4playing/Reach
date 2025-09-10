@@ -1,4 +1,4 @@
-import type { PlatformDef } from '../systems/platform/PlatformSystem';
+import type { PlatformDef } from '../systems/platform/types';
 
 export interface CollisionResult {
   landed: boolean;
@@ -24,7 +24,7 @@ export function checkPlatformCollision(
     
     // Check if player is at or just below the platform surface
     const distanceToSurface = playerBox.bottom - collision.topY;
-    if (distanceToSurface >= -5 && distanceToSurface <= 10) {
+    if (distanceToSurface >= -5 && distanceToSurface <= 15) {
       return {
         landed: true,
         platformY: collision.topY
