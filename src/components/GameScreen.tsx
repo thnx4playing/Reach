@@ -393,99 +393,126 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       const headLeft = newBox.cx - HEAD_W * 0.5;
       const headRight = newBox.cx + HEAD_W * 0.5;
 
-      // ==== SIMPLE PLATFORM COLLISION (Add this to your physics loop) ====
-      // This goes AFTER vertical physics (gravity/velocity) but BEFORE floor collision
+      // ==== ROBUST PLATFORM COLLISION (Replace existing collision code) ====
+      // This goes AFTER vertical physics but BEFORE floor collision
 
-      // Only check collisions when falling at reasonable speed
-      if (vzRef.current < -50) { // Only when falling meaningfully fast
+      // Check for platform collisions when falling (more lenient speed threshold)
+      if (vzRef.current < -20) { // Lower threshold - even slow falling should check
         
-        // Get player position in world coordinates
+        // Get player position
         const playerWorldX = xRef.current + CHAR_W / 2;
-        const playerWorldY = floorTopY - zRef.current; // Current position
-        const playerNextWorldY = floorTopY - (zRef.current + vzRef.current * dt); // Where player will be next frame
+        const playerWorldY = floorTopY - zRef.current; // Current feet position
         
-        // Get platforms that could be relevant
+        // Get platforms that could be relevant (wider search)
         const nearbyPlatforms = platformManager.current?.getPlatformsNearPlayer(
           playerWorldX,
           playerWorldY,
-          150 // Search radius
+          200 // Increased search radius
         ) || [];
         
-        // ==== COLLISION DEBUG LOGGING (Add this temporarily) ====
+        // Add debug logging to see what platforms we're checking
         if (nearbyPlatforms.length > 0) {
-          console.log('COLLISION CHECK:', {
+          console.log('CHECKING COLLISIONS:', {
             playerWorldY: playerWorldY.toFixed(2),
-            playerNextWorldY: playerNextWorldY.toFixed(2),
-            fallSpeed: vzRef.current.toFixed(2),
-            platformsToCheck: nearbyPlatforms.length,
-            platforms: nearbyPlatforms.map(p => ({
-              id: p.id,
-              topY: p.collision?.topY,
-              left: p.collision?.left,
-              right: p.collision?.right
-            }))
+            vzCurrent: vzRef.current.toFixed(2),
+            platformsFound: nearbyPlatforms.filter(p => p.collision?.topY !== 812).length, // Exclude floor
+            playerFeetY: playerWorldY
           });
         }
         
-        // Check each platform for collision
+        // Check each platform
         for (const platform of nearbyPlatforms) {
           if (!platform.collision?.solid) continue;
           
           const collision = platform.collision;
           
-          // Skip floor platforms (we handle floor separately)
-          if (collision.topY >= floorTopY - 5) continue;
+          // Skip floor platforms (let floor collision handle these)
+          if (collision.topY >= floorTopY - 10) continue;
           
-          // Check horizontal overlap with some margin
+          // Check horizontal overlap (more generous)
           const playerLeft = playerWorldX - COL_W / 2;
           const playerRight = playerWorldX + COL_W / 2;
-          const hasHorizontalOverlap = playerLeft < collision.right - 5 && 
-                                      playerRight > collision.left + 5;
+          const overlapMargin = 8; // More forgiving overlap
+          
+          const hasHorizontalOverlap = playerLeft < collision.right - overlapMargin && 
+                                      playerRight > collision.left + overlapMargin;
           
           if (hasHorizontalOverlap) {
-            // Check if player is crossing the platform surface this frame
+            // More forgiving vertical collision detection
             const platformTop = collision.topY;
-            const isAbovePlatform = playerWorldY <= platformTop;
-            const willCrossPlatform = playerNextWorldY >= platformTop - 3;
+            const distanceToSurface = playerWorldY - platformTop;
             
-            if (isAbovePlatform && willCrossPlatform) {
+            // Check if player is close to landing on platform
+            // Allow collision if player is within a reasonable range of the platform surface
+            if (distanceToSurface >= -15 && distanceToSurface <= 25) {
+              
+              console.log('PLATFORM COLLISION DETECTED:', {
+                platformId: platform.id,
+                platformTopY: platformTop,
+                playerFeetY: playerWorldY,
+                distanceToSurface: distanceToSurface.toFixed(2),
+                horizontalOverlap: true,
+                willLand: true
+              });
+              
               // Land on the platform
               const newPlayerZ = Math.max(0, floorTopY - platformTop);
               zRef.current = newPlayerZ;
               vzRef.current = 0;
               onGroundRef.current = true;
               
-              console.log(`LANDED ON PLATFORM: ${platform.id} at world Y ${platformTop}, player Z now ${newPlayerZ}`);
+              console.log(`✅ LANDED ON PLATFORM: ${platform.id} at world Y ${platformTop}, player Z now ${newPlayerZ.toFixed(2)}`);
               
-              // Handle fall damage if falling from height
+              // Handle fall damage
               if (fallingRef.current) {
                 const dropPx = Math.max(0, peakZRef.current - zRef.current);
                 if (dropPx >= FALL_THRESHOLD) {
                   takeDamage(1);
                   playDamageSound();
-                  console.log(`Fall damage: dropped ${dropPx}px`);
+                  console.log(`💥 Fall damage: dropped ${dropPx.toFixed(2)}px`);
                 }
                 fallingRef.current = false;
                 peakZRef.current = 0;
               }
               
-              break; // Stop checking other platforms once we land
+              break; // Stop checking other platforms
+            } else {
+              // Log near misses for debugging
+              if (Math.abs(distanceToSurface) < 50) {
+                console.log('NEAR MISS:', {
+                  platformId: platform.id,
+                  distanceToSurface: distanceToSurface.toFixed(2),
+                  tooHigh: distanceToSurface < -15,
+                  tooLow: distanceToSurface > 25
+                });
+              }
             }
           }
         }
       }
 
-      // Fall damage tracking (separate from collision detection)
-      if (vzRef.current < 0) {
+      // Improved fall tracking (more reliable)
+      if (vzRef.current < -10) { // Start tracking falls earlier
         if (!fallingRef.current) {
           fallingRef.current = true;
           peakZRef.current = Math.max(0, zRef.current);
+          console.log('🔻 Started falling from Z:', peakZRef.current.toFixed(2));
         } else {
           peakZRef.current = Math.max(peakZRef.current, Math.max(0, zRef.current));
         }
-      } else if (vzRef.current > 0) {
-        // Reset fall tracking when moving upward
-        fallingRef.current = false;
+      } else if (vzRef.current > 10) { // Reset when moving up
+        if (fallingRef.current) {
+          console.log('🔺 Stopped falling (moving upward)');
+          fallingRef.current = false;
+        }
+      }
+
+      // Additional ground state verification
+      // Make sure we're not accidentally setting onGround to false
+      if (onGroundRef.current && vzRef.current > 50) {
+        // Only set to false when jumping with significant upward velocity
+        onGroundRef.current = false;
+        console.log('🚀 Left ground (jumping)');
       }
 
       // ==== SIMPLIFIED FLOOR COLLISION ====
@@ -526,6 +553,28 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         playJumpSound();
         
         console.log('Jump executed! VZ:', vzRef.current, 'Z:', zRef.current);
+      }
+
+      // ==== COLLISION DEBUGGING STEPS ====
+      // 1. First, verify platforms exist above ground level:
+      if (frameCount % 120 === 0) { // Every 2 seconds
+        console.log('Non-floor platforms:', 
+          platformManager.current?.getAllPlatforms()
+            .filter(p => p.collision?.topY && p.collision.topY < 800)
+            .map(p => ({ id: p.id, topY: p.collision?.topY }))
+        );
+      }
+
+      // 2. When jumping, log your trajectory:
+      if (Math.abs(vzRef.current) > 100) {
+        if (frameCount % 10 === 0) { // Log every 10 frames when moving fast
+          console.log('JUMP TRAJECTORY:', {
+            currentZ: zRef.current.toFixed(2),
+            velocity: vzRef.current.toFixed(2),
+            worldY: (floorTopY - zRef.current).toFixed(2),
+            direction: vzRef.current > 0 ? 'UP' : 'DOWN'
+          });
+        }
       }
 
       tickIgnoreCeil(jumpStateRef.current);
@@ -594,6 +643,35 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           screenHeight: SCREEN_H,
           cameraY: cameraY,
           expectedPlayerScreenY: (floorTopY - zRef.current - cameraY).toFixed(2)
+        });
+      }
+
+      // ==== PLATFORM DEBUG VISUALIZATION ====
+      // Add this to help visualize where platforms are relative to the player
+
+      if (frameCount % 60 === 0) { // Every 60 frames
+        const playerWorldX = xRef.current + CHAR_W / 2;
+        const playerWorldY = floorTopY - zRef.current;
+        
+        const allPlatforms = platformManager.current?.getAllPlatforms() || [];
+        const nonFloorPlatforms = allPlatforms.filter(p => 
+          p.collision?.solid && p.collision.topY < floorTopY - 10
+        );
+        
+        console.log('🎯 PLATFORM POSITIONS relative to player:', {
+          playerX: playerWorldX.toFixed(2),
+          playerY: playerWorldY.toFixed(2),
+          playerZ: zRef.current.toFixed(2),
+          nearbyPlatforms: nonFloorPlatforms.slice(0, 5).map(p => ({
+            id: p.id,
+            prefab: p.prefab,
+            x: p.x,
+            y: p.y,
+            topY: p.collision?.topY,
+            distanceX: Math.abs(playerWorldX - (p.x + (p.collision?.width || 0) / 2)).toFixed(2),
+            distanceY: Math.abs(playerWorldY - (p.collision?.topY || 0)).toFixed(2),
+            horizontalRange: `${p.collision?.left.toFixed(2)} - ${p.collision?.right.toFixed(2)}`
+          }))
         });
       }
 
