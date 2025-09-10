@@ -1,25 +1,98 @@
 import { Dimensions } from 'react-native';
-import { prefabWidthPx, prefabHeightPx, alignPrefabYToSurfaceTop, getTileSize } from '../../content/maps';
+import { prefabWidthPx, prefabHeightPx, alignPrefabYToSurfaceTop, getTileSize, prefabTopSolidSegmentsPx } from '../../content/maps';
 import type { MapName } from '../../content/maps';
 import type { PlatformDef } from './types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
+// Map-specific platform configurations
+const MAP_PLATFORM_CONFIGS: Record<MapName, {
+  platformTypes: Array<[string, number]>;
+  decorationConfig?: {
+    trees?: { types: string[]; probability: number };
+    mushrooms?: { types: string[]; probability: number; maxPerTile: number };
+    grass?: { types: string[]; probability: number; maxPerTile: number };
+  };
+}> = {
+  grassy: {
+    platformTypes: [
+      ['platform-grass-1-final', 3],           // 30% (3/10)
+      ['platform-grass-3-final', 2],           // 20% (2/10) 
+      ['platform-wood-1-final', 2],            // 20% (2/10)
+      ['platform-wood-3-final', 1],            // 10% (1/10)
+      ['platform-wood-2-left-final', 1],       // 10% (1/10)
+      ['platform-wood-2-right-final', 1],      // 10% (1/10)
+    ],
+    decorationConfig: {
+      trees: {
+        types: ['tree-large-final', 'tree-medium-final', 'tree-small-final'],
+        probability: 0.4, // 40% chance for trees on grass-3 platforms
+      },
+      mushrooms: {
+        types: [
+          'mushroom-red-large-final', 'mushroom-red-medium-final', 'mushroom-red-small-final',
+          'mushroom-green-large-final', 'mushroom-green-medium-final', 'mushroom-green-small-final'
+        ],
+        probability: 0.6, // 60% chance per available tile
+        maxPerTile: 1, // Only one item per tile
+      },
+      grass: {
+        types: ['grass-1-final', 'grass-2-final', 'grass-3-final', 'grass-4-final', 'grass-5-final', 'grass-6-final'],
+        probability: 0.8, // 80% chance per available tile
+        maxPerTile: 1, // Only one item per tile
+      }
+    }
+  },
+  dark: {
+    platformTypes: [
+      // Add dark-specific platforms here when needed
+      ['platform-stone-1', 3],
+      ['platform-stone-3', 2],
+    ]
+  },
+  desert: {
+    platformTypes: [
+      // Add desert-specific platforms here when needed
+      ['platform-sand-1', 3],
+      ['platform-sand-3', 2],
+    ]
+  },
+  dungeon: {
+    platformTypes: [
+      // Add dungeon-specific platforms here when needed
+      ['platform-brick-1', 3],
+      ['platform-brick-3', 2],
+    ]
+  },
+  frozen: {
+    platformTypes: [
+      // Add frozen-specific platforms here when needed
+      ['platform-ice-1', 3],
+      ['platform-ice-3', 2],
+    ]
+  }
+};
+
 export class PlatformManager {
   private platforms: Map<string, PlatformDef> = new Map();
   private mapName: MapName;
-  private floorWorldY: number; // WORLD Y coordinate of floor
+  private floorWorldY: number;
   private scale: number;
-  private generatedMinWorldY = 0; // Highest WORLD Y we've generated to (going up means decreasing Y)
+  private generatedMinWorldY = 0;
   private platformCounter = 0;
+  private config: typeof MAP_PLATFORM_CONFIGS[MapName];
   
   constructor(mapName: MapName, floorScreenY: number, scale = 2) {
     this.mapName = mapName;
     this.scale = scale;
-    // Convert floor screen Y to world Y (floor is at a specific world position)
-    this.floorWorldY = floorScreenY; // Treat the initial floor screen Y as world Y=floorScreenY
+    this.floorWorldY = floorScreenY;
     this.generatedMinWorldY = this.floorWorldY;
+    this.config = MAP_PLATFORM_CONFIGS[mapName];
     
+    if (!this.config) {
+      console.warn(`[PlatformManager] No configuration found for map: ${mapName}`);
+      this.config = MAP_PLATFORM_CONFIGS.grassy; // Fallback
+    }
     
     // Generate initial content
     this.generateFloor();
@@ -27,13 +100,9 @@ export class PlatformManager {
   }
 
   private isSolidPrefab(prefab: string): boolean {
+    // This should be map-specific in the future
     return prefab === 'floor-final' || 
-           prefab === 'platform-grass-1-final' || 
-           prefab === 'platform-grass-3-final' ||
-           prefab === 'platform-wood-1-final' ||
-           prefab === 'platform-wood-2-left-final' ||
-           prefab === 'platform-wood-2-right-final' ||
-           prefab === 'platform-wood-3-final';
+           prefab.startsWith('platform-');
   }
 
   private createPlatform(prefab: string, worldX: number, worldY: number, type: 'platform' | 'decoration' = 'platform'): PlatformDef {
@@ -45,7 +114,7 @@ export class PlatformManager {
     if (this.isSolidPrefab(prefab)) {
       collision = {
         solid: true,
-        topY: worldY, // WORLD Y coordinate of the walkable surface
+        topY: worldY,
         left: worldX,
         right: worldX + width,
         width,
@@ -58,75 +127,91 @@ export class PlatformManager {
       type,
       prefab,
       x: Math.round(worldX),
-      y: Math.round(worldY), // WORLD Y coordinate
+      y: Math.round(worldY),
       scale: this.scale,
       collision,
     };
   }
 
   private generateFloor(): void {
+    const floorPrefab = this.mapName === 'grassy' ? 'floor-final' : 'floor';
     const tileWidth = getTileSize(this.mapName) * this.scale;
     const tilesNeeded = Math.ceil(SCREEN_W / tileWidth) + 1;
     
     for (let i = 0; i < tilesNeeded; i++) {
       const platform = this.createPlatform(
-        'floor-final',
+        floorPrefab,
         i * tileWidth,
-        this.floorWorldY, // Use world Y coordinate
+        this.floorWorldY,
         'platform'
       );
       this.platforms.set(platform.id, platform);
     }
-    
   }
 
   private generateInitialPlatforms(): void {
-    // Generate platforms ABOVE the floor (decreasing world Y)
+    // Generate platforms ABOVE the floor
     for (let i = 0; i < 3; i++) {
       const bandHeight = SCREEN_H * 0.8;
-      const bandBottomWorldY = this.generatedMinWorldY - 50 - (i * 50); // Some spacing between bands
+      const bandBottomWorldY = this.generatedMinWorldY - 50 - (i * 50);
       const bandTopWorldY = bandBottomWorldY - bandHeight;
       
       this.generateBand(bandTopWorldY, bandBottomWorldY);
       this.generatedMinWorldY = bandTopWorldY;
     }
+  }
+
+  private pickPlatformType(): string {
+    const platformTypes = this.config.platformTypes;
+    const totalWeight = platformTypes.reduce((sum, [, weight]) => sum + weight, 0);
+    let random = Math.random() * totalWeight;
     
+    for (const [type, weight] of platformTypes) {
+      random -= weight;
+      if (random <= 0) {
+        return type;
+      }
+    }
+    
+    return platformTypes[0][0]; // Fallback
+  }
+
+  private getValidXPosition(platformType: string, width: number): number {
+    // Handle special positioning requirements
+    if (platformType === 'platform-wood-2-left-final') {
+      return 0; // Flush to left side
+    }
+    
+    if (platformType === 'platform-wood-2-right-final') {
+      return Math.max(0, SCREEN_W - width); // Flush to right side
+    }
+    
+    // Regular platforms - random position with margin
+    const margin = 40;
+    const minX = margin;
+    const maxX = Math.max(minX, SCREEN_W - margin - width);
+    return minX + Math.random() * (maxX - minX);
   }
 
   private generateBand(bandTopWorldY: number, bandBottomWorldY: number): void {
-    const platformTypes = [
-      ['platform-grass-1-final', 3],
-      ['platform-grass-3-final', 2],
-      ['platform-wood-1-final', 2],
-      ['platform-wood-3-final', 1],
-    ] as const;
-
-    const platformCount = 4 + Math.floor(Math.random() * 4);
+    // Increased platform count by 30%: was 4-7, now 5-9
+    const basePlatformCount = 5;
+    const variablePlatformCount = 4;
+    const platformCount = basePlatformCount + Math.floor(Math.random() * variablePlatformCount);
     
     for (let i = 0; i < platformCount; i++) {
-      // Pick platform type
-      const totalWeight = platformTypes.reduce((sum, [, weight]) => sum + weight, 0);
-      let random = Math.random() * totalWeight;
-      let selectedType = platformTypes[0][0];
+      const platformType = this.pickPlatformType();
       
-      for (const [type, weight] of platformTypes) {
-        random -= weight;
-        if (random <= 0) {
-          selectedType = type;
-          break;
-        }
-      }
-
       // Try to place platform
-      const width = prefabWidthPx(this.mapName, selectedType, this.scale);
-      const height = prefabHeightPx(this.mapName, selectedType, this.scale);
+      const width = prefabWidthPx(this.mapName, platformType, this.scale);
+      const height = prefabHeightPx(this.mapName, platformType, this.scale);
       
       for (let attempt = 0; attempt < 50; attempt++) {
-        const worldX = 40 + Math.random() * (SCREEN_W - 80 - width);
+        const worldX = this.getValidXPosition(platformType, width);
         const worldY = bandTopWorldY + 50 + Math.random() * (bandBottomWorldY - bandTopWorldY - height - 100);
         
         if (this.isPositionClear(worldX, worldY, width, height)) {
-          const platform = this.createPlatform(selectedType, worldX, worldY, 'platform');
+          const platform = this.createPlatform(platformType, worldX, worldY, 'platform');
           this.platforms.set(platform.id, platform);
           
           this.generateDecorationsFor(platform);
@@ -154,60 +239,108 @@ export class PlatformManager {
   }
 
   private generateDecorationsFor(platform: PlatformDef): void {
-    if (!platform.collision?.solid) return;
+    if (!platform.collision?.solid || !this.config.decorationConfig) return;
     
+    const decorationConfig = this.config.decorationConfig;
     const isGrass3 = platform.prefab === 'platform-grass-3-final';
     const isGrass1 = platform.prefab === 'platform-grass-1-final';
     
     if (!isGrass3 && !isGrass1) return;
     
+    // Get platform collision segments to determine available tiles
+    const segments = prefabTopSolidSegmentsPx(this.mapName, platform.prefab, platform.scale);
+    const segment = segments[0];
+    if (!segment) return;
+    
     const surfaceWorldY = platform.collision.topY;
-    const surfaceLeft = platform.collision.left;
-    const surfaceWidth = platform.collision.width;
+    const tileSize = getTileSize(this.mapName) * this.scale;
+    const numTiles = Math.floor(segment.w / tileSize);
     
-    // Add decorations
-    const decorationTypes = [
-      'mushroom-red-small-final', 'mushroom-green-small-final',
-      'grass-1-final', 'grass-2-final', 'grass-3-final'
-    ];
+    // Track which tiles are occupied to prevent overlaps
+    const occupiedTiles = new Set<number>();
     
-    if (isGrass3 && Math.random() < 0.4) {
-      const treeType = 'tree-small-final';
-      const treeWidth = prefabWidthPx(this.mapName, treeType, this.scale);
-      
-      if (treeWidth <= surfaceWidth) {
-        const treeX = surfaceLeft + Math.random() * (surfaceWidth - treeWidth);
-        const treeY = alignPrefabYToSurfaceTop(this.mapName, treeType, surfaceWorldY, this.scale);
-        const tree = this.createPlatform(treeType, treeX, treeY, 'decoration');
-        this.platforms.set(tree.id, tree);
+    // Add trees (only on grass-3 platforms)
+    if (isGrass3 && decorationConfig.trees) {
+      const treeConfig = decorationConfig.trees;
+      if (Math.random() < treeConfig.probability) {
+        // Try to place one tree on an available tile
+        const availableTiles = Array.from({length: numTiles}, (_, i) => i)
+          .filter(tileIndex => !occupiedTiles.has(tileIndex));
+        
+        if (availableTiles.length > 0) {
+          const tileIndex = availableTiles[Math.floor(Math.random() * availableTiles.length)];
+          const treeType = treeConfig.types[Math.floor(Math.random() * treeConfig.types.length)];
+          
+          // Check if tree fits in this tile
+          const treeWidth = prefabWidthPx(this.mapName, treeType, this.scale);
+          if (treeWidth <= tileSize) {
+            const treeX = platform.x + segment.x + (tileIndex * tileSize);
+            const treeY = alignPrefabYToSurfaceTop(this.mapName, treeType, surfaceWorldY, this.scale);
+            
+            const tree = this.createPlatform(treeType, treeX, treeY, 'decoration');
+            this.platforms.set(tree.id, tree);
+            occupiedTiles.add(tileIndex);
+          }
+        }
       }
     }
     
-    const decorationCount = isGrass3 ? 2 : 1;
-    for (let i = 0; i < decorationCount && Math.random() < 0.7; i++) {
-      const decorationType = decorationTypes[Math.floor(Math.random() * decorationTypes.length)];
-      const decorationWidth = prefabWidthPx(this.mapName, decorationType, this.scale);
+    // Add mushrooms with tile-based restrictions
+    if (decorationConfig.mushrooms) {
+      const mushroomConfig = decorationConfig.mushrooms;
+      const maxMushrooms = isGrass3 ? 2 : isGrass1 ? 1 : 0;
       
-      if (decorationWidth <= surfaceWidth) {
-        const decorationX = surfaceLeft + Math.random() * (surfaceWidth - decorationWidth);
-        const decorationY = alignPrefabYToSurfaceTop(this.mapName, decorationType, surfaceWorldY, this.scale);
-        const decoration = this.createPlatform(decorationType, decorationX, decorationY, 'decoration');
-        this.platforms.set(decoration.id, decoration);
+      for (let i = 0; i < maxMushrooms; i++) {
+        if (Math.random() < mushroomConfig.probability) {
+          const availableTiles = Array.from({length: numTiles}, (_, i) => i)
+            .filter(tileIndex => !occupiedTiles.has(tileIndex));
+          
+          if (availableTiles.length > 0) {
+            const tileIndex = availableTiles[Math.floor(Math.random() * availableTiles.length)];
+            const mushroomType = mushroomConfig.types[Math.floor(Math.random() * mushroomConfig.types.length)];
+            
+            const mushroomX = platform.x + segment.x + (tileIndex * tileSize);
+            const mushroomY = alignPrefabYToSurfaceTop(this.mapName, mushroomType, surfaceWorldY, this.scale);
+            
+            const mushroom = this.createPlatform(mushroomType, mushroomX, mushroomY, 'decoration');
+            this.platforms.set(mushroom.id, mushroom);
+            occupiedTiles.add(tileIndex);
+          }
+        }
+      }
+    }
+    
+    // Add grass tufts with tile-based restrictions
+    if (decorationConfig.grass) {
+      const grassConfig = decorationConfig.grass;
+      const maxGrass = isGrass3 ? 3 : isGrass1 ? 1 : 0;
+      
+      for (let i = 0; i < maxGrass; i++) {
+        if (Math.random() < grassConfig.probability) {
+          const availableTiles = Array.from({length: numTiles}, (_, i) => i)
+            .filter(tileIndex => !occupiedTiles.has(tileIndex));
+          
+          if (availableTiles.length > 0) {
+            const tileIndex = availableTiles[Math.floor(Math.random() * availableTiles.length)];
+            const grassType = grassConfig.types[Math.floor(Math.random() * grassConfig.types.length)];
+            
+            const grassX = platform.x + segment.x + (tileIndex * tileSize);
+            const grassY = alignPrefabYToSurfaceTop(this.mapName, grassType, surfaceWorldY, this.scale);
+            
+            const grass = this.createPlatform(grassType, grassX, grassY, 'decoration');
+            this.platforms.set(grass.id, grass);
+            occupiedTiles.add(tileIndex);
+          }
+        }
       }
     }
   }
 
-  // CRITICAL FIX: Update for camera should use WORLD coordinates
   updateForCamera(cameraY: number, playerWorldY: number): boolean {
-    
-    // Generate ahead of where the player is going
     const generateAheadWorldY = playerWorldY - SCREEN_H * 2;
-    
     let generated = false;
     
-    // Generate if we need more content above
     if (this.generatedMinWorldY > generateAheadWorldY) {
-      
       while (this.generatedMinWorldY > generateAheadWorldY) {
         const bandHeight = SCREEN_H * 0.8;
         const bandBottomWorldY = this.generatedMinWorldY - 50;
@@ -221,8 +354,6 @@ export class PlatformManager {
     
     // Cull platforms far below player
     const cullBelowWorldY = playerWorldY + SCREEN_H * 4;
-    const initialCount = this.platforms.size;
-    
     const toRemove: string[] = [];
     this.platforms.forEach((platform, id) => {
       if (platform.y > cullBelowWorldY) {
@@ -246,7 +377,6 @@ export class PlatformManager {
     return Array.from(this.platforms.values());
   }
 
-  // FIXED: Use world coordinates for proximity check
   getPlatformsNearPlayer(playerWorldX: number, playerWorldY: number, radius = 200): PlatformDef[] {
     return this.getSolidPlatforms().filter(platform => {
       const platformCenterX = platform.x + (platform.collision?.width || 0) / 2;
@@ -259,16 +389,15 @@ export class PlatformManager {
     });
   }
 
-  // Helper to get floor world Y
   getFloorWorldY(): number {
     return this.floorWorldY;
   }
 
-  // Add a debug method to inspect platforms
   debugPlatformsNearY(worldY: number, range = 200): void {
     const nearby = Array.from(this.platforms.values()).filter(p => 
       Math.abs(p.y - worldY) < range
     );
     
+    console.log(`[PlatformManager] ${nearby.length} platforms near Y=${worldY} (±${range}px)`);
   }
 }
