@@ -82,6 +82,16 @@ export class PlatformManager {
   private platformCounter = 0;
   private config: typeof MAP_PLATFORM_CONFIGS[MapName];
   
+  // Culling system state
+  private hasCrossedFirstBand = false;
+  private lastCullCheck = 0;
+  private CULL_CHECK_INTERVAL = 1000; // Check every 1 second for performance
+  private CULL_DISTANCE = 725; // 725px below character (500px + 75px + 150px adjustment)
+  
+  // Death floor system
+  private deathFloor: PlatformDef | null = null;
+  private highestPlayerY: number = 0; // Track highest point player has reached
+  
   constructor(mapName: MapName, floorScreenY: number, scale = 2) {
     this.mapName = mapName;
     this.scale = scale;
@@ -440,6 +450,11 @@ export class PlatformManager {
     const generateAheadWorldY = playerWorldY - SCREEN_H * 2;
     let generated = false;
     
+    // Check if player has crossed the first band (for culling activation)
+    if (!this.hasCrossedFirstBand && playerWorldY < this.floorWorldY - SCREEN_H * 0.8) {
+      this.hasCrossedFirstBand = true;
+    }
+    
     if (this.generatedMinWorldY > generateAheadWorldY) {
       while (this.generatedMinWorldY > generateAheadWorldY) {
         const bandHeight = SCREEN_H * 0.8;
@@ -454,18 +469,42 @@ export class PlatformManager {
       }
     }
     
-    // Cull platforms far below player
-    const cullBelowWorldY = playerWorldY + SCREEN_H * 4;
-    const toRemove: string[] = [];
-    this.platforms.forEach((platform, id) => {
-      if (platform.y > cullBelowWorldY) {
-        toRemove.push(id);
+    // PERFORMANCE OPTIMIZED: Only cull if player has crossed first band
+    if (this.hasCrossedFirstBand) {
+      const now = Date.now();
+      if (now - this.lastCullCheck > this.CULL_CHECK_INTERVAL) {
+        this.lastCullCheck = now;
+        
+        // Cull platforms 500px below player (much more aggressive than before)
+        const cullBelowWorldY = playerWorldY + this.CULL_DISTANCE;
+        const toRemove: string[] = [];
+        
+        // Efficient iteration - only check platforms that might need culling
+        this.platforms.forEach((platform, id) => {
+          if (platform.y > cullBelowWorldY) {
+            toRemove.push(id);
+          }
+        });
+        
+        if (toRemove.length > 0) {
+          toRemove.forEach(id => this.platforms.delete(id));
+          generated = true;
+        }
       }
-    });
-    
-    if (toRemove.length > 0) {
-      toRemove.forEach(id => this.platforms.delete(id));
-      generated = true;
+    } else {
+      // Original culling for before first band (less aggressive)
+      const cullBelowWorldY = playerWorldY + SCREEN_H * 4;
+      const toRemove: string[] = [];
+      this.platforms.forEach((platform, id) => {
+        if (platform.y > cullBelowWorldY) {
+          toRemove.push(id);
+        }
+      });
+      
+      if (toRemove.length > 0) {
+        toRemove.forEach(id => this.platforms.delete(id));
+        generated = true;
+      }
     }
     
     return generated;
@@ -480,7 +519,7 @@ export class PlatformManager {
   }
 
   getPlatformsNearPlayer(playerWorldX: number, playerWorldY: number, radius = 200): PlatformDef[] {
-    return this.getSolidPlatforms().filter(platform => {
+    const nearbyPlatforms = this.getSolidPlatforms().filter(platform => {
       const platformCenterX = platform.x + (platform.collision?.width || 0) / 2;
       const platformCenterY = platform.y;
       
@@ -489,6 +528,13 @@ export class PlatformManager {
       
       return dx < radius && dy < radius;
     });
+    
+    // Always include death floor if it exists, regardless of distance
+    if (this.deathFloor && !nearbyPlatforms.includes(this.deathFloor)) {
+      nearbyPlatforms.push(this.deathFloor);
+    }
+    
+    return nearbyPlatforms;
   }
 
   getFloorWorldY(): number {
@@ -500,5 +546,133 @@ export class PlatformManager {
       Math.abs(p.y - worldY) < range
     );
     
+  }
+
+  /**
+   * Check if player has fallen below the culling point (should die)
+   * Only active after crossing the first band
+   */
+  hasPlayerFallenBelowCullingPoint(playerWorldY: number): boolean {
+    if (!this.hasCrossedFirstBand) {
+      return false; // No death penalty before crossing first band
+    }
+    
+    // Player dies if they fall 500px below their highest point
+    // We use the floor as a reference since that's where they start
+    const cullThreshold = this.floorWorldY + this.CULL_DISTANCE;
+    const shouldDie = playerWorldY > cullThreshold;
+    
+    if (shouldDie) {
+    }
+    
+    return shouldDie;
+  }
+
+  /**
+   * Get the culling threshold for UI/debug purposes
+   */
+  getCullingThreshold(): number | null {
+    if (!this.hasCrossedFirstBand) {
+      return null;
+    }
+    return this.floorWorldY + this.CULL_DISTANCE;
+  }
+
+  /**
+   * Create or update the death floor that follows the player
+   * Death floor only moves up, never down
+   */
+  updateDeathFloor(playerWorldY: number): void {
+    if (!this.hasCrossedFirstBand) {
+      // Remove death floor if it exists and player hasn't crossed first band
+      if (this.deathFloor) {
+        this.platforms.delete(this.deathFloor.id);
+        this.deathFloor = null;
+      }
+      this.highestPlayerY = 0; // Reset highest point
+      return;
+    }
+
+    if (!this.deathFloor) {
+      // Create death floor for the first time - spawn off-screen below player
+      const spawnY = playerWorldY + SCREEN_H * 2; // Spawn well below player
+      this.deathFloor = this.createDeathFloor(spawnY);
+      this.platforms.set(this.deathFloor.id, this.deathFloor);
+      this.highestPlayerY = playerWorldY; // Initialize highest point to current position
+    } else {
+      // Death floor is always 575px below the highest point reached
+      const deathFloorY = this.highestPlayerY + this.CULL_DISTANCE;
+      
+      // Only update death floor if it needs to move UP (never down)
+      if (deathFloorY < this.deathFloor.y) {
+        this.deathFloor.y = deathFloorY;
+        if (this.deathFloor.collision) {
+          this.deathFloor.collision.topY = deathFloorY + 100; // Keep collision 100px lower
+        }
+      }
+    }
+  }
+
+  /**
+   * Update the highest point when player lands on a platform
+   * This should be called when player successfully lands on a platform
+   */
+  updateHighestPointOnLanding(platformTopY: number): void {
+    if (!this.hasCrossedFirstBand) {
+      return; // Don't track before first band
+    }
+
+    // Update highest point based on platform landing (only goes up)
+    if (platformTopY < this.highestPlayerY || this.highestPlayerY === 0) {
+      const oldHighest = this.highestPlayerY;
+      this.highestPlayerY = platformTopY;
+      // Removed debug logging for cleaner console
+    }
+  }
+
+  /**
+   * Create a death floor platform
+   */
+  private createDeathFloor(worldY: number): PlatformDef {
+    const id = `death_floor_${this.platformCounter++}`;
+    const width = SCREEN_W; // Full screen width
+    
+    return {
+      id,
+      type: 'platform',
+      prefab: 'floor-final', // Use existing floor prefab to avoid warnings
+      x: 0,
+      y: worldY,
+      scale: this.scale,
+      collision: {
+        solid: true,
+        topY: worldY + 100, // Collision box 100px lower than visual position
+        left: 0,
+        right: width,
+        width,
+        height: 32 * this.scale, // Standard platform height
+      },
+    };
+  }
+
+  /**
+   * Check if a platform is the death floor
+   */
+  isDeathFloor(platform: PlatformDef): boolean {
+    return platform.id === this.deathFloor?.id;
+  }
+
+  /**
+   * Get the death floor if it exists
+   */
+  getDeathFloor(): PlatformDef | null {
+    return this.deathFloor;
+  }
+
+  /**
+   * Get the highest point the player has reached
+   */
+  getHighestPlayerY(): number {
+    return this.highestPlayerY;
   }
 }

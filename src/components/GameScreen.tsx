@@ -185,6 +185,22 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
     }
   }, [levelData.mapName, floorTopY]);
 
+  // PERFORMANCE OPTIMIZATION: Viewport culling - only render visible platforms
+  const visiblePlatforms = useMemo(() => {
+    if (!allPlatforms.length) return [];
+    
+    const viewportTop = cameraY - SCREEN_H * 0.5; // 50% margin above camera
+    const viewportBottom = cameraY + SCREEN_H * 1.5; // 50% margin below camera
+    
+    return allPlatforms.filter(platform => {
+      const platformTop = platform.y;
+      const platformBottom = platform.y + (platform.collision?.height || 32);
+      
+      // Platform is visible if it overlaps with viewport
+      return platformBottom > viewportTop && platformTop < viewportBottom;
+    });
+  }, [allPlatforms, cameraY]);
+
   // Add this after platformManager initialization to validate the setup:
   useEffect(() => {
     if (platformManager.current) {
@@ -381,6 +397,13 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       const prevTopY = prevFeetY - COL_H;
       const currTopY = currFeetY - COL_H;
 
+      // ==== DEATH FLOOR UPDATE ====
+      // Update the death floor position to follow the player
+      if (platformManager.current) {
+        const playerWorldY = floorTopY - zRef.current;
+        platformManager.current.updateDeathFloor(playerWorldY);
+      }
+
       // Head span for ceiling collision
       const headLeft = newBox.cx - HEAD_W * 0.5;
       const headRight = newBox.cx + HEAD_W * 0.5;
@@ -429,6 +452,14 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
             // Allow collision if player is within a reasonable range of the platform surface
             if (distanceToSurface >= -15 && distanceToSurface <= 25) {
               
+              // Check if this is the death floor
+              if (platformManager.current?.isDeathFloor(platform)) {
+                // Death floor contact - instant death
+                takeDamage(999); // Massive damage to ensure death
+                playDamageSound();
+                // Don't continue with physics - player is dead
+                return;
+              }
               
               // Land on the platform
               const newPlayerZ = Math.max(0, floorTopY - platformTop);
@@ -436,6 +467,10 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               vzRef.current = 0;
               onGroundRef.current = true;
               
+              // Update highest point based on platform landing (not jump peak)
+              if (platformManager.current) {
+                platformManager.current.updateHighestPointOnLanding(platformTop);
+              }
               
               // Handle fall damage
               if (fallingRef.current) {
@@ -484,6 +519,11 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         zRef.current = 0;
         if (vzRef.current < 0) vzRef.current = 0;
         onGroundRef.current = true;
+        
+        // Update highest point when landing on original floor
+        if (platformManager.current) {
+          platformManager.current.updateHighestPointOnLanding(floorTopY);
+        }
       }
 
       // ==== CEILING COLLISION (rising only) ====
@@ -535,13 +575,14 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
             setCameraY(newCameraY);
             
             // Throttle platform generation to prevent frame drops
-            // Only update platforms every 3 camera movements to reduce performance impact
-            if (platformManager.current && frameCount % 6 === 0) { // Every 6 frames (3 camera updates)
+            // Only update platforms every 15 frames to reduce performance impact
+            if (platformManager.current && frameCount % 15 === 0) { // Every 15 frames (250ms at 60fps)
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
               if (platformsChanged) {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
               }
+              
             }
           }
         }
@@ -589,8 +630,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           
           {/* Render world under camera transform */}
           <Group transform={[{ translateY: -cameraY }]}>
-            {/* Platforms */}
-            {allPlatforms.map((platform) => (
+            {/* Platforms - PERFORMANCE: Only render visible platforms */}
+            {visiblePlatforms.map((platform) => (
               <PrefabNode
                 key={platform.id}
                 map={levelData.mapName}
@@ -628,9 +669,64 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         width={160} 
         height={28} 
         x={SCREEN_W - 160 + 20} 
-        y={50} 
+        y={50}
       />
       
+        
+        {/* Death Floor Visual */}
+        {platformManager.current?.getDeathFloor() && (
+          <View style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: SCREEN_H - (floorTopY - platformManager.current.getDeathFloor()!.y) - cameraY,
+            height: 32 * SCALE,
+            backgroundColor: 'rgba(255, 0, 0, 0.8)',
+            borderTopWidth: 2,
+            borderTopColor: '#ff4444',
+          }}>
+            <Text style={{
+              color: 'white',
+              fontSize: 16,
+              fontWeight: 'bold',
+              textAlign: 'center',
+              marginTop: 4,
+            }}>
+              DEATH FLOOR
+            </Text>
+          </View>
+        )}
+      
+      {/* Performance Debug Display */}
+      <View style={{
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        padding: 10,
+        borderRadius: 5,
+        zIndex: 5,
+      }}>
+        <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>
+          PERFORMANCE DEBUG
+        </Text>
+        <Text style={{ color: 'white', fontSize: 10 }}>
+          Total Platforms: {allPlatforms.length}
+        </Text>
+        <Text style={{ color: 'white', fontSize: 10 }}>
+          Visible Platforms: {visiblePlatforms.length}
+        </Text>
+        <Text style={{ color: 'white', fontSize: 10 }}>
+          Culled: {allPlatforms.length - visiblePlatforms.length}
+        </Text>
+        <Text style={{ color: 'white', fontSize: 10 }}>
+          Reduction: {Math.round((1 - visiblePlatforms.length / allPlatforms.length) * 100)}%
+        </Text>
+        <Text style={{ color: 'white', fontSize: 10 }}>
+          Update Freq: 15 frames (250ms)
+        </Text>
+      </View>
+
       {/* Death modal */}
       <DeathModal 
         onRestart={handleRestart}
