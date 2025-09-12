@@ -1,7 +1,7 @@
 // src/render/HazardBand.tsx
 import React, { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
-import { Canvas, Rect, LinearGradient, vec, Paint, Path, Skia } from "@shopify/react-native-skia";
+import { StyleSheet, View, Text } from "react-native";
+import { Canvas, Paint, Path, Skia } from "@shopify/react-native-skia";
 
 type Props = {
   width: number;
@@ -12,16 +12,16 @@ type Props = {
 };
 
 /**
- * Animated lava hazard band with wavy top edge.
- * The wave itself uses lava gradient colors.
+ * Animated lava hazard band using layered solid colors to simulate gradient.
+ * Fallback when Skia LinearGradient doesn't work.
  */
 export default function HazardBand({ width, height, y, opacity = 1, timeMs = 0 }: Props) {
   // Create animated wavy path for the lava surface
-  const wavyPath = useMemo(() => {
+  const createWavyPath = (waveOffset = 0) => {
     const path = Skia.Path.Make();
-    const waveHeight = 25; // Slightly bigger waves for more dramatic effect
-    const waveFreq = 0.015; // Slightly slower frequency for more fluid look
-    const time = (timeMs || 0) * 0.002; // Slow, hypnotic animation
+    const waveHeight = 25;
+    const waveFreq = 0.015;
+    const time = (timeMs || 0) * 0.002 + waveOffset;
     
     // Start from top-left
     path.moveTo(0, waveHeight);
@@ -41,26 +41,27 @@ export default function HazardBand({ width, height, y, opacity = 1, timeMs = 0 }
     path.close();
     
     return path;
-  }, [width, height, timeMs]);
+  };
 
-  // Enhanced lava gradient colors
-  const lavaColors = [
-    '#FFFF00', // Bright yellow (hottest - top)
-    '#FF8C00', // Dark orange
-    '#FF4500', // Orange red
-    '#DC143C', // Crimson
-    '#8B0000', // Dark red
-    '#4B0000', // Very dark red (bottom)
+  // Create multiple wave paths for layering effect
+  const paths = useMemo(() => ({
+    base: createWavyPath(0),
+    layer1: createWavyPath(0.2),
+    layer2: createWavyPath(0.4),
+    layer3: createWavyPath(0.6),
+  }), [width, height, timeMs]);
+
+  // Lava color layers (brightest to darkest)
+  const lavaLayers = [
+    { color: '#FFFF44', opacity: 1.0, path: paths.base },    // Bright yellow base
+    { color: '#FFAA00', opacity: 0.8, path: paths.layer1 },  // Orange overlay
+    { color: '#FF4400', opacity: 0.6, path: paths.layer2 },  // Red-orange
+    { color: '#AA1100', opacity: 0.4, path: paths.layer3 },  // Dark red highlights
   ];
 
-  const lavaPositions = [0, 0.15, 0.35, 0.6, 0.8, 1.0];
-
-  // Animate gradient position for flowing effect
-  const animatedPositions = useMemo(() => {
-    const time = (timeMs || 0) * 0.0008; // Slow gradient animation
-    const offset = Math.sin(time) * 0.08; // Subtle movement
-    return lavaPositions.map(pos => Math.max(0, Math.min(1, pos + offset)));
-  }, [timeMs]);
+  if (__DEV__) {
+    console.log('[HazardBand] Using layered approach with', lavaLayers.length, 'layers');
+  }
 
   return (
     <View style={{ 
@@ -73,18 +74,38 @@ export default function HazardBand({ width, height, y, opacity = 1, timeMs = 0 }
       opacity 
     }}>
       <Canvas style={{ width, height }}>
-        {/* Single wavy lava surface with gradient */}
-        <Path path={wavyPath}>
-          <Paint>
-            <LinearGradient
-              start={vec(0, 0)}
-              end={vec(0, height)}
-              colors={lavaColors}
-              positions={animatedPositions}
-            />
-          </Paint>
-        </Path>
+        {/* Layer solid colors to simulate gradient effect */}
+        {lavaLayers.map((layer, index) => (
+          <Path 
+            key={index}
+            path={layer.path} 
+            color={layer.color}
+            opacity={layer.opacity}
+            style="fill"
+          />
+        ))}
+        
+        {/* Debug: Keep the white outline */}
+        {__DEV__ && (
+          <Path path={paths.base} style="stroke" strokeWidth={2} color="white" />
+        )}
       </Canvas>
+      
+      {/* Debug info */}
+      {__DEV__ && (
+        <View style={{
+          position: 'absolute',
+          top: 5,
+          left: 5,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          padding: 4,
+          borderRadius: 4,
+        }}>
+          <Text style={{ color: 'white', fontSize: 10 }}>
+            HazardBand (Layered): {width}x{height} @ {Math.round(y)}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

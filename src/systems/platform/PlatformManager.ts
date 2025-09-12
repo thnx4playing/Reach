@@ -612,7 +612,7 @@ export class PlatformManager {
       if (Math.abs(targetY - this.deathFloor.y) > 10) { // Only update if significant change
         this.deathFloor.y = targetY;
         if (this.deathFloor.collision) {
-          this.deathFloor.collision.topY = targetY - 50; // Collision 50px above visual
+          this.deathFloor.collision.topY = targetY + 40; // Collision 40px below visual lava surface
         }
       }
     }
@@ -651,7 +651,7 @@ export class PlatformManager {
       scale: this.scale,
       collision: {
         solid: true,
-        topY: worldY - 50, // Collision box 50px above visual for early detection
+        topY: worldY + 40, // Collision box 40px below visual lava surface
         left: -SCREEN_W / 2,
         right: width - SCREEN_W / 2,
         width,

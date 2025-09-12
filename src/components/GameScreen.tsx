@@ -409,6 +409,22 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       const prevTopY = prevFeetY - COL_H;
       const currTopY = currFeetY - COL_H;
 
+      // ==== DIRECT HAZARD BAND DEATH CHECK ====
+      // Check if player has fallen into the hazard band area (more reliable than platform collision)
+      const deathFloor = platformManager.current?.getDeathFloor();
+      if (deathFloor && !isDead) {
+        const hazardTopWorld = deathFloor.y;
+        const playerWorldY = floorTopY - zRef.current;
+        
+        // Player dies if they fall 40px into the hazard band area
+        if (playerWorldY >= hazardTopWorld + 40) {
+          console.log(`[DEATH] Player fell into hazard band! Player Y: ${playerWorldY}, Hazard Y: ${hazardTopWorld}, Death Zone: ${hazardTopWorld + 40}`);
+          takeDamage(999);
+          playDamageSound();
+          return; // Stop physics processing
+        }
+      }
+
       // ==== DEATH FLOOR UPDATE ====
       // Update the death floor position to follow the player
       if (platformManager.current) {
@@ -447,39 +463,49 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           // Skip floor platforms (let floor collision handle these)
           if (collision.topY >= floorTopY - 10) continue;
           
-          // Check horizontal overlap (more generous)
+          // SPECIAL HANDLING FOR DEATH FLOOR - Much tighter collision
+          if (platformManager.current?.isDeathFloor(platform)) {
+            // Check horizontal overlap (normal)
+            const playerLeft = playerWorldX - COL_W / 2;
+            const playerRight = playerWorldX + COL_W / 2;
+            const hasHorizontalOverlap = playerLeft < collision.right && 
+                                        playerRight > collision.left;
+            
+            if (hasHorizontalOverlap) {
+              // DEATH FLOOR: Only kill when player actually touches it (much tighter range)
+              const distanceToSurface = playerWorldY - collision.topY;
+              
+              // Only kill when player is AT or BELOW the death floor surface
+              if (distanceToSurface >= -5 && distanceToSurface <= 10) {
+                console.log(`[DEATH] Player touched lava! Distance: ${distanceToSurface}px`);
+                takeDamage(999);
+                playDamageSound();
+                return;
+              }
+            }
+            continue; // Skip normal platform logic for death floor
+          }
+          
+          // NORMAL PLATFORMS - Keep existing generous collision
           const playerLeft = playerWorldX - COL_W / 2;
           const playerRight = playerWorldX + COL_W / 2;
-          const overlapMargin = 8; // More forgiving overlap
+          const overlapMargin = 8;
           
           const hasHorizontalOverlap = playerLeft < collision.right - overlapMargin && 
                                       playerRight > collision.left + overlapMargin;
           
           if (hasHorizontalOverlap) {
-            // More forgiving vertical collision detection
             const platformTop = collision.topY;
             const distanceToSurface = playerWorldY - platformTop;
             
-            // Check if player is close to landing on platform
-            // Allow collision if player is within a reasonable range of the platform surface
+            // Normal platforms keep generous collision (-15 to +25)
             if (distanceToSurface >= -15 && distanceToSurface <= 25) {
-              
-              // Check if this is the death floor
-              if (platformManager.current?.isDeathFloor(platform)) {
-                // Death floor contact - instant death
-                takeDamage(999); // Massive damage to ensure death
-                playDamageSound();
-                // Don't continue with physics - player is dead
-                return;
-              }
-              
-              // Land on the platform
+              // Land on the platform (existing logic)
               const newPlayerZ = Math.max(0, floorTopY - platformTop);
               zRef.current = newPlayerZ;
               vzRef.current = 0;
               onGroundRef.current = true;
               
-              // Update highest point based on platform landing (not jump peak)
               if (platformManager.current) {
                 platformManager.current.updateHighestPointOnLanding(platformTop);
               }
@@ -495,11 +521,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
                 peakZRef.current = 0;
               }
               
-              break; // Stop checking other platforms
-            } else {
-              // Log near misses for debugging
-              if (Math.abs(distanceToSurface) < 50) {
-              }
+              break;
             }
           }
         }
