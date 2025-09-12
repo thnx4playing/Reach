@@ -593,21 +593,26 @@ export class PlatformManager {
       return;
     }
 
+    // Update highest point tracking (more responsive)
+    if (playerWorldY < this.highestPlayerY || this.highestPlayerY === 0) {
+      this.highestPlayerY = playerWorldY;
+    }
+
     if (!this.deathFloor) {
-      // Create death floor for the first time - spawn off-screen below player
-      const spawnY = playerWorldY + SCREEN_H * 2; // Spawn well below player
+      // Create death floor for the first time - spawn at appropriate distance
+      const spawnY = this.highestPlayerY + this.CULL_DISTANCE;
       this.deathFloor = this.createDeathFloor(spawnY);
       this.platforms.set(this.deathFloor.id, this.deathFloor);
-      this.highestPlayerY = playerWorldY; // Initialize highest point to current position
+      console.log(`[PlatformManager] Death floor created at Y=${spawnY}, player at Y=${playerWorldY}`);
     } else {
-      // Death floor is always 575px below the highest point reached
-      const deathFloorY = this.highestPlayerY + this.CULL_DISTANCE;
+      // Death floor follows at fixed distance below highest point
+      const targetY = this.highestPlayerY + this.CULL_DISTANCE;
       
-      // Only update death floor if it needs to move UP (never down)
-      if (deathFloorY < this.deathFloor.y) {
-        this.deathFloor.y = deathFloorY;
+      // Always update death floor position (it can move up or down now)
+      if (Math.abs(targetY - this.deathFloor.y) > 10) { // Only update if significant change
+        this.deathFloor.y = targetY;
         if (this.deathFloor.collision) {
-          this.deathFloor.collision.topY = deathFloorY + 100; // Keep collision 100px lower
+          this.deathFloor.collision.topY = targetY - 50; // Collision 50px above visual
         }
       }
     }
@@ -635,22 +640,22 @@ export class PlatformManager {
    */
   private createDeathFloor(worldY: number): PlatformDef {
     const id = `death_floor_${this.platformCounter++}`;
-    const width = SCREEN_W; // Full screen width
+    const width = SCREEN_W * 2; // Extra wide to prevent edge cases
     
     return {
       id,
       type: 'platform',
       prefab: 'floor-final', // Use existing floor prefab to avoid warnings
-      x: 0,
+      x: -SCREEN_W / 2, // Center the extra-wide platform
       y: worldY,
       scale: this.scale,
       collision: {
         solid: true,
-        topY: worldY + 100, // Collision box 100px lower than visual position
-        left: 0,
-        right: width,
+        topY: worldY - 50, // Collision box 50px above visual for early detection
+        left: -SCREEN_W / 2,
+        right: width - SCREEN_W / 2,
         width,
-        height: 32 * this.scale, // Standard platform height
+        height: 100, // Thicker collision for reliable detection
       },
     };
   }
@@ -674,5 +679,26 @@ export class PlatformManager {
    */
   getHighestPlayerY(): number {
     return this.highestPlayerY;
+  }
+
+  /**
+   * Get debug info about the death floor for UI display
+   */
+  getDeathFloorDebugInfo(): { 
+    exists: boolean; 
+    worldY: number; 
+    distanceFromPlayer: number;
+    highestPoint: number;
+  } | null {
+    if (!this.deathFloor || !this.hasCrossedFirstBand) {
+      return null;
+    }
+    
+    return {
+      exists: true,
+      worldY: this.deathFloor.y,
+      distanceFromPlayer: 0, // Will be calculated by caller
+      highestPoint: this.highestPlayerY
+    };
   }
 }

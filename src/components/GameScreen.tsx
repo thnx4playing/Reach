@@ -19,6 +19,7 @@ import { checkPlatformCollision } from '../physics/PlatformCollision';
 import type { PlatformDef } from '../systems/platform/types';
 import idleJson from '../../assets/character/dash/Idle_atlas.json';
 import { dbg } from '../utils/dbg';
+import { HazardDebugger } from '../debug/HazardDebugger';
 
 // Health system imports
 import { useHealth } from '../systems/health/HealthContext';
@@ -115,6 +116,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const [currentPlayerBox, setCurrentPlayerBox] = useState<{left: number; right: number; top: number; bottom: number; cx: number; feetY: number; w: number; h: number} | null>(null);
   const [frameCount, setFrameCount] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
+  const [hazardAnimationTime, setHazardAnimationTime] = useState(0);
 
   // State variables
   const [x, setX] = useState(SCREEN_W * 0.5);
@@ -323,6 +325,11 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       // PERFORMANCE: Optimized state update frequency for smooth animation
       if (frameCount % 2 === 0) { // Every 2 frames for smooth animation
         setFrameCount(prev => prev + 1);
+        
+        // Update hazard animation time
+        if (frameCount % 3 === 0) { // Update every 3 frames for smooth animation
+          setHazardAnimationTime(t);
+        }
         
         // Only update state if values have changed significantly to reduce re-renders
         const newX = Math.round(xRef.current);
@@ -625,7 +632,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         style={styles.canvas}
         pointerEvents="none"
       >
-          {/* Parallax Background */}
+          {/* Parallax Background with hazard clipping */}
           {(() => {
             const df = platformManager.current?.getDeathFloor?.();
             const hazardTopWorld = df?.y ?? null;
@@ -638,8 +645,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
                 timeSec={elapsedSec}
                 viewport={{ width: SCREEN_W, height: SCREEN_H }}
                 clipMaxY={
-                  hazardTopScreen != null
-                    ? Math.max(0, Math.min(hazardTopScreen, SCREEN_H))
+                  hazardTopScreen != null && hazardTopScreen < SCREEN_H + 100
+                    ? Math.max(0, Math.min(hazardTopScreen + 50, SCREEN_H)) // 50px overlap
                     : undefined
                 }
               />
@@ -691,27 +698,32 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       />
       
         
-        {/* Hazard Band aligned to the *death floor* */}
+        {/* Hazard Band - Improved lava rendering */}
         {(() => {
           const df = platformManager.current?.getDeathFloor?.();
           const hazardTopWorld = df?.y ?? null;
-          const hazardTopScreen = hazardTopWorld != null ? worldYToScreenY(hazardTopWorld) : null;
           
-          if (hazardTopScreen == null) return null;
+          if (hazardTopWorld == null) return null;
           
-          const REVEAL_GAP = 56;   // only show when within 56px of bottom
-          // TEMPORARILY BYPASS REVEAL TO TEST RENDERING
-          // if (hazardTopScreen > SCREEN_H - REVEAL_GAP) return null;
-
-          // Clamp slightly so it never overdraws UI at the very bottom
-          const yTop = Math.min(hazardTopScreen, SCREEN_H - 8);
-
+          // Convert world Y to screen Y
+          const hazardTopScreen = worldYToScreenY(hazardTopWorld);
+          
+          // Only show when hazard is in or near viewport
+          if (hazardTopScreen > SCREEN_H + 200) return null;
+          
+          // Calculate height - make it tall enough to cover everything below
+          const hazardHeight = Math.max(SCREEN_H, SCREEN_H - hazardTopScreen + 200);
+          
+          // Clamp Y position to prevent rendering above viewport
+          const clampedY = Math.max(-100, hazardTopScreen - 50); // 50px overlap for wavy edge
+          
           return (
             <HazardBand
               width={SCREEN_W}
-              height={SCREEN_H * 2}  // very tall so it paints everything below
-              y={yTop}
+              height={hazardHeight}
+              y={clampedY}
               opacity={1}
+              timeMs={hazardAnimationTime}
             />
           );
         })()}
@@ -745,6 +757,19 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           Update Freq: 15 frames (250ms)
         </Text>
       </View>
+
+      {/* Hazard System Debug */}
+      <HazardDebugger
+        playerWorldY={floorTopY - zRef.current}
+        hazardWorldY={platformManager.current?.getDeathFloor()?.y ?? null}
+        hazardScreenY={(() => {
+          const df = platformManager.current?.getDeathFloor?.();
+          return df ? worldYToScreenY(df.y) : null;
+        })()}
+        highestPoint={platformManager.current?.getHighestPlayerY() ?? 0}
+        cameraY={cameraY}
+        hasCrossedFirstBand={platformManager.current ? (platformManager.current as any).hasCrossedFirstBand : false}
+      />
 
       {/* Death modal */}
       <DeathModal 
