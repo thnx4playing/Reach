@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "image": "Wall_Land_atlas.png",
+    "size": {
+      "w": 292,
+      "h": 584
+    },
+    "tileSize": 288,
+    "padding": 2,
+    "type": "character",
+    "animation": "Wall Land"
+  },
+  "frames": {
+    "Wall Land_001": {
+      "x": 2,
+      "y": 2,
+      "w": 288,
+      "h": 288,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Wall Land_002": {
+      "x": 2,
+      "y": 294,
+      "w": 288,
+      "h": 288,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

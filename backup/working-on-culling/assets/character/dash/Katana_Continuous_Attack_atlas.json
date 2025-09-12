@@ -1,0 +1,1455 @@
+{
+  "meta": {
+    "image": "Katana_Continuous_Attack_atlas.png",
+    "size": {
+      "w": 160,
+      "h": 460
+    },
+    "tileSize": 16,
+    "padding": 2,
+    "type": "character",
+    "animation": "Katana Continuous Attack"
+  },
+  "frames": {
+    "Katana Continuous Attack_1": {
+      "x": 2,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_2": {
+      "x": 22,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_3": {
+      "x": 42,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_4": {
+      "x": 62,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_5": {
+      "x": 82,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_6": {
+      "x": 102,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_7": {
+      "x": 122,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_8": {
+      "x": 142,
+      "y": 2,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_9": {
+      "x": 2,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_10": {
+      "x": 22,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_11": {
+      "x": 42,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_12": {
+      "x": 62,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_13": {
+      "x": 82,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_14": {
+      "x": 102,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_15": {
+      "x": 122,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_16": {
+      "x": 142,
+      "y": 22,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_17": {
+      "x": 2,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_18": {
+      "x": 22,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_19": {
+      "x": 42,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_20": {
+      "x": 62,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_21": {
+      "x": 82,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_22": {
+      "x": 102,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_23": {
+      "x": 122,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_24": {
+      "x": 142,
+      "y": 42,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_25": {
+      "x": 2,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_26": {
+      "x": 22,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_27": {
+      "x": 42,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_28": {
+      "x": 62,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_29": {
+      "x": 82,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_30": {
+      "x": 102,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_31": {
+      "x": 122,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_32": {
+      "x": 142,
+      "y": 62,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_33": {
+      "x": 2,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_34": {
+      "x": 22,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_35": {
+      "x": 42,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_36": {
+      "x": 62,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_37": {
+      "x": 82,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_38": {
+      "x": 102,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_39": {
+      "x": 122,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_40": {
+      "x": 142,
+      "y": 82,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_41": {
+      "x": 2,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_42": {
+      "x": 22,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_43": {
+      "x": 42,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_44": {
+      "x": 62,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_45": {
+      "x": 82,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_46": {
+      "x": 102,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_47": {
+      "x": 122,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_48": {
+      "x": 142,
+      "y": 102,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_49": {
+      "x": 2,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_50": {
+      "x": 22,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_51": {
+      "x": 42,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_52": {
+      "x": 62,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_53": {
+      "x": 82,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_54": {
+      "x": 102,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_55": {
+      "x": 122,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_56": {
+      "x": 142,
+      "y": 122,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_57": {
+      "x": 2,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_58": {
+      "x": 22,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_59": {
+      "x": 42,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_60": {
+      "x": 62,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_61": {
+      "x": 82,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_62": {
+      "x": 102,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_63": {
+      "x": 122,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_64": {
+      "x": 142,
+      "y": 142,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_65": {
+      "x": 2,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_66": {
+      "x": 22,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_67": {
+      "x": 42,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_68": {
+      "x": 62,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_69": {
+      "x": 82,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_70": {
+      "x": 102,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_71": {
+      "x": 122,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_72": {
+      "x": 142,
+      "y": 162,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_73": {
+      "x": 2,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_74": {
+      "x": 22,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_75": {
+      "x": 42,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_76": {
+      "x": 62,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_77": {
+      "x": 82,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_78": {
+      "x": 102,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_79": {
+      "x": 122,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_80": {
+      "x": 142,
+      "y": 182,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_81": {
+      "x": 2,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_82": {
+      "x": 22,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_83": {
+      "x": 42,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_84": {
+      "x": 62,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_85": {
+      "x": 82,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_86": {
+      "x": 102,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_87": {
+      "x": 122,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_88": {
+      "x": 142,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_89": {
+      "x": 2,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_90": {
+      "x": 22,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_91": {
+      "x": 42,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_92": {
+      "x": 62,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_93": {
+      "x": 82,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_94": {
+      "x": 102,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_95": {
+      "x": 122,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_96": {
+      "x": 142,
+      "y": 222,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_97": {
+      "x": 2,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_98": {
+      "x": 22,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_99": {
+      "x": 42,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_100": {
+      "x": 62,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_101": {
+      "x": 82,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_102": {
+      "x": 102,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_103": {
+      "x": 122,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_104": {
+      "x": 142,
+      "y": 242,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_105": {
+      "x": 2,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_106": {
+      "x": 22,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_107": {
+      "x": 42,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_108": {
+      "x": 62,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_109": {
+      "x": 82,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_110": {
+      "x": 102,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_111": {
+      "x": 122,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_112": {
+      "x": 142,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_113": {
+      "x": 2,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_114": {
+      "x": 22,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_115": {
+      "x": 42,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_116": {
+      "x": 62,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_117": {
+      "x": 82,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_118": {
+      "x": 102,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_119": {
+      "x": 122,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_120": {
+      "x": 142,
+      "y": 282,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_121": {
+      "x": 2,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_122": {
+      "x": 22,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_123": {
+      "x": 42,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_124": {
+      "x": 62,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_125": {
+      "x": 82,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_126": {
+      "x": 102,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_127": {
+      "x": 122,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_128": {
+      "x": 142,
+      "y": 302,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_129": {
+      "x": 2,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_130": {
+      "x": 22,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_131": {
+      "x": 42,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_132": {
+      "x": 62,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_133": {
+      "x": 82,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_134": {
+      "x": 102,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_135": {
+      "x": 122,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_136": {
+      "x": 142,
+      "y": 322,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_137": {
+      "x": 2,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_138": {
+      "x": 22,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_139": {
+      "x": 42,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_140": {
+      "x": 62,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_141": {
+      "x": 82,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_142": {
+      "x": 102,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_143": {
+      "x": 122,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_144": {
+      "x": 142,
+      "y": 342,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_145": {
+      "x": 2,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_146": {
+      "x": 22,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_147": {
+      "x": 42,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_148": {
+      "x": 62,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_149": {
+      "x": 82,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_150": {
+      "x": 102,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_151": {
+      "x": 122,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_152": {
+      "x": 142,
+      "y": 362,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_153": {
+      "x": 2,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_154": {
+      "x": 22,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_155": {
+      "x": 42,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_156": {
+      "x": 62,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_157": {
+      "x": 82,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_158": {
+      "x": 102,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_159": {
+      "x": 122,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_160": {
+      "x": 142,
+      "y": 382,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_161": {
+      "x": 2,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_162": {
+      "x": 22,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_163": {
+      "x": 42,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_164": {
+      "x": 62,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_165": {
+      "x": 82,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_166": {
+      "x": 102,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_167": {
+      "x": 122,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_168": {
+      "x": 142,
+      "y": 402,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_169": {
+      "x": 2,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_170": {
+      "x": 22,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_171": {
+      "x": 42,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_172": {
+      "x": 62,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_173": {
+      "x": 82,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_174": {
+      "x": 102,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_175": {
+      "x": 122,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_176": {
+      "x": 142,
+      "y": 422,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_177": {
+      "x": 2,
+      "y": 442,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_178": {
+      "x": 22,
+      "y": 442,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_179": {
+      "x": 42,
+      "y": 442,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Continuous Attack_180": {
+      "x": 62,
+      "y": 442,
+      "w": 16,
+      "h": 16,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

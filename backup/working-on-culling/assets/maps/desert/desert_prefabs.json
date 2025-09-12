@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "map": "desert",
+    "tileset_image": "desert-tileset-final.png",
+    "tileset_grid_json": "",
+    "tileSize": 16
+  },
+  "prefabs": {
+    "floor-final": {
+      "rects": [
+        [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 16,
+            "h": 16
+          }
+        ]
+      ]
+    }
+  }
+}

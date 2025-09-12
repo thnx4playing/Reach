@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "image": "Katana_walk_atlas.png",
+    "size": {
+      "w": 156,
+      "h": 208
+    },
+    "tileSize": 48,
+    "padding": 2,
+    "type": "character",
+    "animation": "Katana walk"
+  },
+  "frames": {
+    "Katana walk_1": {
+      "x": 2,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana walk_2": {
+      "x": 54,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana walk_3": {
+      "x": 106,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana walk_4": {
+      "x": 2,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana walk_5": {
+      "x": 54,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana walk_6": {
+      "x": 106,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana walk_7": {
+      "x": 2,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana walk_8": {
+      "x": 54,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana walk_9": {
+      "x": 106,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana walk_10": {
+      "x": 2,
+      "y": 158,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

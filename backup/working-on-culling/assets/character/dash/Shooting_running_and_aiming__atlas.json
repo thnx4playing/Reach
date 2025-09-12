@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "image": "Shooting_running_and_aiming__atlas.png",
+    "size": {
+      "w": 388,
+      "h": 776
+    },
+    "tileSize": 384,
+    "padding": 2,
+    "type": "character",
+    "animation": "Shooting (running and aiming)"
+  },
+  "frames": {
+    "Shooting (running and aiming)_001": {
+      "x": 2,
+      "y": 2,
+      "w": 384,
+      "h": 384,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Shooting (running and aiming)_002": {
+      "x": 2,
+      "y": 390,
+      "w": 384,
+      "h": 384,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

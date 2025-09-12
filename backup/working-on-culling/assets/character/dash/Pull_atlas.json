@@ -1,0 +1,63 @@
+{
+  "meta": {
+    "image": "Pull_atlas.png",
+    "size": {
+      "w": 104,
+      "h": 156
+    },
+    "tileSize": 48,
+    "padding": 2,
+    "type": "character",
+    "animation": "Pull"
+  },
+  "frames": {
+    "Pull_1": {
+      "x": 2,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Pull_2": {
+      "x": 54,
+      "y": 2,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Pull_3": {
+      "x": 2,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Pull_4": {
+      "x": 54,
+      "y": 54,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Pull_5": {
+      "x": 2,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Pull_6": {
+      "x": 54,
+      "y": 106,
+      "w": 48,
+      "h": 48,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

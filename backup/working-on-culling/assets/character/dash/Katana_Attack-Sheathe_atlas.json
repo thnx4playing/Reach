@@ -1,0 +1,415 @@
+{
+  "meta": {
+    "image": "Katana_Attack-Sheathe_atlas.png",
+    "size": {
+      "w": 252,
+      "h": 288
+    },
+    "tileSize": 32,
+    "padding": 2,
+    "type": "character",
+    "animation": "Katana Attack-Sheathe"
+  },
+  "frames": {
+    "Katana Attack-Sheathe_1": {
+      "x": 2,
+      "y": 2,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_2": {
+      "x": 38,
+      "y": 2,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_3": {
+      "x": 74,
+      "y": 2,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_4": {
+      "x": 110,
+      "y": 2,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_5": {
+      "x": 146,
+      "y": 2,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_6": {
+      "x": 182,
+      "y": 2,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_7": {
+      "x": 218,
+      "y": 2,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_8": {
+      "x": 2,
+      "y": 38,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_9": {
+      "x": 38,
+      "y": 38,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_10": {
+      "x": 74,
+      "y": 38,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_11": {
+      "x": 110,
+      "y": 38,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_12": {
+      "x": 146,
+      "y": 38,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_13": {
+      "x": 182,
+      "y": 38,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_14": {
+      "x": 218,
+      "y": 38,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_15": {
+      "x": 2,
+      "y": 74,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_16": {
+      "x": 38,
+      "y": 74,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_17": {
+      "x": 74,
+      "y": 74,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_18": {
+      "x": 110,
+      "y": 74,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_19": {
+      "x": 146,
+      "y": 74,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_20": {
+      "x": 182,
+      "y": 74,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_21": {
+      "x": 218,
+      "y": 74,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_22": {
+      "x": 2,
+      "y": 110,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_23": {
+      "x": 38,
+      "y": 110,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_24": {
+      "x": 74,
+      "y": 110,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_25": {
+      "x": 110,
+      "y": 110,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_26": {
+      "x": 146,
+      "y": 110,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_27": {
+      "x": 182,
+      "y": 110,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_28": {
+      "x": 218,
+      "y": 110,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_29": {
+      "x": 2,
+      "y": 146,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_30": {
+      "x": 38,
+      "y": 146,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_31": {
+      "x": 74,
+      "y": 146,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_32": {
+      "x": 110,
+      "y": 146,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_33": {
+      "x": 146,
+      "y": 146,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_34": {
+      "x": 182,
+      "y": 146,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_35": {
+      "x": 218,
+      "y": 146,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_36": {
+      "x": 2,
+      "y": 182,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_37": {
+      "x": 38,
+      "y": 182,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_38": {
+      "x": 74,
+      "y": 182,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_39": {
+      "x": 110,
+      "y": 182,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_40": {
+      "x": 146,
+      "y": 182,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_41": {
+      "x": 182,
+      "y": 182,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_42": {
+      "x": 218,
+      "y": 182,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_43": {
+      "x": 2,
+      "y": 218,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_44": {
+      "x": 38,
+      "y": 218,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_45": {
+      "x": 74,
+      "y": 218,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_46": {
+      "x": 110,
+      "y": 218,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_47": {
+      "x": 146,
+      "y": 218,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_48": {
+      "x": 182,
+      "y": 218,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_49": {
+      "x": 218,
+      "y": 218,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Attack-Sheathe_50": {
+      "x": 2,
+      "y": 254,
+      "w": 32,
+      "h": 32,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

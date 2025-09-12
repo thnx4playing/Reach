@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "image": "Wall_Slide_atlas.png",
+    "size": {
+      "w": 148,
+      "h": 296
+    },
+    "tileSize": 144,
+    "padding": 2,
+    "type": "character",
+    "animation": "Wall Slide"
+  },
+  "frames": {
+    "Wall Slide_001": {
+      "x": 2,
+      "y": 2,
+      "w": 144,
+      "h": 144,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Wall Slide_002": {
+      "x": 2,
+      "y": 150,
+      "w": 144,
+      "h": 144,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

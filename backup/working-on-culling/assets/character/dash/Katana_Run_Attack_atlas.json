@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "image": "Katana_Run_Attack_atlas.png",
+    "size": {
+      "w": 204,
+      "h": 272
+    },
+    "tileSize": 64,
+    "padding": 2,
+    "type": "character",
+    "animation": "Katana Run Attack"
+  },
+  "frames": {
+    "Katana Run Attack_1": {
+      "x": 2,
+      "y": 2,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Run Attack_2": {
+      "x": 70,
+      "y": 2,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Run Attack_3": {
+      "x": 138,
+      "y": 2,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Run Attack_4": {
+      "x": 2,
+      "y": 70,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Run Attack_5": {
+      "x": 70,
+      "y": 70,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Run Attack_6": {
+      "x": 138,
+      "y": 70,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Run Attack_7": {
+      "x": 2,
+      "y": 138,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Run Attack_8": {
+      "x": 70,
+      "y": 138,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Run Attack_9": {
+      "x": 138,
+      "y": 138,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    },
+    "Katana Run Attack_10": {
+      "x": 2,
+      "y": 206,
+      "w": 64,
+      "h": 64,
+      "pivotX": 0.5,
+      "pivotY": 0.9
+    }
+  }
+}

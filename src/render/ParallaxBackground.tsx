@@ -1,5 +1,5 @@
 import React from 'react';
-import { Group, Image as SkImage, useImage } from '@shopify/react-native-skia';
+import { Group, Image as SkImage, useImage, rect } from '@shopify/react-native-skia';
 import type { ParallaxConfig } from '../content/parallaxConfig';
 
 // --- Small deterministic PRNG so each tile can have stable variations ---
@@ -21,6 +21,7 @@ interface ParallaxBackgroundProps {
   cameraY: number;
   timeSec: number;
   viewport: { width: number; height: number };
+  clipMaxY?: number; // NEW: only draw above this Y
 }
 
 export default function ParallaxBackground({
@@ -28,15 +29,17 @@ export default function ParallaxBackground({
   cameraY,
   timeSec,
   viewport,
+  clipMaxY,
 }: ParallaxBackgroundProps) {
 
   
   const { width, height } = viewport;
   
-
+  // Create clip rect if clipMaxY is specified
+  const clipRect = typeof clipMaxY === "number" ? rect(0, 0, width, Math.max(0, clipMaxY)) : undefined;
 
   return (
-    <Group>
+    <Group {...(clipRect ? { clip: clipRect } : {})}>
       {(variant.layers ? variant.layers : []).map((layer, layerIndex) => {
         const image = useImage(layer.src);
         if (!image) return null;

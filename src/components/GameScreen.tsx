@@ -9,6 +9,7 @@ import RNGHControls from '../input/RNGHControls';
 import SafeTouchBoundary from '../infra/SafeTouchBoundary';
 import { PrefabNode } from '../render/PrefabNode';
 import ParallaxBackground from '../render/ParallaxBackground';
+import HazardBand from '../render/HazardBand';
 import { PARALLAX } from '../content/parallaxConfig';
 import type { LevelData } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, prefabWidthPx } from '../content/maps';
@@ -176,6 +177,10 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // NEW UNIFIED PLATFORM SYSTEM
   const platformManager = useRef<PlatformManager | null>(null);
   const [allPlatforms, setAllPlatforms] = useState<PlatformDef[]>([]);
+
+  // World->Screen convert: give us the screen Y from a world Y
+  const worldYToScreenY = (worldY: number) =>
+    SCREEN_H - (floorTopY - worldY) - cameraY;
 
   // Initialize platform manager
   useEffect(() => {
@@ -621,12 +626,25 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         pointerEvents="none"
       >
           {/* Parallax Background */}
-          <ParallaxBackground
-            variant={PARALLAX[levelData.mapName as keyof typeof PARALLAX] as any}
-            cameraY={cameraY}
-            timeSec={elapsedSec}
-            viewport={{ width: SCREEN_W, height: SCREEN_H }}
-          />
+          {(() => {
+            const df = platformManager.current?.getDeathFloor?.();
+            const hazardTopWorld = df?.y ?? null;
+            const hazardTopScreen = hazardTopWorld != null ? worldYToScreenY(hazardTopWorld) : null;
+            
+            return (
+              <ParallaxBackground
+                variant={PARALLAX[levelData.mapName as keyof typeof PARALLAX] as any}
+                cameraY={cameraY}
+                timeSec={elapsedSec}
+                viewport={{ width: SCREEN_W, height: SCREEN_H }}
+                clipMaxY={
+                  hazardTopScreen != null
+                    ? Math.max(0, Math.min(hazardTopScreen, SCREEN_H))
+                    : undefined
+                }
+              />
+            );
+          })()}
           
           {/* Render world under camera transform */}
           <Group transform={[{ translateY: -cameraY }]}>
@@ -673,29 +691,30 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       />
       
         
-        {/* Death Floor Visual */}
-        {platformManager.current?.getDeathFloor() && (
-          <View style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            top: SCREEN_H - (floorTopY - platformManager.current.getDeathFloor()!.y) - cameraY,
-            height: 32 * SCALE,
-            backgroundColor: 'rgba(255, 0, 0, 0.8)',
-            borderTopWidth: 2,
-            borderTopColor: '#ff4444',
-          }}>
-            <Text style={{
-              color: 'white',
-              fontSize: 16,
-              fontWeight: 'bold',
-              textAlign: 'center',
-              marginTop: 4,
-            }}>
-              DEATH FLOOR
-            </Text>
-          </View>
-        )}
+        {/* Hazard Band aligned to the *death floor* */}
+        {(() => {
+          const df = platformManager.current?.getDeathFloor?.();
+          const hazardTopWorld = df?.y ?? null;
+          const hazardTopScreen = hazardTopWorld != null ? worldYToScreenY(hazardTopWorld) : null;
+          
+          if (hazardTopScreen == null) return null;
+          
+          const REVEAL_GAP = 56;   // only show when within 56px of bottom
+          // TEMPORARILY BYPASS REVEAL TO TEST RENDERING
+          // if (hazardTopScreen > SCREEN_H - REVEAL_GAP) return null;
+
+          // Clamp slightly so it never overdraws UI at the very bottom
+          const yTop = Math.min(hazardTopScreen, SCREEN_H - 8);
+
+          return (
+            <HazardBand
+              width={SCREEN_W}
+              height={SCREEN_H * 2}  // very tall so it paints everything below
+              y={yTop}
+              opacity={1}
+            />
+          );
+        })()}
       
       {/* Performance Debug Display */}
       <View style={{
