@@ -30,6 +30,8 @@ export class SoundManager {
       // Preload sound files
       await this.loadSound('jump', require('../../assets/sounds/jump.wav'));
       await this.loadSound('damage', require('../../assets/sounds/damage.wav'));
+      await this.loadSound('death', require('../../assets/sounds/death.wav'));
+      await this.loadSound('fire-death', require('../../assets/sounds/fire-death.wav'));
 
       this.isInitialized = true;
       console.log('[SoundManager] Initialized successfully');
@@ -40,6 +42,7 @@ export class SoundManager {
 
   private async loadSound(name: string, source: any): Promise<void> {
     try {
+      console.log(`[SoundManager] Attempting to load sound: ${name} from source:`, source);
       const { sound } = await Audio.Sound.createAsync(source, {
         shouldPlay: false,
         isLooping: false,
@@ -47,9 +50,10 @@ export class SoundManager {
       });
       
       this.sounds.set(name, sound);
-      console.log(`[SoundManager] Loaded sound: ${name}`);
+      console.log(`[SoundManager] Successfully loaded sound: ${name}`);
     } catch (error) {
       console.error(`[SoundManager] Failed to load sound ${name}:`, error);
+      console.error(`[SoundManager] Source was:`, source);
     }
   }
 
@@ -79,6 +83,14 @@ export class SoundManager {
 
   public async playDamageSound(): Promise<void> {
     await this.playSound('damage', 0.8); // Slightly quieter for damage
+  }
+
+  public async playDeathSound(): Promise<void> {
+    await this.playSound('death', 0.9); // Death sound for fall damage and other deaths
+  }
+
+  public async playFireDeathSound(): Promise<void> {
+    await this.playSound('fire-death', 0.9); // Fire death sound for lava hazard
   }
 
   public async cleanup(): Promise<void> {

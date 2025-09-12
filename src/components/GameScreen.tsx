@@ -19,7 +19,6 @@ import { checkPlatformCollision } from '../physics/PlatformCollision';
 import type { PlatformDef } from '../systems/platform/types';
 import idleJson from '../../assets/character/dash/Idle_atlas.json';
 import { dbg } from '../utils/dbg';
-import { HazardDebugger } from '../debug/HazardDebugger';
 
 // Health system imports
 import { useHealth } from '../systems/health/HealthContext';
@@ -146,8 +145,12 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // Health system integration
   const { isDead, bars, takeDamage, hits, sys, reset: resetHealth } = useHealth();
   
+  // Track previous death state to detect when player dies
+  const prevIsDeadRef = useRef(isDead);
+  const deathTypeRef = useRef<'fire' | 'normal' | null>(null);
+  
   // Audio system integration
-  const { playJumpSound, playDamageSound } = useSound();
+  const { playJumpSound, playDamageSound, playDeathSound, playFireDeathSound } = useSound();
   const maxHits = sys.state.maxHits;
   const { isHurt } = useDamageAnimations();
   
@@ -270,6 +273,21 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
     zRef.current = 0;
     setZ(0);
   }, []);
+
+  // Detect when player dies and play appropriate death sound
+  useEffect(() => {
+    if (isDead && !prevIsDeadRef.current) {
+      // Player just died
+      if (deathTypeRef.current === 'fire') {
+        playFireDeathSound();
+      } else {
+        playDeathSound();
+      }
+      // Reset death type
+      deathTypeRef.current = null;
+    }
+    prevIsDeadRef.current = isDead;
+  }, [isDead, playFireDeathSound, playDeathSound]);
 
   // PERFORMANCE DEBUGGING: Extensive debugging for character movement issues
   useEffect(() => {
@@ -419,8 +437,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         // Player dies if they fall 40px into the hazard band area
         if (playerWorldY >= hazardTopWorld + 40) {
           console.log(`[DEATH] Player fell into hazard band! Player Y: ${playerWorldY}, Hazard Y: ${hazardTopWorld}, Death Zone: ${hazardTopWorld + 40}`);
+          deathTypeRef.current = 'fire';
           takeDamage(999);
-          playDamageSound();
           return; // Stop physics processing
         }
       }
@@ -478,8 +496,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               // Only kill when player is AT or BELOW the death floor surface
               if (distanceToSurface >= -5 && distanceToSurface <= 10) {
                 console.log(`[DEATH] Player touched lava! Distance: ${distanceToSurface}px`);
+                deathTypeRef.current = 'fire';
                 takeDamage(999);
-                playDamageSound();
                 return;
               }
             }
@@ -780,18 +798,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         </Text>
       </View>
 
-      {/* Hazard System Debug */}
-      <HazardDebugger
-        playerWorldY={floorTopY - zRef.current}
-        hazardWorldY={platformManager.current?.getDeathFloor()?.y ?? null}
-        hazardScreenY={(() => {
-          const df = platformManager.current?.getDeathFloor?.();
-          return df ? worldYToScreenY(df.y) : null;
-        })()}
-        highestPoint={platformManager.current?.getHighestPlayerY() ?? 0}
-        cameraY={cameraY}
-        hasCrossedFirstBand={platformManager.current ? (platformManager.current as any).hasCrossedFirstBand : false}
-      />
 
       {/* Death modal */}
       <DeathModal 

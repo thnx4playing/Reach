@@ -59,9 +59,6 @@ export default function HazardBand({ width, height, y, opacity = 1, timeMs = 0 }
     { color: '#AA1100', opacity: 0.4, path: paths.layer3 },  // Dark red highlights
   ];
 
-  if (__DEV__) {
-    console.log('[HazardBand] Using layered approach with', lavaLayers.length, 'layers');
-  }
 
   return (
     <View style={{ 
@@ -85,27 +82,8 @@ export default function HazardBand({ width, height, y, opacity = 1, timeMs = 0 }
           />
         ))}
         
-        {/* Debug: Keep the white outline */}
-        {__DEV__ && (
-          <Path path={paths.base} style="stroke" strokeWidth={2} color="white" />
-        )}
       </Canvas>
       
-      {/* Debug info */}
-      {__DEV__ && (
-        <View style={{
-          position: 'absolute',
-          top: 5,
-          left: 5,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          padding: 4,
-          borderRadius: 4,
-        }}>
-          <Text style={{ color: 'white', fontSize: 10 }}>
-            HazardBand (Layered): {width}x{height} @ {Math.round(y)}
-          </Text>
-        </View>
-      )}
     </View>
   );
 }
