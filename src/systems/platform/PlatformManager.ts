@@ -106,9 +106,20 @@ export class PlatformManager {
       this.config = MAP_PLATFORM_CONFIGS.grassy; // Fallback
     }
     
+    // Remove wood-2 platforms from regular spawning
+    this.updateConfigForPairedPlatforms();
+    
     // Generate initial content
     this.generateFloor();
     this.generateInitialPlatforms();
+  }
+
+  // Update the existing configuration to remove wood-2 platforms from regular spawning
+  private updateConfigForPairedPlatforms(): void {
+    // Filter out wood-2 platforms from regular platform types
+    this.config.platformTypes = this.config.platformTypes.filter(([type]) => 
+      type !== 'platform-wood-2-left-final' && type !== 'platform-wood-2-right-final'
+    );
   }
 
   private isSolidPrefab(prefab: string): boolean {
@@ -162,13 +173,26 @@ export class PlatformManager {
   }
 
   private generateInitialPlatforms(): void {
-    // Generate platforms ABOVE the floor
-    for (let i = 0; i < 3; i++) {
-      const bandHeight = SCREEN_H * 0.8;
-      // Small 24px overlap to guarantee coverage
-      const SEAM_OVERLAP = 24;
-      const bandBottomWorldY = this.generatedMinWorldY + SEAM_OVERLAP;
+    // CRITICAL FIX: Band height must be based on actual jump capability
+    // Max jump height: 203px
+    // Safe band height: ~300px (1.5x max jump for some challenge)
+    // Old system used SCREEN_H * 0.8 = ~675px (impossible!)
+    
+    const MAX_JUMP_HEIGHT = 203;
+    const SAFE_BAND_HEIGHT = MAX_JUMP_HEIGHT * 1.5; // 300px - allows for platform variety
+    
+    console.log(`[PlatformManager] Using physics-correct band height: ${SAFE_BAND_HEIGHT}px (was ${SCREEN_H * 0.8}px)`);
+    
+    // Generate 4-5 smaller, reachable bands instead of 3 massive ones
+    for (let i = 0; i < 4; i++) {
+      const bandHeight = SAFE_BAND_HEIGHT;
+      
+      // Create small gaps between bands for seam coverage
+      const BAND_GAP = 50; // Small overlap between bands
+      const bandBottomWorldY = this.generatedMinWorldY - (i * BAND_GAP);
       const bandTopWorldY = bandBottomWorldY - bandHeight;
+      
+      console.log(`[PlatformManager] Generating band ${i}: ${bandTopWorldY} to ${bandBottomWorldY} (height: ${bandHeight}px)`);
       
       this.generateBand(bandTopWorldY, bandBottomWorldY);
       this.generatedMinWorldY = bandTopWorldY;
@@ -191,59 +215,757 @@ export class PlatformManager {
   }
 
   private getValidXPosition(platformType: string, width: number): number {
-    // Handle special positioning requirements
-    if (platformType === 'platform-wood-2-left-final') {
-      return 0; // Flush to left side
-    }
-    
-    if (platformType === 'platform-wood-2-right-final') {
-      return Math.max(0, SCREEN_W - width); // Flush to right side
+    // Wood-2 platforms should NEVER use this method - they have special positioning
+    if (platformType === 'platform-wood-2-left-final' || platformType === 'platform-wood-2-right-final') {
+      console.warn('[PlatformManager] Wood-2 platforms should not use getValidXPosition');
+      return 0;
     }
     
     // Regular platforms - random position with margin
-    const margin = 40;
+    const margin = 30;
     const minX = margin;
     const maxX = Math.max(minX, SCREEN_W - margin - width);
     return minX + Math.random() * (maxX - minX);
   }
 
   private generateBand(bandTopWorldY: number, bandBottomWorldY: number): void {
-    // Increased platform density: was 5-9, now 9-13
-    const basePlatformCount = 9;
-    const variablePlatformCount = 4;
-    const platformCount = basePlatformCount + Math.floor(Math.random() * variablePlatformCount);
+    // Ultra-conservative physics constants
+    const MAX_JUMP_HEIGHT = 203;
+    const MAX_JUMP_DISTANCE = 229;
     
-    // Track if we've placed a paired platform set in this band
-    let pairedPlatformPlaced = false;
+    // VERY SAFE spacing - ensure every jump is easily possible
+    const EASY_VERTICAL_GAP = 80;     // 40% of max jump height
+    const MEDIUM_VERTICAL_GAP = 120;  // 60% of max jump height  
+    const HARD_VERTICAL_GAP = 150;    // 75% of max jump height (safe margin)
     
-    // Much smaller guard bands - let platforms spawn to the band edges
-    const EDGE_MARGIN = 8; // was 50
-    const minY = bandTopWorldY + EDGE_MARGIN;
-    const maxY = bandBottomWorldY - 32 - EDGE_MARGIN; // 32 is typical platform height
+    const EASY_HORIZONTAL_GAP = 60;   // 25% of max distance
+    const MEDIUM_HORIZONTAL_GAP = 100; // 45% of max distance
+    const HARD_HORIZONTAL_GAP = 160;  // 70% of max distance
+    const SCREEN_WRAP_GAP = 250;      // Forces screen wrap
     
-    for (let i = 0; i < platformCount; i++) {
-      let platformType = this.pickPlatformType();
+    // Detect if this is the first band (near floor)
+    const isFirstBand = bandBottomWorldY >= this.floorWorldY - 200;
+    
+    console.log(`[PlatformManager] Generating ${isFirstBand ? 'FIRST' : 'UPPER'} band: ${bandTopWorldY} to ${bandBottomWorldY}`);
+    
+    // First band gets extra-easy jumps
+    const DIFFICULTY_DISTRIBUTION = {
+      easy: isFirstBand ? 0.8 : 0.5,      // 80% easy in first band
+      medium: isFirstBand ? 0.2 : 0.4,    
+      hard: isFirstBand ? 0.0 : 0.1,      // No hard jumps in first band
+      screenWrap: isFirstBand ? 0.0 : 0.0 // No screen wrap for now until spacing is perfect
+    };
+
+    // Platform count - fewer platforms with better spacing
+    const basePlatformCount = 5;
+    const variablePlatformCount = 2;
+    const totalPlatforms = basePlatformCount + Math.floor(Math.random() * variablePlatformCount);
+    
+    // Generate difficulty sequence
+    const difficultySequence = this.generateDifficultySequence(totalPlatforms, DIFFICULTY_DISTRIBUTION);
+    
+    // Track placed platforms
+    const placedPlatforms: Array<{
+      x: number, y: number, width: number, height: number, difficulty: string
+    }> = [];
+    
+    // Skip paired platforms for now - focus on getting basic spacing right
+    
+    // Place first platform at guaranteed reachable height
+    if (isFirstBand) {
+      this.placeFirstReachablePlatformUltraConservative(
+        bandTopWorldY, 
+        bandBottomWorldY, 
+        placedPlatforms
+      );
+      difficultySequence.shift();
+    }
+    
+    // Place remaining platforms with ultra-conservative spacing
+    for (let i = 0; i < difficultySequence.length; i++) {
+      const difficulty = difficultySequence[i];
+      let platformType = this.pickPlatformTypeForDifficulty(difficulty);
       
-      // Handle paired platform requirements
-      if ((platformType === 'platform-wood-2-left-final' || platformType === 'platform-wood-2-right-final') && !pairedPlatformPlaced) {
-        // Place both platforms as a pair
+      // Skip wood-2 platforms
+      if (platformType === 'platform-wood-2-left-final' || platformType === 'platform-wood-2-right-final') {
+        platformType = this.pickPlatformTypeForDifficulty('medium');
+      }
+      
+      if (!platformType) continue;
+      
+      this.placePlatformUltraConservative(
+        platformType, 
+        difficulty, 
+        bandTopWorldY, 
+        bandBottomWorldY, 
+        placedPlatforms,
+        placedPlatforms.length === 0
+      );
+    }
+    
+    // Ensure seam coverage
+    this.ensureSeamCoverageUltraConservative(bandTopWorldY, bandBottomWorldY, placedPlatforms);
+  }
+
+  private placeFirstReachablePlatformUltraConservative(
+    bandTopWorldY: number,
+    bandBottomWorldY: number,
+    placedPlatforms: Array<{x: number, y: number, width: number, height: number, difficulty: string}>
+  ): void {
+    const platformType = 'platform-grass-3-final';
+    const width = prefabWidthPx(this.mapName, platformType, this.scale);
+    const height = prefabHeightPx(this.mapName, platformType, this.scale);
+    
+    // ULTRA-CONSERVATIVE: Place first platform only 80px above floor (well within 203px jump)
+    const ULTRA_SAFE_HEIGHT = 80;
+    const worldY = this.floorWorldY - ULTRA_SAFE_HEIGHT;
+    
+    // Ensure within band boundaries
+    const clampedY = Math.max(bandTopWorldY + 20, Math.min(bandBottomWorldY - height - 20, worldY));
+    
+    // Center horizontally
+    const worldX = (SCREEN_W - width) / 2;
+    
+    console.log(`[PlatformManager] ULTRA-CONSERVATIVE first platform: ${ULTRA_SAFE_HEIGHT}px above floor (max jump: 203px)`);
+    
+    const platform = this.createPlatform(platformType, worldX, clampedY, 'platform');
+    this.platforms.set(platform.id, platform);
+    this.generateDecorationsFor(platform);
+    
+    placedPlatforms.push({
+      x: worldX,
+      y: clampedY,
+      width,
+      height,
+      difficulty: 'easy'
+    });
+  }
+
+  private placePlatformUltraConservative(
+    platformType: string,
+    difficulty: string,
+    bandTopWorldY: number,
+    bandBottomWorldY: number,
+    placedPlatforms: Array<{x: number, y: number, width: number, height: number, difficulty: string}>,
+    isFirst: boolean
+  ): boolean {
+    const width = prefabWidthPx(this.mapName, platformType, this.scale);
+    const height = prefabHeightPx(this.mapName, platformType, this.scale);
+    
+    const referencePlatform = placedPlatforms[placedPlatforms.length - 1];
+    
+    for (let attempt = 0; attempt < 100; attempt++) {
+      let worldX: number;
+      let worldY: number;
+      
+      if (isFirst || !referencePlatform) {
+        worldX = this.getValidXPosition(platformType, width);
+        worldY = this.getRandomYInBand(bandTopWorldY, bandBottomWorldY, height);
+      } else {
+        const positioned = this.positionUltraConservative(
+          referencePlatform,
+          width,
+          height,
+          difficulty,
+          bandTopWorldY,
+          bandBottomWorldY
+        );
+        
+        if (!positioned) continue;
+        worldX = positioned.x;
+        worldY = positioned.y;
+      }
+      
+      if (this.isPositionClearForPlacement(worldX, worldY, width, height, placedPlatforms)) {
+        const platform = this.createPlatform(platformType, worldX, worldY, 'platform');
+        this.platforms.set(platform.id, platform);
+        this.generateDecorationsFor(platform);
+        
+        placedPlatforms.push({
+          x: worldX,
+          y: worldY,
+          width,
+          height,
+          difficulty
+        });
+        
+        // Log actual gap created
+        if (referencePlatform) {
+          const verticalGap = referencePlatform.y - worldY;
+          const horizontalGap = worldX - (referencePlatform.x + referencePlatform.width);
+          console.log(`[PlatformManager] ${difficulty} gap: V=${verticalGap}px, H=${horizontalGap}px (max: V=203px, H=229px)`);
+        }
+        
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  private positionUltraConservative(
+    referencePlatform: {x: number, y: number, width: number, height: number},
+    newWidth: number,
+    newHeight: number,
+    difficulty: string,
+    bandTopWorldY: number,
+    bandBottomWorldY: number
+  ): {x: number, y: number} | null {
+    
+    // ULTRA-CONSERVATIVE gaps - way smaller than max jump capability
+    const EASY_VERTICAL_GAP = 60;     // 30% of max jump (203px)
+    const MEDIUM_VERTICAL_GAP = 90;   // 45% of max jump  
+    const HARD_VERTICAL_GAP = 120;    // 60% of max jump
+    
+    const EASY_HORIZONTAL_GAP = 50;   // 22% of max distance (229px)
+    const MEDIUM_HORIZONTAL_GAP = 80; // 35% of max distance
+    const HARD_HORIZONTAL_GAP = 120;  // 52% of max distance
+    
+    const refRightX = referencePlatform.x + referencePlatform.width;
+    const refY = referencePlatform.y;
+    
+    let horizontalGap: number;
+    let verticalGap: number; // Positive = going up
+    
+    switch (difficulty) {
+      case 'easy':
+        horizontalGap = 30 + Math.random() * (EASY_HORIZONTAL_GAP - 30);
+        verticalGap = Math.random() * EASY_VERTICAL_GAP - EASY_VERTICAL_GAP/2; // ±30px
+        break;
+        
+      case 'medium':
+        horizontalGap = EASY_HORIZONTAL_GAP + Math.random() * (MEDIUM_HORIZONTAL_GAP - EASY_HORIZONTAL_GAP);
+        verticalGap = Math.random() * MEDIUM_VERTICAL_GAP - MEDIUM_VERTICAL_GAP/2; // ±45px
+        break;
+        
+      case 'hard':
+        horizontalGap = MEDIUM_HORIZONTAL_GAP + Math.random() * (HARD_HORIZONTAL_GAP - MEDIUM_HORIZONTAL_GAP);
+        verticalGap = Math.random() * HARD_VERTICAL_GAP - HARD_VERTICAL_GAP/2; // ±60px
+        break;
+        
+      default:
+        horizontalGap = EASY_HORIZONTAL_GAP;
+        verticalGap = 0;
+    }
+    
+    // Calculate target position
+    let targetX = refRightX + horizontalGap;
+    let targetY = refY - verticalGap; // Subtract because Y increases downward
+    
+    // Handle screen wrapping (disabled for now)
+    if (targetX + newWidth > SCREEN_W + 50) {
+      targetX = targetX - SCREEN_W - 100;
+      if (targetX + newWidth > referencePlatform.x - 40) {
+        targetX = referencePlatform.x - newWidth - 60;
+      }
+    }
+    
+    // Clamp to band boundaries
+    targetY = Math.max(bandTopWorldY + 25, Math.min(bandBottomWorldY - newHeight - 25, targetY));
+    
+    // Ensure minimum spacing
+    if (Math.abs(targetX - referencePlatform.x) < 25 && Math.abs(targetY - referencePlatform.y) < 25) {
+      return null;
+    }
+    
+    return { x: targetX, y: targetY };
+  }
+
+  private ensureSeamCoverageUltraConservative(
+    bandTopWorldY: number,
+    bandBottomWorldY: number,
+    placedPlatforms: Array<{x: number, y: number, width: number, height: number}>
+  ): void {
+    const seamZoneTop = bandTopWorldY;
+    const seamZoneBottom = bandTopWorldY + 100; // Larger seam zone
+    
+    const hasSeamCoverage = placedPlatforms.some(p => 
+      p.y >= seamZoneTop && p.y <= seamZoneBottom
+    );
+    
+    if (!hasSeamCoverage) {
+      const fallbackType = 'platform-grass-3-final';
+      const width = prefabWidthPx(this.mapName, fallbackType, this.scale);
+      const height = prefabHeightPx(this.mapName, fallbackType, this.scale);
+      
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const worldX = this.getValidXPosition(fallbackType, width);
+        const worldY = seamZoneTop + Math.random() * (seamZoneBottom - seamZoneTop - height);
+        
+        if (this.isPositionClearForPlacement(worldX, worldY, width, height, placedPlatforms)) {
+          const platform = this.createPlatform(fallbackType, worldX, worldY, 'platform');
+          this.platforms.set(platform.id, platform);
+          console.log(`[PlatformManager] Seam coverage at ${this.floorWorldY - worldY}px above floor`);
+          break;
+        }
+      }
+    }
+  }
+
+  private placePlatformWithPhysicsCorrectSpacing(
+    platformType: string,
+    difficulty: string,
+    bandTopWorldY: number,
+    bandBottomWorldY: number,
+    placedPlatforms: Array<{x: number, y: number, width: number, height: number, difficulty: string}>,
+    isFirst: boolean
+  ): boolean {
+    const width = prefabWidthPx(this.mapName, platformType, this.scale);
+    const height = prefabHeightPx(this.mapName, platformType, this.scale);
+    
+    // Get reference platform
+    const referencePlatform = placedPlatforms[placedPlatforms.length - 1];
+    
+    for (let attempt = 0; attempt < 100; attempt++) {
+      let worldX: number;
+      let worldY: number;
+      
+      if (isFirst || !referencePlatform) {
+        // First platform - place anywhere reasonable
+        worldX = this.getValidXPosition(platformType, width);
+        worldY = this.getRandomYInBand(bandTopWorldY, bandBottomWorldY, height);
+      } else {
+        // Position relative to reference with PHYSICS-CORRECT spacing
+        const positioned = this.positionWithPhysicsCorrectSpacing(
+          referencePlatform,
+          width,
+          height,
+          difficulty,
+          bandTopWorldY,
+          bandBottomWorldY
+        );
+        
+        if (!positioned) continue;
+        worldX = positioned.x;
+        worldY = positioned.y;
+      }
+      
+      // Check collision
+      if (this.isPositionClearForPlacement(worldX, worldY, width, height, placedPlatforms)) {
+        const platform = this.createPlatform(platformType, worldX, worldY, 'platform');
+        this.platforms.set(platform.id, platform);
+        this.generateDecorationsFor(platform);
+        
+        placedPlatforms.push({
+          x: worldX,
+          y: worldY,
+          width,
+          height,
+          difficulty
+        });
+        
+        // Log the actual gap created
+        if (referencePlatform) {
+          const verticalGap = referencePlatform.y - worldY; // Negative if going up
+          const horizontalGap = worldX - (referencePlatform.x + referencePlatform.width);
+          console.log(`[PlatformManager] ${difficulty} jump: V=${verticalGap}px, H=${horizontalGap}px`);
+        }
+        
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  private positionWithPhysicsCorrectSpacing(
+    referencePlatform: {x: number, y: number, width: number, height: number},
+    newWidth: number,
+    newHeight: number,
+    difficulty: string,
+    bandTopWorldY: number,
+    bandBottomWorldY: number
+  ): {x: number, y: number} | null {
+    
+    // PHYSICS-CORRECT SPACING VALUES
+    const EASY_VERTICAL_GAP = 120;    // 60% of max jump height
+    const MEDIUM_VERTICAL_GAP = 160;  // 80% of max jump height  
+    const HARD_VERTICAL_GAP = 190;    // 95% of max jump height
+    
+    const EASY_HORIZONTAL_GAP = 80;   // 35% of max distance
+    const MEDIUM_HORIZONTAL_GAP = 140; // 60% of max distance
+    const HARD_HORIZONTAL_GAP = 200;  // 87% of max distance
+    const SCREEN_WRAP_GAP = 280;      // Forces screen wrap
+    
+    const refRightX = referencePlatform.x + referencePlatform.width;
+    const refY = referencePlatform.y;
+    
+    let horizontalGap: number;
+    let verticalGap: number; // Positive = going up, negative = going down
+    
+    switch (difficulty) {
+      case 'easy':
+        horizontalGap = 40 + Math.random() * (EASY_HORIZONTAL_GAP - 40);
+        verticalGap = Math.random() * EASY_VERTICAL_GAP - EASY_VERTICAL_GAP/2; // ±60px
+        break;
+        
+      case 'medium':
+        horizontalGap = EASY_HORIZONTAL_GAP + Math.random() * (MEDIUM_HORIZONTAL_GAP - EASY_HORIZONTAL_GAP);
+        verticalGap = Math.random() * MEDIUM_VERTICAL_GAP - MEDIUM_VERTICAL_GAP/2; // ±80px
+        break;
+        
+      case 'hard':
+        horizontalGap = MEDIUM_HORIZONTAL_GAP + Math.random() * (HARD_HORIZONTAL_GAP - MEDIUM_HORIZONTAL_GAP);
+        verticalGap = Math.random() * HARD_VERTICAL_GAP - HARD_VERTICAL_GAP/2; // ±95px
+        break;
+        
+      case 'screenWrap':
+        horizontalGap = SCREEN_WRAP_GAP + Math.random() * 80;
+        verticalGap = Math.random() * MEDIUM_VERTICAL_GAP - MEDIUM_VERTICAL_GAP/2; // ±80px
+        break;
+        
+      default:
+        horizontalGap = EASY_HORIZONTAL_GAP;
+        verticalGap = 0;
+    }
+    
+    // Calculate target position
+    let targetX = refRightX + horizontalGap;
+    let targetY = refY - verticalGap; // Subtract because Y increases downward
+    
+    // Handle screen wrapping
+    if (targetX + newWidth > SCREEN_W + 50) {
+      targetX = targetX - SCREEN_W - 100;
+      
+      // Avoid overlap after wrapping
+      if (targetX + newWidth > referencePlatform.x - 40) {
+        targetX = referencePlatform.x - newWidth - 60;
+      }
+    }
+    
+    // Clamp to band boundaries
+    targetY = Math.max(bandTopWorldY + 25, Math.min(bandBottomWorldY - newHeight - 25, targetY));
+    
+    // Ensure reasonable spacing
+    if (Math.abs(targetX - referencePlatform.x) < 30 && Math.abs(targetY - referencePlatform.y) < 30) {
+      return null;
+    }
+    
+    return { x: targetX, y: targetY };
+  }
+
+  private placePairedPlatformsPhysicsCorrect(
+    bandTopWorldY: number,
+    bandBottomWorldY: number,
+    placedPlatforms: Array<{x: number, y: number, width: number, height: number, difficulty: string}>
+  ): boolean {
+    const leftWidth = prefabWidthPx(this.mapName, 'platform-wood-2-left-final', this.scale);
+    const rightWidth = prefabWidthPx(this.mapName, 'platform-wood-2-right-final', this.scale);
+    const height = prefabHeightPx(this.mapName, 'platform-wood-2-left-final', this.scale);
+    
+    const margin = 30;
+    const minY = bandTopWorldY + margin;
+    const maxY = bandBottomWorldY - height - margin;
+    
+    if (maxY <= minY) return false;
+    
+    for (let attempt = 0; attempt < 30; attempt++) {
+      // Left platform flush to left edge
+      const leftX = 0;
+      const leftY = minY + Math.random() * (maxY - minY);
+      
+      // Right platform flush to right edge, exactly 50px higher
+      const rightX = SCREEN_W - rightWidth;
+      const rightY = leftY - 50; // 50px higher (well within jump range)
+      
+      // Ensure right platform stays in bounds
+      if (rightY < minY) continue;
+      
+      if (this.isPositionClearForPlacement(leftX, leftY, leftWidth, height, placedPlatforms) &&
+          this.isPositionClearForPlacement(rightX, rightY, rightWidth, height, placedPlatforms)) {
+        
+        const leftPlatform = this.createPlatform('platform-wood-2-left-final', leftX, leftY, 'platform');
+        const rightPlatform = this.createPlatform('platform-wood-2-right-final', rightX, rightY, 'platform');
+        
+        this.platforms.set(leftPlatform.id, leftPlatform);
+        this.platforms.set(rightPlatform.id, rightPlatform);
+        
+        this.generateDecorationsFor(leftPlatform);
+        this.generateDecorationsFor(rightPlatform);
+        
+        placedPlatforms.push({
+          x: leftX, y: leftY, width: leftWidth, height, difficulty: 'paired-left'
+        });
+        placedPlatforms.push({
+          x: rightX, y: rightY, width: rightWidth, height, difficulty: 'paired-right'
+        });
+        
+        console.log(`[PlatformManager] Paired platforms: 50px vertical gap (safe for ${203}px max jump)`);
+        
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  private ensureSeamCoveragePhysicsCorrect(
+    bandTopWorldY: number,
+    bandBottomWorldY: number,
+    placedPlatforms: Array<{x: number, y: number, width: number, height: number}>
+  ): void {
+    const seamZoneTop = bandTopWorldY;
+    const seamZoneBottom = bandTopWorldY + 80; // Larger seam zone for better coverage
+    
+    const hasSeamCoverage = placedPlatforms.some(p => 
+      p.y >= seamZoneTop && p.y <= seamZoneBottom
+    );
+    
+    if (!hasSeamCoverage) {
+      const fallbackType = 'platform-grass-3-final'; // Use wide platform for seam
+      const width = prefabWidthPx(this.mapName, fallbackType, this.scale);
+      const height = prefabHeightPx(this.mapName, fallbackType, this.scale);
+      
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const worldX = this.getValidXPosition(fallbackType, width);
+        const worldY = seamZoneTop + Math.random() * (seamZoneBottom - seamZoneTop - height);
+        
+        if (this.isPositionClearForPlacement(worldX, worldY, width, height, placedPlatforms)) {
+          const platform = this.createPlatform(fallbackType, worldX, worldY, 'platform');
+          this.platforms.set(platform.id, platform);
+          console.log(`[PlatformManager] Seam coverage platform placed at ${this.floorWorldY - worldY}px above floor`);
+          break;
+        }
+      }
+    }
+  }
+
+  private generateDifficultySequence(count: number, distribution: any): string[] {
+    const sequence: string[] = [];
+    
+    // Calculate counts for each difficulty
+    const easyCount = Math.round(count * distribution.easy);
+    const mediumCount = Math.round(count * distribution.medium);
+    const hardCount = Math.round(count * distribution.hard);
+    const screenWrapCount = Math.round(count * distribution.screenWrap);
+    
+    // Fill sequence
+    for (let i = 0; i < easyCount; i++) sequence.push('easy');
+    for (let i = 0; i < mediumCount; i++) sequence.push('medium');
+    for (let i = 0; i < hardCount; i++) sequence.push('hard');
+    for (let i = 0; i < screenWrapCount; i++) sequence.push('screenWrap');
+    
+    // Shuffle for variety, but ensure first platform is easy/medium
+    const shuffled = this.shuffleArray(sequence);
+    
+    // Ensure first jump is not too hard
+    if (shuffled[0] === 'hard' || shuffled[0] === 'screenWrap') {
+      const easyIndex = shuffled.findIndex(d => d === 'easy' || d === 'medium');
+      if (easyIndex > 0) {
+        [shuffled[0], shuffled[easyIndex]] = [shuffled[easyIndex], shuffled[0]];
+      }
+    }
+    
+    return shuffled;
+  }
+
+  private pickPlatformTypeForDifficulty(difficulty: string): string {
+    // Exclude wood-2 platforms from regular selection
+    const regularPlatforms = this.config.platformTypes.filter(([type]) => 
+      type !== 'platform-wood-2-left-final' && type !== 'platform-wood-2-right-final'
+    );
+    
+    switch (difficulty) {
+      case 'easy':
+        // Prefer wider platforms for easy jumps
+        return this.weightedPick([
+          ['platform-grass-3-final', 4],
+          ['platform-wood-3-final', 3],
+          ['platform-grass-1-final', 2],
+          ['platform-wood-1-final', 1],
+        ]);
+      
+      case 'medium':
+        // Mix of platform sizes (excluding wood-2 platforms)
+        return this.weightedPick(regularPlatforms);
+      
+      case 'hard':
+      case 'screenWrap':
+        // Prefer smaller platforms for challenge
+        return this.weightedPick([
+          ['platform-wood-1-final', 4],
+          ['platform-grass-1-final', 3],
+          ['platform-grass-3-final', 2],
+          ['platform-wood-3-final', 1],
+        ]);
+      
+      default:
+        return this.weightedPick(regularPlatforms)[0];
+    }
+  }
+
+  private placePlatformWithDifficulty(
+    platformType: string,
+    difficulty: string,
+    bandTopWorldY: number,
+    bandBottomWorldY: number,
+    placedPlatforms: Array<{x: number, y: number, width: number, height: number, difficulty: string}>,
+    isFirst: boolean
+  ): boolean {
+    const width = prefabWidthPx(this.mapName, platformType, this.scale);
+    const height = prefabHeightPx(this.mapName, platformType, this.scale);
+    
+    // Get reference platform (last placed platform for positioning)
+    const referencePlatform = placedPlatforms[placedPlatforms.length - 1];
+    
+    for (let attempt = 0; attempt < 100; attempt++) {
+      let worldX: number;
+      let worldY: number;
+      
+      if (isFirst || !referencePlatform) {
+        // First platform or no reference - place anywhere reasonable
+        worldX = this.getValidXPosition(platformType, width);
+        worldY = this.getRandomYInBand(bandTopWorldY, bandBottomWorldY, height);
+      } else {
+        // Position relative to reference platform based on difficulty
+        const positioned = this.positionRelativeToPlatform(
+          referencePlatform,
+          width,
+          height,
+          difficulty,
+          bandTopWorldY,
+          bandBottomWorldY
+        );
+        
+        if (!positioned) continue;
+        worldX = positioned.x;
+        worldY = positioned.y;
+      }
+      
+      // Check collision with existing platforms
+      if (this.isPositionClearForPlacement(worldX, worldY, width, height, placedPlatforms)) {
+        // Create and place platform
+        const platform = this.createPlatform(platformType, worldX, worldY, 'platform');
+        this.platforms.set(platform.id, platform);
+        this.generateDecorationsFor(platform);
+        
+        // Add to tracking
+        placedPlatforms.push({
+          x: worldX,
+          y: worldY,
+          width,
+          height,
+          difficulty
+        });
+        
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  private positionRelativeToPlatform(
+    referencePlatform: {x: number, y: number, width: number, height: number},
+    newWidth: number,
+    newHeight: number,
+    difficulty: string,
+    bandTopWorldY: number,
+    bandBottomWorldY: number
+  ): {x: number, y: number} | null {
+    
+    const MAX_JUMP_HEIGHT = 200;
+    const MAX_JUMP_DISTANCE = 220;
+    const EASY_JUMP_DISTANCE = 120;
+    const HARD_JUMP_DISTANCE = 180;
+    const SCREEN_WRAP_THRESHOLD = 280;
+    
+    // Calculate reference platform's right edge and center Y
+    const refRightX = referencePlatform.x + referencePlatform.width;
+    const refCenterY = referencePlatform.y;
+    
+    let targetDistance: number;
+    let heightVariation: number;
+    
+    switch (difficulty) {
+      case 'easy':
+        targetDistance = 60 + Math.random() * (EASY_JUMP_DISTANCE - 60);
+        heightVariation = Math.random() * 60 - 30; // ±30px height variation (reduced)
+        break;
+        
+      case 'medium':
+        targetDistance = EASY_JUMP_DISTANCE + Math.random() * (HARD_JUMP_DISTANCE - EASY_JUMP_DISTANCE);
+        heightVariation = Math.random() * 100 - 50; // ±50px height variation
+        break;
+        
+      case 'hard':
+        targetDistance = HARD_JUMP_DISTANCE + Math.random() * (MAX_JUMP_DISTANCE - HARD_JUMP_DISTANCE);
+        heightVariation = Math.random() * 140 - 70; // ±70px height variation
+        break;
+        
+      case 'screenWrap':
+        // Force screen wrap by making gap too wide
+        targetDistance = SCREEN_WRAP_THRESHOLD + Math.random() * 80;
+        heightVariation = Math.random() * 120 - 60; // ±60px height variation
+        break;
+        
+      default:
+        targetDistance = EASY_JUMP_DISTANCE;
+        heightVariation = 0;
+    }
+    
+    // Calculate target position
+    let targetX = refRightX + targetDistance;
+    let targetY = refCenterY + heightVariation;
+    
+    // Handle screen wrapping for impossible jumps
+    if (targetX + newWidth > SCREEN_W + 50) {
+      // Wrap to left side of screen
+      targetX = targetX - SCREEN_W - 100; // Add extra offset for clean wrap
+      
+      // Ensure we don't overlap with reference platform after wrapping
+      if (targetX + newWidth > referencePlatform.x - 40) {
+        targetX = referencePlatform.x - newWidth - 60;
+      }
+    }
+    
+    // Clamp Y to band boundaries with proper margins
+    const margin = 25;
+    targetY = Math.max(bandTopWorldY + margin, Math.min(bandBottomWorldY - newHeight - margin, targetY));
+    
+    // Ensure minimum distance from reference platform
+    if (Math.abs(targetX - referencePlatform.x) < 40 && Math.abs(targetY - referencePlatform.y) < 40) {
+      return null; // Too close, try again
+    }
+    
+    return { x: targetX, y: targetY };
+  }
+
+  private placePairedPlatforms(
+    bandTopWorldY: number,
+    bandBottomWorldY: number,
+    placedPlatforms: Array<{x: number, y: number, width: number, height: number, difficulty: string}>
+  ): boolean {
         const leftWidth = prefabWidthPx(this.mapName, 'platform-wood-2-left-final', this.scale);
         const rightWidth = prefabWidthPx(this.mapName, 'platform-wood-2-right-final', this.scale);
         const height = prefabHeightPx(this.mapName, 'platform-wood-2-left-final', this.scale);
         
-        // Try to place the pair
-        for (let attempt = 0; attempt < 50; attempt++) {
-          // Place left platform at left edge
+    // Calculate valid Y range for both platforms
+    const margin = 30;
+    const minY = bandTopWorldY + margin;
+    const maxY = bandBottomWorldY - height - margin;
+    
+    if (maxY <= minY) return false; // Band too small
+    
+    for (let attempt = 0; attempt < 30; attempt++) {
+      // Left platform - FLUSH to left edge (x = 0)
           const leftX = 0;
-          const leftY = minY + Math.random() * Math.max(1, (maxY - minY));
-          
-          // Place right platform 150px above and at right edge
-          const rightX = Math.max(0, SCREEN_W - rightWidth);
-          const rightY = Math.min(maxY, leftY - 150); // keep the vertical offset intent but clamp into band
-          
-          // Check if both positions are clear
-          if (this.isPositionClear(leftX, leftY, leftWidth, height) && 
-              this.isPositionClear(rightX, rightY, rightWidth, height)) {
+      const leftY = minY + Math.random() * (maxY - minY);
+      
+      // Right platform - FLUSH to right edge
+      const rightX = SCREEN_W - rightWidth;
+      
+      // Right platform positioned 50px above left platform (as requested)
+      const rightY = leftY - 50;
+      
+      // Ensure right platform is still within band boundaries
+      if (rightY < minY) {
+        continue; // Try again with different positioning
+      }
+      
+      // Check if positions are clear
+      if (this.isPositionClearForPlacement(leftX, leftY, leftWidth, height, placedPlatforms) &&
+          this.isPositionClearForPlacement(rightX, rightY, rightWidth, height, placedPlatforms)) {
             
             // Create both platforms
             const leftPlatform = this.createPlatform('platform-wood-2-left-final', leftX, leftY, 'platform');
@@ -255,76 +977,116 @@ export class PlatformManager {
             this.generateDecorationsFor(leftPlatform);
             this.generateDecorationsFor(rightPlatform);
             
-            pairedPlatformPlaced = true;
-            break;
-          }
-        }
+        // Add to tracking
+        placedPlatforms.push({
+          x: leftX, y: leftY, width: leftWidth, height, difficulty: 'paired-left'
+        });
+        placedPlatforms.push({
+          x: rightX, y: rightY, width: rightWidth, height, difficulty: 'paired-right'
+        });
         
-        // Skip the normal platform placement for this iteration
-        continue;
-      }
-      
-      // Skip individual wood-2 platforms if we've already placed a pair
-      if ((platformType === 'platform-wood-2-left-final' || platformType === 'platform-wood-2-right-final') && pairedPlatformPlaced) {
-        // Pick a different platform type
-        platformType = this.pickPlatformType();
-        // If we get another wood-2 platform, skip this iteration
-        if (platformType === 'platform-wood-2-left-final' || platformType === 'platform-wood-2-right-final') {
-          continue;
-        }
-      }
-      
-      // Try to place platform with improved positioning to avoid gaps
-      const width = prefabWidthPx(this.mapName, platformType, this.scale);
-      const height = prefabHeightPx(this.mapName, platformType, this.scale);
-      
-      for (let attempt = 0; attempt < 50; attempt++) {
-        const worldX = this.getValidXPosition(platformType, width);
-        
-        // Use weighted random to favor lower positions (closer to bottom of band)
-        // This helps ensure platforms are available in the bottom 20% of the band
-        const weight = Math.random();
-        const worldY = minY + weight * weight * (maxY - minY);
-        
-        if (this.isPositionClear(worldX, worldY, width, height)) {
-          const platform = this.createPlatform(platformType, worldX, worldY, 'platform');
-          this.platforms.set(platform.id, platform);
-          
-          this.generateDecorationsFor(platform);
-          break;
-        }
+        return true;
       }
     }
     
-    // Ensure at least one platform near the top seam to bridge bands
-    (() => {
-      const seamBandTop = bandTopWorldY;
-      const seamBandBottom = bandTopWorldY + 32; // 32px near the top
+    return false;
+  }
 
-      const hasSeamBridge = Array.from(this.platforms.values()).some(p =>
-        p.type === 'platform' &&
-        p.y >= seamBandTop &&
-        p.y <= seamBandBottom
-      );
+  private getRandomYInBand(bandTopWorldY: number, bandBottomWorldY: number, platformHeight: number): number {
+    const margin = 20;
+    const minY = bandTopWorldY + margin;
+    const maxY = bandBottomWorldY - platformHeight - margin;
+    
+    return minY + Math.random() * Math.max(1, maxY - minY);
+  }
 
-      if (!hasSeamBridge) {
-        // pick a small/medium prefab from config
-        const fallbackType = this.config.platformTypes[0]?.[0] ?? 'platform-wood-1-final';
-        const width  = prefabWidthPx(this.mapName, fallbackType, this.scale);
+  private isPositionClearForPlacement(
+    worldX: number, 
+    worldY: number, 
+    width: number, 
+    height: number, 
+    placedPlatforms: Array<{x: number, y: number, width: number, height: number}>
+  ): boolean {
+    const margin = 30; // Reduced margin for denser placement
+    
+    // Check against existing platforms
+    for (const platform of this.platforms.values()) {
+      const pWidth = prefabWidthPx(this.mapName, platform.prefab, platform.scale);
+      const pHeight = prefabHeightPx(this.mapName, platform.prefab, platform.scale);
+      
+      if (!(worldX + width + margin < platform.x || 
+            platform.x + pWidth + margin < worldX || 
+            worldY + height + margin < platform.y || 
+            platform.y + pHeight + margin < worldY)) {
+        return false;
+      }
+    }
+    
+    // Check against placed platforms in this batch
+    for (const platform of placedPlatforms) {
+      if (!(worldX + width + margin < platform.x || 
+            platform.x + platform.width + margin < worldX || 
+            worldY + height + margin < platform.y || 
+            platform.y + platform.height + margin < worldY)) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
+  private ensureSeamCoverage(
+    bandTopWorldY: number,
+    bandBottomWorldY: number,
+    placedPlatforms: Array<{x: number, y: number, width: number, height: number}>
+  ): void {
+    const seamZoneTop = bandTopWorldY;
+    const seamZoneBottom = bandTopWorldY + 50; // 50px seam zone
+    
+    // Check if we have coverage in the seam zone
+    const hasSeamCoverage = placedPlatforms.some(p => 
+      p.y >= seamZoneTop && p.y <= seamZoneBottom
+    );
+    
+    if (!hasSeamCoverage) {
+      // Place a small platform in the seam zone
+      const fallbackType = 'platform-wood-1-final';
+      const width = prefabWidthPx(this.mapName, fallbackType, this.scale);
         const height = prefabHeightPx(this.mapName, fallbackType, this.scale);
 
-        // try a few positions near the seam
         for (let attempt = 0; attempt < 20; attempt++) {
           const worldX = this.getValidXPosition(fallbackType, width);
-          const worldY = seamBandTop + 8 + Math.random() * Math.max(1, (seamBandBottom - seamBandTop - height - 8));
-          if (this.isPositionClear(worldX, worldY, width, height)) {
+        const worldY = seamZoneTop + Math.random() * (seamZoneBottom - seamZoneTop - height);
+        
+        if (this.isPositionClearForPlacement(worldX, worldY, width, height, placedPlatforms)) {
             const platform = this.createPlatform(fallbackType, worldX, worldY, 'platform');
             this.platforms.set(platform.id, platform);
             break;
           }
         }
       }
-    })();
+  }
+
+  // Helper utility methods
+  private weightedPick(choices: Array<[string, number]>): string {
+    const totalWeight = choices.reduce((sum, [, weight]) => sum + weight, 0);
+    let random = Math.random() * totalWeight;
+    
+    for (const [choice, weight] of choices) {
+      random -= weight;
+      if (random <= 0) return choice;
+    }
+    
+    return choices[0][0];
+  }
+
+  private shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
   }
 
   private isPositionClear(worldX: number, worldY: number, width: number, height: number): boolean {
@@ -459,11 +1221,15 @@ export class PlatformManager {
     
     if (this.generatedMinWorldY > generateAheadWorldY) {
       while (this.generatedMinWorldY > generateAheadWorldY) {
-        const bandHeight = SCREEN_H * 0.8;
-        // Small 24px overlap to guarantee coverage
-        const SEAM_OVERLAP = 24;
-        const bandBottomWorldY = this.generatedMinWorldY + SEAM_OVERLAP;
-        const bandTopWorldY = bandBottomWorldY - bandHeight;
+        // FIXED: Use physics-correct band height here too
+        const MAX_JUMP_HEIGHT = 203;
+        const SAFE_BAND_HEIGHT = MAX_JUMP_HEIGHT * 1.5; // 300px
+        const BAND_GAP = 50;
+        
+        const bandBottomWorldY = this.generatedMinWorldY + BAND_GAP;
+        const bandTopWorldY = bandBottomWorldY - SAFE_BAND_HEIGHT;
+        
+        console.log(`[PlatformManager] Dynamic band generation: ${bandTopWorldY} to ${bandBottomWorldY} (height: ${SAFE_BAND_HEIGHT}px)`);
         
         this.generateBand(bandTopWorldY, bandBottomWorldY);
         this.generatedMinWorldY = bandTopWorldY;
@@ -518,17 +1284,17 @@ export class PlatformManager {
       }
     } else {
       // Original culling for before first band (less aggressive)
-      const cullBelowWorldY = playerWorldY + SCREEN_H * 4;
-      const toRemove: string[] = [];
-      this.platforms.forEach((platform, id) => {
-        if (platform.y > cullBelowWorldY) {
-          toRemove.push(id);
-        }
-      });
-      
-      if (toRemove.length > 0) {
-        toRemove.forEach(id => this.platforms.delete(id));
-        generated = true;
+    const cullBelowWorldY = playerWorldY + SCREEN_H * 4;
+    const toRemove: string[] = [];
+    this.platforms.forEach((platform, id) => {
+      if (platform.y > cullBelowWorldY) {
+        toRemove.push(id);
+      }
+    });
+    
+    if (toRemove.length > 0) {
+      toRemove.forEach(id => this.platforms.delete(id));
+      generated = true;
       }
     }
     
