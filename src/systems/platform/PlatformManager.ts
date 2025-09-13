@@ -603,7 +603,6 @@ export class PlatformManager {
       const spawnY = this.highestPlayerY + this.CULL_DISTANCE;
       this.deathFloor = this.createDeathFloor(spawnY);
       this.platforms.set(this.deathFloor.id, this.deathFloor);
-      console.log(`[PlatformManager] Death floor created at Y=${spawnY}, player at Y=${playerWorldY}`);
     } else {
       // Death floor follows at fixed distance below highest point
       const targetY = this.highestPlayerY + this.CULL_DISTANCE;

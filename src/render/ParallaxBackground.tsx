@@ -21,7 +21,8 @@ interface ParallaxBackgroundProps {
   cameraY: number;
   timeSec: number;
   viewport: { width: number; height: number };
-  clipMaxY?: number; // NEW: only draw above this Y
+  floorTopY?: number; // NEW: Floor position in world coordinates
+  clipMaxY?: number;
 }
 
 export default function ParallaxBackground({
@@ -29,14 +30,27 @@ export default function ParallaxBackground({
   cameraY,
   timeSec,
   viewport,
+  floorTopY,
   clipMaxY,
 }: ParallaxBackgroundProps) {
 
   
   const { width, height } = viewport;
   
-  // Create clip rect if clipMaxY is specified
-  const clipRect = typeof clipMaxY === "number" ? rect(0, 0, width, Math.max(0, clipMaxY)) : undefined;
+  // Calculate floor position in screen coordinates
+  const floorScreenY = floorTopY ? (floorTopY - cameraY) : (height * 0.8);
+  
+  // Create clip rect that respects both clipMaxY and floor position
+  let finalClipMaxY = clipMaxY;
+  if (floorTopY) {
+    finalClipMaxY = finalClipMaxY 
+      ? Math.min(finalClipMaxY, floorScreenY)
+      : floorScreenY;
+  }
+  
+  const clipRect = typeof finalClipMaxY === "number" 
+    ? rect(0, 0, width, Math.max(0, finalClipMaxY)) 
+    : undefined;
 
   return (
     <Group {...(clipRect ? { clip: clipRect } : {})}>
@@ -111,8 +125,15 @@ export default function ParallaxBackground({
           return <Group key={layerIndex}>{nodes}</Group>;
         }
 
-        // MOUNTAINS (idx >= 2): draw ONCE, anchored to bottom of the viewport, no vertical tiling
-        const y = height - scaledHeight + yOffset;
+        // MOUNTAINS (idx >= 2): draw ONCE, anchored to bottom but respect floor
+        let y = height - scaledHeight + yOffset;
+        
+        // Don't let mountains render below the floor
+        if (floorTopY) {
+          const maxY = floorScreenY - scaledHeight;
+          y = Math.min(y, maxY);
+        }
+        
         return (
           <SkImage
             key={layerIndex}

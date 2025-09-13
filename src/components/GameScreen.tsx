@@ -289,18 +289,12 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
     prevIsDeadRef.current = isDead;
   }, [isDead, playFireDeathSound, playDeathSound]);
 
-  // PERFORMANCE DEBUGGING: Extensive debugging for character movement issues
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
     let frameCount = 0;
-    let lastDebugTime = 0;
-    let totalLoopTime = 0;
-    let maxLoopTime = 0;
-    let minLoopTime = Infinity;
 
     const loop = (t: number) => {
-      const loopStart = performance.now();
       frameCount++;
       
       // PERFORMANCE: Simplified timing - just use basic delta time
@@ -397,7 +391,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         didWrapRef.current = true;
       }
 
-      // PERFORMANCE DEBUG: Track second getPlayerBox timing
       const newBoxStart = performance.now();
       const newBox = getPlayerBox({
         xRefIsLeftEdge: true,
@@ -436,7 +429,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         
         // Player dies if they fall 40px into the hazard band area
         if (playerWorldY >= hazardTopWorld + 40) {
-          console.log(`[DEATH] Player fell into hazard band! Player Y: ${playerWorldY}, Hazard Y: ${hazardTopWorld}, Death Zone: ${hazardTopWorld + 40}`);
           deathTypeRef.current = 'fire';
           takeDamage(999);
           return; // Stop physics processing
@@ -495,7 +487,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               
               // Only kill when player is AT or BELOW the death floor surface
               if (distanceToSurface >= -5 && distanceToSurface <= 10) {
-                console.log(`[DEATH] Player touched lava! Distance: ${distanceToSurface}px`);
                 deathTypeRef.current = 'fire';
                 takeDamage(999);
                 return;
@@ -616,9 +607,10 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       // Smoother camera movement with throttled platform generation
 
       if (frameCount % 2 === 0) { // Every 2 frames for smoother movement (was 5)
-        const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.25); // 25% from top
+        const DEADZONE_FROM_TOP = Math.round(SCREEN_H * 0.40); // CHANGED: 40% from top (was 0.25)
         const playerScreenY = floorTopY - zRef.current - cameraY;
         
+        // UPWARD TRACKING: When player rises into dead-zone, camera moves up
         if (playerScreenY < DEADZONE_FROM_TOP) {
           const targetCameraY = cameraY + (playerScreenY - DEADZONE_FROM_TOP);
           const newCameraY = Math.round(targetCameraY);
@@ -634,29 +626,33 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               if (platformsChanged) {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
               }
-              
             }
           }
         }
+        // DOWNWARD TRACKING: Limited to 100px below dead-zone
+        else if (playerScreenY > DEADZONE_FROM_TOP + 100) {
+          // Only allow camera to move down if player is more than 100px below dead-zone
+          const maxDownwardCameraY = cameraY + 100;
+          const targetCameraY = cameraY + (playerScreenY - DEADZONE_FROM_TOP - 100);
+          const newCameraY = Math.min(maxDownwardCameraY, Math.round(targetCameraY));
+          
+          if (Math.abs(newCameraY - cameraY) > 1) {
+            setCameraY(newCameraY);
+            
+            if (platformManager.current && frameCount % 15 === 0) {
+              const playerWorldY = floorTopY - zRef.current;
+              const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
+              if (platformsChanged) {
+                setAllPlatforms(platformManager.current.getAllPlatforms());
+              }
+            }
+          }
+        }
+        // MIDDLE ZONE: Player is between dead-zone and 100px below - camera doesn't move
       }
 
 
 
-      // PERFORMANCE DEBUG: Track total loop time and log periodically
-      const loopTime = performance.now() - loopStart;
-      totalLoopTime += loopTime;
-      maxLoopTime = Math.max(maxLoopTime, loopTime);
-      minLoopTime = Math.min(minLoopTime, loopTime);
-      
-      // Reset performance counters every 10 seconds
-      if (t - lastDebugTime > 10000) {
-        // Reset counters
-        frameCount = 0;
-        totalLoopTime = 0;
-        maxLoopTime = 0;
-        minLoopTime = Infinity;
-        lastDebugTime = t;
-      }
 
       raf = requestAnimationFrame(loop);
     };
@@ -684,6 +680,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
                 cameraY={cameraY}
                 timeSec={elapsedSec}
                 viewport={{ width: SCREEN_W, height: SCREEN_H }}
+                floorTopY={floorTopY} // ADD THIS LINE
                 clipMaxY={
                   hazardTopScreen != null && hazardTopScreen < SCREEN_H + 100
                     ? Math.max(0, Math.min(hazardTopScreen + 50, SCREEN_H)) // 50px overlap
@@ -768,35 +765,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
           );
         })()}
       
-      {/* Performance Debug Display */}
-      <View style={{
-        position: 'absolute',
-        top: 50,
-        right: 20,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        padding: 10,
-        borderRadius: 5,
-        zIndex: 5,
-      }}>
-        <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>
-          PERFORMANCE DEBUG
-        </Text>
-        <Text style={{ color: 'white', fontSize: 10 }}>
-          Total Platforms: {allPlatforms.length}
-        </Text>
-        <Text style={{ color: 'white', fontSize: 10 }}>
-          Visible Platforms: {visiblePlatforms.length}
-        </Text>
-        <Text style={{ color: 'white', fontSize: 10 }}>
-          Culled: {allPlatforms.length - visiblePlatforms.length}
-        </Text>
-        <Text style={{ color: 'white', fontSize: 10 }}>
-          Reduction: {Math.round((1 - visiblePlatforms.length / allPlatforms.length) * 100)}%
-        </Text>
-        <Text style={{ color: 'white', fontSize: 10 }}>
-          Update Freq: 15 frames (250ms)
-        </Text>
-      </View>
 
 
       {/* Death modal */}
