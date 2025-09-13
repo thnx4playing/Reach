@@ -86,7 +86,8 @@ export class PlatformManager {
   private hasCrossedFirstBand = false;
   private lastCullCheck = 0;
   private CULL_CHECK_INTERVAL = 1000; // Check every 1 second for performance
-  private CULL_DISTANCE = 725; // 725px below character (500px + 75px + 150px adjustment)
+  private CULL_DISTANCE = 600; // 600px below character for lava/death floor positioning
+  private PLATFORM_CULL_DISTANCE = 200; // 200px below character for platform removal
   
   // Death floor system
   private deathFloor: PlatformDef | null = null;
@@ -475,14 +476,37 @@ export class PlatformManager {
       if (now - this.lastCullCheck > this.CULL_CHECK_INTERVAL) {
         this.lastCullCheck = now;
         
-        // Cull platforms 500px below player (much more aggressive than before)
-        const cullBelowWorldY = playerWorldY + this.CULL_DISTANCE;
+        // Cull platforms 200px below player (aggressive for performance)
+        const cullBelowWorldY = playerWorldY + this.PLATFORM_CULL_DISTANCE;
         const toRemove: string[] = [];
+        const culledParentPlatforms: PlatformDef[] = [];
         
-        // Efficient iteration - only check platforms that might need culling
+        // First pass: identify parent platforms to cull
         this.platforms.forEach((platform, id) => {
-          if (platform.y > cullBelowWorldY) {
+          if (platform.type === 'platform' && platform.y > cullBelowWorldY) {
             toRemove.push(id);
+            culledParentPlatforms.push(platform);
+          }
+        });
+        
+        // Second pass: cull decorations that belong to culled parent platforms
+        // We'll cull decorations that are positioned near culled parent platforms
+        this.platforms.forEach((platform, id) => {
+          if (platform.type === 'decoration') {
+            // Check if this decoration is near any culled parent platform
+            const isNearCulledParent = culledParentPlatforms.some(parentPlatform => {
+              const decorationCenterX = platform.x + (prefabWidthPx(this.mapName, platform.prefab, this.scale) / 2);
+              const parentCenterX = parentPlatform.x + (parentPlatform.collision?.width || prefabWidthPx(this.mapName, parentPlatform.prefab, this.scale)) / 2;
+              const horizontalDistance = Math.abs(decorationCenterX - parentCenterX);
+              const verticalDistance = Math.abs(platform.y - parentPlatform.y);
+              
+              // If decoration is within reasonable distance of a culled parent platform, cull it too
+              return horizontalDistance < 200 && verticalDistance < 100;
+            });
+            
+            if (isNearCulledParent) {
+              toRemove.push(id);
+            }
           }
         });
         
