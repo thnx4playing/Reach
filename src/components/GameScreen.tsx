@@ -627,6 +627,14 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
               }
             }
+            
+            // Update fade-out animations every frame for smooth animation
+            if (platformManager.current) {
+              const fadeChanged = platformManager.current.updateFadeOutAnimations();
+              if (fadeChanged) {
+                setAllPlatforms(platformManager.current.getAllPlatforms());
+              }
+            }
           }
         }
         // DOWNWARD TRACKING: Limited to 100px below dead-zone
@@ -646,13 +654,26 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
               }
             }
+            
+            // Update fade-out animations every frame for smooth animation
+            if (platformManager.current) {
+              const fadeChanged = platformManager.current.updateFadeOutAnimations();
+              if (fadeChanged) {
+                setAllPlatforms(platformManager.current.getAllPlatforms());
+              }
+            }
           }
         }
         // MIDDLE ZONE: Player is between dead-zone and 100px below - camera doesn't move
       }
 
-
-
+      // Update fade-out animations every frame for smooth animation (runs regardless of camera movement)
+      if (platformManager.current) {
+        const fadeChanged = platformManager.current.updateFadeOutAnimations();
+        if (fadeChanged) {
+          setAllPlatforms(platformManager.current.getAllPlatforms());
+        }
+      }
 
       raf = requestAnimationFrame(loop);
     };
@@ -701,6 +722,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
                 x={platform.x}
                 y={platform.y}
                 scale={platform.scale}
+                opacity={platform.fadeOut?.opacity ?? 1.0}
               />
             ))}
             

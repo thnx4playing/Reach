@@ -14,4 +14,10 @@ export interface PlatformDef {
     width: number;
     height: number;
   };
+  // Fade-out animation state
+  fadeOut?: {
+    startTime: number; // Timestamp when fade started
+    duration: number;  // Fade duration in milliseconds
+    opacity: number;   // Current opacity (0.0 to 1.0)
+  };
 }

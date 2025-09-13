@@ -88,6 +88,7 @@ export class PlatformManager {
   private CULL_CHECK_INTERVAL = 1000; // Check every 1 second for performance
   private CULL_DISTANCE = 600; // 600px below character for lava/death floor positioning
   private PLATFORM_CULL_DISTANCE = 200; // 200px below character for platform removal
+  private FADE_OUT_DURATION = 1000; // 1 second fade-out duration
   
   // Death floor system
   private deathFloor: PlatformDef | null = null;
@@ -481,18 +482,19 @@ export class PlatformManager {
         const toRemove: string[] = [];
         const culledParentPlatforms: PlatformDef[] = [];
         
-        // First pass: identify parent platforms to cull
+        // First pass: identify parent platforms to start fading out
         this.platforms.forEach((platform, id) => {
-          if (platform.type === 'platform' && platform.y > cullBelowWorldY) {
-            toRemove.push(id);
+          if (platform.type === 'platform' && platform.y > cullBelowWorldY && !platform.fadeOut) {
+            this.startFadeOut(platform);
             culledParentPlatforms.push(platform);
+            generated = true; // Mark that we need to update the game
           }
         });
         
-        // Second pass: cull decorations that belong to culled parent platforms
-        // We'll cull decorations that are positioned near culled parent platforms
+        // Second pass: start fading out decorations that belong to culled parent platforms
+        // We'll fade decorations that are positioned near culled parent platforms
         this.platforms.forEach((platform, id) => {
-          if (platform.type === 'decoration') {
+          if (platform.type === 'decoration' && !platform.fadeOut) {
             // Check if this decoration is near any culled parent platform
             const isNearCulledParent = culledParentPlatforms.some(parentPlatform => {
               const decorationCenterX = platform.x + (prefabWidthPx(this.mapName, platform.prefab, this.scale) / 2);
@@ -500,20 +502,19 @@ export class PlatformManager {
               const horizontalDistance = Math.abs(decorationCenterX - parentCenterX);
               const verticalDistance = Math.abs(platform.y - parentPlatform.y);
               
-              // If decoration is within reasonable distance of a culled parent platform, cull it too
+              // If decoration is within reasonable distance of a culled parent platform, fade it too
               return horizontalDistance < 200 && verticalDistance < 100;
             });
             
             if (isNearCulledParent) {
-              toRemove.push(id);
+              this.startFadeOut(platform);
+              generated = true; // Mark that we need to update the game
             }
           }
         });
         
-        if (toRemove.length > 0) {
-          toRemove.forEach(id => this.platforms.delete(id));
-          generated = true;
-        }
+        // Platforms are now faded out instead of instantly removed
+        // The actual removal happens in updateFadeOutAnimations()
       }
     } else {
       // Original culling for before first band (less aggressive)
@@ -695,6 +696,50 @@ export class PlatformManager {
    */
   getDeathFloor(): PlatformDef | null {
     return this.deathFloor;
+  }
+
+  /**
+   * Update fade-out animations and remove fully faded platforms
+   */
+  updateFadeOutAnimations(): boolean {
+    const now = Date.now();
+    const toRemove: string[] = [];
+    let hasChanges = false;
+
+    this.platforms.forEach((platform, id) => {
+      if (platform.fadeOut) {
+        const elapsed = now - platform.fadeOut.startTime;
+        const progress = Math.min(elapsed / platform.fadeOut.duration, 1.0);
+        
+        // Calculate opacity using smooth easing (ease-out)
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        platform.fadeOut.opacity = Math.max(0, 1 - easeOut);
+        
+        // Remove platform when fade is complete
+        if (progress >= 1.0) {
+          toRemove.push(id);
+          hasChanges = true;
+        }
+      }
+    });
+
+    // Remove fully faded platforms
+    toRemove.forEach(id => this.platforms.delete(id));
+    
+    return hasChanges;
+  }
+
+  /**
+   * Start fade-out animation for a platform
+   */
+  private startFadeOut(platform: PlatformDef): void {
+    if (!platform.fadeOut) {
+      platform.fadeOut = {
+        startTime: Date.now(),
+        duration: this.FADE_OUT_DURATION,
+        opacity: 1.0
+      };
+    }
   }
 
   /**

@@ -1,12 +1,12 @@
 import React from "react";
-import { Image as SkImageComponent, useImage } from "@shopify/react-native-skia";
+import { Image as SkImageComponent, useImage, Group } from "@shopify/react-native-skia";
 import { MAPS, MapName } from "../content/maps";
 import { usePreloadedImage } from "./ImagePreloaderContext";
 import { grassyPrefabImages } from "../assets/grassyPrefabs";
 
-type Props = { map: MapName; name: string; x?: number; y?: number; scale?: number };
+type Props = { map: MapName; name: string; x?: number; y?: number; scale?: number; opacity?: number };
 
-export function PrefabNode({ map, name, x = 0, y = 0, scale = 2 }: Props) {
+export function PrefabNode({ map, name, x = 0, y = 0, scale = 2, opacity = 1.0 }: Props) {
   const def = MAPS[map];
   const pf = def.prefabs?.prefabs?.[name];
   if (!pf) { 
@@ -26,14 +26,16 @@ export function PrefabNode({ map, name, x = 0, y = 0, scale = 2 }: Props) {
 
   // ONE place will apply foot inset: alignPrefabYToSurfaceTop (not here)
   return (
-    <SkImageComponent
-      image={finalImg}
-      x={Math.round(x)}
-      y={Math.round(y)}
-      width={Math.round(width)}
-      height={Math.round(height)}
-      fit="fill"
-    />
+    <Group opacity={opacity}>
+      <SkImageComponent
+        image={finalImg}
+        x={Math.round(x)}
+        y={Math.round(y)}
+        width={Math.round(width)}
+        height={Math.round(height)}
+        fit="fill"
+      />
+    </Group>
   );
 }
 
