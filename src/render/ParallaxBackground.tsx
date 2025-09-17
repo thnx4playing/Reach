@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Group, Image as SkImage, useImage, rect } from '@shopify/react-native-skia';
 import type { ParallaxConfig } from '../content/parallaxConfig';
 
@@ -34,6 +34,10 @@ export default function ParallaxBackground({
   clipMaxY,
 }: ParallaxBackgroundProps) {
 
+  // Safety check for variant
+  if (!variant || !variant.layers || !Array.isArray(variant.layers)) {
+    return null;
+  }
   
   const { width, height } = viewport;
   
@@ -54,7 +58,9 @@ export default function ParallaxBackground({
 
   return (
     <Group {...(clipRect ? { clip: clipRect } : {})}>
-      {(variant.layers ? variant.layers : []).map((layer, layerIndex) => {
+      {(variant?.layers || []).map((layer, layerIndex) => {
+        if (!layer || !layer.src) return null;
+        
         const image = useImage(layer.src);
         if (!image) return null;
 
@@ -66,7 +72,7 @@ export default function ParallaxBackground({
         const scaledHeight = ih * scale;
 
         // Parallax (positive cameraY goes down)
-        const yOffset = -cameraY * layer.vFactor;
+        const yOffset = -cameraY * (layer.vFactor ?? 0);
         const xDriftBase = (layer.hDrift ?? 0) * -timeSec; // drift left when positive
 
         // SKY (idx 0) + CLOUDS (idx 1): tile in X and Y infinitely
@@ -75,8 +81,8 @@ export default function ParallaxBackground({
           const baseY = ((yOffset % scaledHeight) + scaledHeight) % scaledHeight - scaledHeight;
           // Wrap the base drift so we never accumulate huge coordinates
           const baseX = ((xDriftBase % width) + width) % width - width;
-          // Draw 4 columns to stay safe when we jitter tiles horizontally
-          const tilesX = 4;
+          // PERFORMANCE FIX: Reduce tile count for better performance
+          const tilesX = 2; // Reduced from 4 to 2 for better performance
 
           const nodes: JSX.Element[] = [];
           for (let ix = 0; ix < tilesX; ix++) {
@@ -86,40 +92,47 @@ export default function ParallaxBackground({
               const seed = (layerIndex + 1) * 73856093 ^ ix * 19349663 ^ iy * 83492791;
               const varyClouds = layerIndex === 1;
 
-              // Horizontal jitter (±15% panel width), vertical jitter (±20% panel height)
-              const jx = varyClouds ? randRange(seed + 1, -0.15 * width, 0.15 * width) : 0;
-              const jy = varyClouds ? randRange(seed + 2, -0.20 * scaledHeight, 0.20 * scaledHeight) : 0;
+              // PERFORMANCE FIX: Simplified calculations for clouds
+              if (varyClouds) {
+                // Simplified cloud variation - less expensive calculations
+                const jx = (seed % 100 - 50) * 0.01 * width * 0.15; // Simple pseudo-random jitter
+                const jy = ((seed >> 8) % 100 - 50) * 0.01 * scaledHeight * 0.20;
+                const wobble = Math.sin(timeSec * 0.6 + (seed % 628) * 0.01) * 2; // Simplified wobble
+                const alpha = 0.85 + ((seed >> 16) % 16) * 0.01; // Simplified alpha 0.85-1.0
 
-              // Slight per-tile drift speed multiplier (0.6x..1.4x)
-              const driftMul = varyClouds ? randRange(seed + 3, 0.6, 1.4) : 1.0;
+                const y = baseY + iy * scaledHeight + jy + wobble;
+                const xTile = x + jx;
 
-              // Tiny vertical wobble with a dephased start
-              const wobble =
-                varyClouds
-                  ? Math.sin(timeSec * 0.6 + randRange(seed + 4, 0, Math.PI * 2)) * 2
-                  : 0;
+                nodes.push(
+                  <Group key={`${layerIndex}-xy-${ix}-${iy}`} opacity={alpha}>
+                    <SkImage
+                      image={image}
+                      x={xTile}
+                      y={y}
+                      width={width}
+                      height={scaledHeight}
+                      fit="fill"
+                    />
+                  </Group>
+                );
+              } else {
+                // Sky layer - no variation, simple positioning
+                const y = baseY + iy * scaledHeight;
+                const xTile = x;
 
-              // Slight opacity variation (0.85..1.0)
-              const alpha = varyClouds ? randRange(seed + 5, 0.85, 1.0) : 1.0;
-
-              const y = baseY + iy * scaledHeight + jy + wobble;
-              // Keep the *relative* extra drift wrapped to screen width to avoid huge coords
-              const extra = xDriftBase * (driftMul - 1);                // delta from base speed
-              const extraWrapped = ((extra % width) + width) % width;   // 0..width
-              const xTile = x + jx + extraWrapped;
-
-              nodes.push(
-                <Group key={`${layerIndex}-xy-${ix}-${iy}`} opacity={alpha}>
-                  <SkImage
-                    image={image}
-                    x={xTile}
-                    y={y}
-                    width={width}
-                    height={scaledHeight}
-                    fit="fill"
-                  />
-                </Group>
-              );
+                nodes.push(
+                  <Group key={`${layerIndex}-xy-${ix}-${iy}`}>
+                    <SkImage
+                      image={image}
+                      x={xTile}
+                      y={y}
+                      width={width}
+                      height={scaledHeight}
+                      fit="fill"
+                    />
+                  </Group>
+                );
+              }
             }
           }
           return <Group key={layerIndex}>{nodes}</Group>;

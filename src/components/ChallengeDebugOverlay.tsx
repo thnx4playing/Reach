@@ -20,7 +20,7 @@ export const ChallengeDebugOverlay: React.FC<ChallengeDebugOverlayProps> = ({
     <View style={styles.debugOverlay}>
       <Text style={styles.debugTitle}>Challenge System</Text>
       <Text style={styles.debugText}>Level: {challengeLevel}</Text>
-      <Text style={styles.debugText}>Bands at level: {bandsAtLevel}/3</Text>
+      <Text style={styles.debugText}>Progress: {bandsAtLevel} screens</Text>
       <Text style={styles.debugText}>Total bands: {totalBands}</Text>
       <Text style={styles.debugText}>Height: {Math.round(playerHeight)}px</Text>
       
@@ -28,7 +28,7 @@ export const ChallengeDebugOverlay: React.FC<ChallengeDebugOverlayProps> = ({
         <View 
           style={[
             styles.progressFill,
-            { width: `${(bandsAtLevel / 3) * 100}%` }
+            { width: `${Math.min(100, (bandsAtLevel / 10) * 100)}%` }
           ]}
         />
       </View>

@@ -26,6 +26,7 @@ import HealthBar from './HealthBar';
 import { DeathModal } from '../ui/DeathModal';
 import { useDamageAnimations } from '../systems/health/useDamageAnimations';
 import { ChallengeDebugOverlay } from './ChallengeDebugOverlay';
+import { CullingDebugOverlay } from './CullingDebugOverlay';
 
 // Audio system imports
 import { useSound } from '../audio/useSound';
@@ -134,6 +135,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const onGroundRef = useRef(true);
   const didWrapRef = useRef(false);
   const feetYRef = useRef(levelData?.floorTopY ?? 0);
+  const frameCountRef = useRef(0); // Shared frame count for debug logging
   
   // Fall damage state machine (z-based)
   const peakZRef = useRef<number>(0);
@@ -189,6 +191,17 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
     level: 'Easy', 
     bandsAtLevel: 0, 
     totalBands: 0 
+  });
+
+  // Culling info state
+  const [cullingInfo, setCullingInfo] = useState({
+    totalPlatforms: 0,
+    totalDecorations: 0,
+    totalCulled: 0,
+    platformsCulled: 0,
+    decorationsCulled: 0,
+    fadedThisFrame: 0,
+    prunedThisFrame: 0
   });
 
   // World->Screen convert: give us the screen Y from a world Y
@@ -304,6 +317,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
 
     const loop = (t: number) => {
       frameCount++;
+      frameCountRef.current = frameCount;
+      
       
       // PERFORMANCE: Simplified timing - just use basic delta time
       const dt = Math.min(0.0166, (t - last) / 1000); // Cap at 60 FPS
@@ -636,6 +651,10 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               const challenge = platformManager.current.getCurrentChallenge();
               setChallengeInfo(challenge);
               
+              // Update culling info
+              const culling = platformManager.current.getCullingStats();
+              setCullingInfo(culling);
+              
               if (platformsChanged) {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
               }
@@ -667,6 +686,10 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               // Update challenge info
               const challenge = platformManager.current.getCurrentChallenge();
               setChallengeInfo(challenge);
+              
+              // Update culling info
+              const culling = platformManager.current.getCullingStats();
+              setCullingInfo(culling);
               
               if (platformsChanged) {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
@@ -713,9 +736,11 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
             const hazardTopWorld = df?.y ?? null;
             const hazardTopScreen = hazardTopWorld != null ? worldYToScreenY(hazardTopWorld) : null;
             
+            const parallaxVariant = PARALLAX[levelData.mapName as keyof typeof PARALLAX] || PARALLAX.grassy;
+            
             return (
               <ParallaxBackground
-                variant={PARALLAX[levelData.mapName as keyof typeof PARALLAX] as any}
+                variant={parallaxVariant}
                 cameraY={cameraY}
                 timeSec={elapsedSec}
                 viewport={{ width: SCREEN_W, height: SCREEN_H }}
@@ -782,25 +807,41 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         playerHeight={floorTopY - z}
       />
       
+      {/* Culling Debug Overlay */}
+      <CullingDebugOverlay
+        totalPlatforms={cullingInfo.totalPlatforms}
+        totalDecorations={cullingInfo.totalDecorations}
+        totalCulled={cullingInfo.totalCulled}
+        platformsCulled={cullingInfo.platformsCulled}
+        decorationsCulled={cullingInfo.decorationsCulled}
+        fadedThisFrame={cullingInfo.fadedThisFrame}
+        prunedThisFrame={cullingInfo.prunedThisFrame}
+      />
+      
         
         {/* Hazard Band - Improved lava rendering */}
         {(() => {
           const df = platformManager.current?.getDeathFloor?.();
           const hazardTopWorld = df?.y ?? null;
           
+          
           if (hazardTopWorld == null) return null;
           
           // Convert world Y to screen Y
           const hazardTopScreen = worldYToScreenY(hazardTopWorld);
           
+          
           // Only show when hazard is in or near viewport
-          if (hazardTopScreen > SCREEN_H + 200) return null;
+          if (hazardTopScreen > SCREEN_H + 200) {
+            return null;
+          }
           
           // Calculate height - make it tall enough to cover everything below
           const hazardHeight = Math.max(SCREEN_H, SCREEN_H - hazardTopScreen + 200);
           
           // Clamp Y position to prevent rendering above viewport
           const clampedY = Math.max(-100, hazardTopScreen - 50); // 50px overlap for wavy edge
+          
           
           return (
             <HazardBand
