@@ -18,7 +18,8 @@ type Props = {
  */
 export default function GroundBand({ width, height, y, opacity = 1, timeMs = 0 }: Props) {
   const grassHeight = Math.max(8, Math.round(height * 0.05)); // top green lip
-  const dirtHeight  = Math.max(0, height - grassHeight);
+  // Extend dirt area by 50px below the calculated height to fill more black space
+  const dirtHeight  = Math.max(0, height - grassHeight + 50);
 
   // Small wavy grass edge
   const waveAmp = 4;
@@ -69,7 +70,7 @@ export default function GroundBand({ width, height, y, opacity = 1, timeMs = 0 }
 
   return (
     <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, opacity }}>
-      <Canvas style={{ position: "absolute", left: 0, top: 0, width, height: y + height }}>
+      <Canvas style={{ position: "absolute", left: 0, top: 0, width, height: y + height + 50 }}>
         {/* Dirt base rectangles */}
         {dirtLayers.map((l, i) => {
           const h = Math.max(0, dirtHeight * l.hMul);

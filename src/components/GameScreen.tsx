@@ -820,13 +820,23 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       />
       
       {/* Ground Band - Dirt with grass top */}
-      <GroundBand
-        width={SCREEN_W}
-        height={Math.max(0, SCREEN_H - floorTopY)}
-        y={floorTopY}
-        opacity={1}
-        timeMs={hazardAnimationTime}
-      />
+      {(() => {
+        // Use the same world->screen conversion as HazardBand for consistency
+        const groundScreenY = worldYToScreenY(floorTopY);
+        // Adjust upward to align grass lip exactly under character's feet
+        const adjustedGroundY = groundScreenY - 30; // Move up 30px to align better
+        const groundH = Math.max(0, SCREEN_H - adjustedGroundY);
+        
+        return (
+          <GroundBand
+            width={SCREEN_W}
+            height={groundH}
+            y={adjustedGroundY}
+            opacity={1}
+            timeMs={hazardAnimationTime}
+          />
+        );
+      })()}
       
         {/* Hazard Band - Improved lava rendering */}
         {(() => {
