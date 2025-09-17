@@ -1,55 +1,31 @@
 // src/systems/platform/PlatformManager.ts
-// v4 – Spawn tuning per requests:
-// 1) Grass vs Wood weighting ~75% grass (grass-1/grass-3), ~25% wood (wood-1/wood-3/wood-2-left/wood-2-right)
-// 2) Paired wood-2 left/right: reduced frequency & no longer required; they can also spawn individually, locked to edges
-// 3) Placement distribution: center-biased sampling so middle gets used (not just edges)
-// 4) Lava/DeathFloor unchanged (getDeathFloor/getLavaY + updateDeathFloor behavior preserved)
-// 5) Floor preserved via ensureFloor
-//
-// Rendering still uses your existing <PrefabNode> with Group+clip (no srcRect).
+// v5 - Ground band integration + no prefab floor + centered starter
+// Preserves all previous fixes: lava system, culling stats, decorations, progress tracking
 
 import { Dimensions } from 'react-native';
-import type { MapName } from '../../content/maps';
 import { prefabWidthPx, prefabHeightPx, prefabTopSolidSegmentsPx, getTileSize, alignPrefabYToSurfaceTop } from '../../content/maps';
+import type { MapName } from '../../content/maps';
 import type { PlatformDef } from './types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
-// ---------------- Physics (tune as needed) ----------------
-const PHYSICS = {
-  gravity: 1500,      // px/s^2
-  jumpVel: 780,       // px/s
-  maxRunSpeed: 220,   // px/s
-  margin: 0.08,       // safety margin
-};
+// Physics
+const PHYSICS = { gravity: 1500, jumpVel: 780, maxRunSpeed: 220, margin: 0.08 };
 
-// ---------------- Prefab names ----------------
+// Prefabs
 const PREF_LEFT  = 'platform-wood-2-left-final'  as const;
 const PREF_RIGHT = 'platform-wood-2-right-final' as const;
-const PREF_FLOOR = 'floor-final' as const;
 
-// Singles pool is now GRASS-weighted; wood-2-left/right included as singles too (edge-locked)
-const GRASS_PREFABS = [
-  'platform-grass-1-final',
-  'platform-grass-3-final',
-] as const;
+// Pools
+const GRASS_PREFABS = ['platform-grass-1-final', 'platform-grass-3-final'] as const;
+const WOOD_PREFABS  = ['platform-wood-1-final', 'platform-wood-3-final', 'platform-wood-2-left-final', 'platform-wood-2-right-final'] as const;
 
-const WOOD_PREFABS = [
-  'platform-wood-1-final',
-  'platform-wood-3-final',
-  'platform-wood-2-left-final',
-  'platform-wood-2-right-final',
-] as const;
-
-type Difficulty = 'E' | 'M' | 'H';
-type RNG = () => number;
-
-// Tunables
+// Weights / tuning
 const AHEAD_SCREENS = 2.5;
-const MAX_ATTEMPTS = 6;
-const VERT_PAIR_GAP = 100;     // px vertical gap for edge pairs
-const PAIR_CHANCE   = 0.08;    // reduced frequency
-const GRASS_WEIGHT  = 0.75;    // ~75% grass, 25% wood
+const MAX_ATTEMPTS  = 6;
+const GRASS_WEIGHT  = 0.75;
+const PAIR_CHANCE   = 0.08;
+const VERT_PAIR_GAP = 100;
 
 // Decoration configuration (restored from old system)
 const DECORATION_CONFIG = {
@@ -69,10 +45,11 @@ const DECORATION_CONFIG = {
   }
 };
 
-// Xorshift32 for deterministic seeds
+// RNG
+type RNG = () => number;
 function makeSeededRNG(seed: number): RNG {
   let x = (seed >>> 0) || 1;
-  return function rng() {
+  return () => {
     x ^= x << 13; x >>>= 0;
     x ^= x >> 17; x >>>= 0;
     x ^= x << 5;  x >>>= 0;
@@ -80,162 +57,131 @@ function makeSeededRNG(seed: number): RNG {
   };
 }
 
-function shuffle<T>(arr: T[], rng: RNG) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-}
-
 function refillBag(rng: RNG): Difficulty[] {
-  const bag: Difficulty[] = ['E','E','M','M','H'];
-  shuffle(bag, rng);
-  return bag;
+  const b: Difficulty[] = ['E','E','M','M','H'];
+  for(let i = b.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [b[i], b[j]] = [b[j], b[i]];
+  }
+  return b;
 }
 
-function maxVerticalReach(v0: number, g: number) {
-  return (v0 * v0) / (2 * g);
+type Difficulty = 'E'|'M'|'H';
+
+function maxVerticalReach() { 
+  return (PHYSICS.jumpVel * PHYSICS.jumpVel) / (2 * PHYSICS.gravity); 
 }
 
-// Jump envelope oracle: can we reach dyUp (vertical) with dx (horizontal)?
-function reachable(dx: number, dyUp: number, phys = PHYSICS) {
-  const m = phys.margin;
-  const g = phys.gravity;
-  const v0 = phys.jumpVel;
-  const vx = Math.max(1, phys.maxRunSpeed) * (1 - m);
-
-  const disc = v0*v0 - 2*g*dyUp;
-  if (disc <= 0) return false;
-  const t = (v0 + Math.sqrt(disc)) / g; // permissive root (descending branch)
+function reachable(dx: number, dyUp: number) {
+  const m = PHYSICS.margin, g = PHYSICS.gravity, v0 = PHYSICS.jumpVel, vx = Math.max(1, PHYSICS.maxRunSpeed) * (1 - m);
+  const disc = v0 * v0 - 2 * g * dyUp; 
+  if (disc <= 0) return false; 
+  const t = (v0 + Math.sqrt(disc)) / g; 
   const dxMax = vx * t;
   return Math.abs(dx) <= dxMax * (1 - m);
 }
 
-function pickDyForDifficulty(diff: Difficulty, rng: RNG) {
-  const H = maxVerticalReach(PHYSICS.jumpVel, PHYSICS.gravity);
-  const ranges: Record<Difficulty, [number, number]> = {
-    E: [0.28, 0.45],
-    M: [0.45, 0.62],
-    H: [0.62, 0.80],
-  };
-  const [lo, hi] = ranges[diff];
-  return (lo + (hi - lo) * rng()) * H;
+function pickDy(diff: Difficulty, rng: RNG) {
+  const H = maxVerticalReach();
+  const r = {E: [.28, .45], M: [.45, .62], H: [.62, .80]}[diff];
+  return (r[0] + (r[1] - r[0]) * rng()) * H;
 }
 
-// Center-biased target X sampler: ~60% center (30–70%), 20% left (5–30%), 20% right (70–95%)
-function sampleTargetX(rng: RNG): number {
+function sampleTargetX(rng: RNG) {
   const r = rng();
-  let frac: number;
-  if (r < 0.60) {
-    frac = 0.30 + (0.70 - 0.30) * rng();
-  } else if (r < 0.80) {
-    frac = 0.05 + (0.30 - 0.05) * rng();
+  let f: number;
+  if (r < .60) {
+    f = .30 + (.70 - .30) * rng();
+  } else if (r < .80) {
+    f = .05 + (.30 - .05) * rng();
   } else {
-    frac = 0.70 + (0.95 - 0.70) * rng();
+    f = .70 + (.95 - .70) * rng();
   }
-  return frac * SCREEN_W;
+  return f * SCREEN_W;
 }
 
-function weightedPickPrefab(rng: RNG): string {
+function weightedPrefab(rng: RNG) {
   if (rng() < GRASS_WEIGHT) {
-    const i = Math.floor(rng() * GRASS_PREFABS.length);
-    return GRASS_PREFABS[i];
-  } else {
-    const i = Math.floor(rng() * WOOD_PREFABS.length);
-    return WOOD_PREFABS[i];
+    return GRASS_PREFABS[Math.floor(rng() * GRASS_PREFABS.length)];
   }
+  return WOOD_PREFABS[Math.floor(rng() * WOOD_PREFABS.length)];
 }
 
-// Bounds helpers for PlatformDef
-function platformBounds(mapName: MapName, p: PlatformDef, scale: number) {
-  const w = prefabWidthPx(mapName, p.prefab, scale);
-  const h = prefabHeightPx(mapName, p.prefab, scale);
-  return { x: p.x, y: p.y, w, h };
+function bounds(map: MapName, p: PlatformDef, scale: number) {
+  const w = prefabWidthPx(map, p.prefab, scale);
+  const h = prefabHeightPx(map, p.prefab, scale);
+  return {x: p.x, y: p.y, w, h};
 }
 
 export class EnhancedPlatformManager {
-  private mapName: MapName;
+  private map: MapName;
   private scale: number;
   private rng: RNG;
   private bag: Difficulty[] = [];
   private nextId = 1;
-
   private platforms: PlatformDef[] = [];
-  private topMostY: number;       // smallest y placed so far
-  private deathFloorY: number;    // for culling/fade
-
-  // Debug/challenge bookkeeping
-  private bandsGeneratedAtCurrentLevel = 0;
-  private highestPlayerY: number | undefined; // Track player's highest point
+  private topMostY: number;
+  private deathFloor: PlatformDef | null = null; // keep object (used by lava renderer)
+  private highestPlayerY = 0;
   
-  // Culling statistics
+  // Debug/challenge bookkeeping - PRESERVED
+  private bandsGeneratedAtCurrentLevel = 0;
+  private playerHighestY: number | undefined; // Track player's highest point
+  
+  // Culling statistics - PRESERVED
   private totalPlatformsCulled = 0;
   private totalDecorationsCulled = 0;
   private platformsFadedThisFrame = 0;
   private platformsPrunedThisFrame = 0;
 
   constructor(mapName: MapName, floorTopY: number, scale = 2) {
-    this.mapName = mapName;
+    this.map = mapName; 
     this.scale = scale;
-    // Deterministic daily seed by default (yyyyMMdd)
-    const today = new Date();
-    const seed = today.getFullYear()*10000 + (today.getMonth()+1)*100 + today.getDate();
-    this.rng = makeSeededRNG(seed);
-
-    // Seed bag
+    const d = new Date(); 
+    const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+    this.rng = makeSeededRNG(seed); 
     this.bag = refillBag(this.rng);
-
-    // Initial top-most
     this.topMostY = floorTopY;
-    // FIX: Use 0.5*SCREEN_H to match updateDeathFloor logic
-    this.deathFloorY = floorTopY + SCREEN_H * 0.5;
 
-    // Restore floor
-    this.ensureFloor(floorTopY);
-
-    // Seed a couple starter ledges above the floor
-    this.ensureInitialPlatforms(floorTopY);
+    // No prefab floor. Start with one centered platform slightly above floor.
+    this.seedStarter(floorTopY);
   }
 
-  private ensureFloor(floorTopY: number) {
-    const h = 32;
-    const floor: PlatformDef = {
+  private seedStarter(floorTopY: number) {
+    const H = maxVerticalReach();
+    const dy = 0.34 * H;
+    const prefab = 'platform-grass-3-final';
+    const w = prefabWidthPx(this.map, prefab, this.scale);
+    const xCenter = SCREEN_W * 0.5;
+    const yTop = floorTopY - dy;
+    const xLeft = Math.round(xCenter - w / 2);
+    const p: PlatformDef = {
       id: String(this.nextId++),
       type: 'platform',
-      prefab: (PREF_FLOOR as unknown as string) || 'platform-wood-3-final',
-      x: 0,
-      y: Math.round(floorTopY),
+      prefab,
+      x: xLeft,
+      y: Math.round(yTop),
       scale: this.scale,
-      collision: { solid: true, topY: Math.round(floorTopY), left: 0, right: SCREEN_W, width: SCREEN_W, height: h }
+      collision: this.col(prefab, xLeft, Math.round(yTop))
     };
-    this.platforms.push(floor);
-    this.topMostY = Math.min(this.topMostY, floor.y);
+    this.platforms.push(p); 
+    this.topMostY = Math.min(this.topMostY, p.y);
+    
+    // Generate decorations for starter platform
+    this.generateDecorationsFor(p);
   }
 
-  private ensureInitialPlatforms(floorTopY: number) {
-    const startNames = ['platform-wood-3-final','platform-grass-1-final'] as const;
-    let last = { xCenter: SCREEN_W * 0.5, yTop: floorTopY };
-    for (let i=0;i<2;i++) {
-      const name = startNames[i % startNames.length];
-      const H = maxVerticalReach(PHYSICS.jumpVel, PHYSICS.gravity);
-      const dyUp = (0.30 + 0.06*i) * H;
-      const dx = (i===0? -0.18 : 0.22) * SCREEN_W;
-      last = this.placeRelative(name, last.xCenter, last.yTop, dx, dyUp);
-    }
-  }
-
-  private takeDifficulty(): Difficulty {
-    if (!this.bag.length) this.bag = refillBag(this.rng);
-    return this.bag.pop()!;
-  }
-
-  private buildCollision(prefab: string, x: number, yTop: number, w: number, h: number): PlatformDef['collision'] {
-    const segs = prefabTopSolidSegmentsPx(this.mapName, prefab, this.scale);
+  private col(prefab: string, x: number, yTop: number): PlatformDef['collision'] {
+    const segs = prefabTopSolidSegmentsPx(this.map, prefab, this.scale);
     if (!segs.length) {
-      return { solid: true, topY: yTop, left: x, right: x + w, width: w, height: h };
+      const w = prefabWidthPx(this.map, prefab, this.scale);
+      const h = prefabHeightPx(this.map, prefab, this.scale);
+      return {solid: true, topY: yTop, left: x, right: x + w, width: w, height: h};
     }
-    const topY = yTop + Math.min(...segs.map(s => s.y));
-    return { solid: true, topY, left: x, right: x + w, width: w, height: h };
+    const w = prefabWidthPx(this.map, prefab, this.scale);
+    const h = prefabHeightPx(this.map, prefab, this.scale);
+    const topY = yTop + Math.min(...segs.map(s => s.y)); 
+    return {solid: true, topY, left: x, right: x + w, width: w, height: h};
   }
 
   private generateDecorationsFor(platform: PlatformDef): void {
@@ -247,12 +193,12 @@ export class EnhancedPlatformManager {
     if (!isGrass3 && !isGrass1) return;
     
     // Get platform collision segments to determine available tiles
-    const segments = prefabTopSolidSegmentsPx(this.mapName, platform.prefab, this.scale);
+    const segments = prefabTopSolidSegmentsPx(this.map, platform.prefab, this.scale);
     const segment = segments[0];
     if (!segment) return;
     
     const surfaceWorldY = platform.collision.topY;
-    const tileSize = getTileSize(this.mapName) * this.scale;
+    const tileSize = getTileSize(this.map) * this.scale;
     const numTiles = Math.floor(segment.w / tileSize);
     
     // Track which tiles are occupied to prevent overlaps
@@ -269,10 +215,10 @@ export class EnhancedPlatformManager {
           const tileIndex = availableTiles[Math.floor(this.rng() * availableTiles.length)];
           const treeType = treeConfig.types[Math.floor(this.rng() * treeConfig.types.length)];
           
-          const treeWidth = prefabWidthPx(this.mapName, treeType, this.scale);
+          const treeWidth = prefabWidthPx(this.map, treeType, this.scale);
           if (treeWidth <= tileSize) {
             const treeWorldX = platform.x + segment.x + (tileIndex * tileSize);
-            const treeWorldY = alignPrefabYToSurfaceTop(this.mapName, treeType, surfaceWorldY, this.scale);
+            const treeWorldY = alignPrefabYToSurfaceTop(this.map, treeType, surfaceWorldY, this.scale);
             
             const tree: PlatformDef = {
               id: String(this.nextId++),
@@ -301,7 +247,7 @@ export class EnhancedPlatformManager {
           const mushroomType = mushroomConfig.types[Math.floor(this.rng() * mushroomConfig.types.length)];
           
           const mushroomWorldX = platform.x + segment.x + (tileIndex * tileSize);
-          const mushroomWorldY = alignPrefabYToSurfaceTop(this.mapName, mushroomType, surfaceWorldY, this.scale);
+          const mushroomWorldY = alignPrefabYToSurfaceTop(this.map, mushroomType, surfaceWorldY, this.scale);
           
           const mushroom: PlatformDef = {
             id: String(this.nextId++),
@@ -332,7 +278,7 @@ export class EnhancedPlatformManager {
             const grassType = grassConfig.types[Math.floor(this.rng() * grassConfig.types.length)];
             
             const grassWorldX = platform.x + segment.x + (tileIndex * tileSize);
-            const grassWorldY = alignPrefabYToSurfaceTop(this.mapName, grassType, surfaceWorldY, this.scale);
+            const grassWorldY = alignPrefabYToSurfaceTop(this.map, grassType, surfaceWorldY, this.scale);
             
             const grass: PlatformDef = {
               id: String(this.nextId++),
@@ -350,219 +296,178 @@ export class EnhancedPlatformManager {
     }
   }
 
+  private highest(): {xCenter: number; yTop: number} | null { 
+    if (!this.platforms.length) return null; 
+    const top = this.platforms.reduce((a, b) => a.y < b.y ? a : b); 
+    const w = prefabWidthPx(this.map, top.prefab, this.scale); 
+    return {xCenter: top.x + w / 2, yTop: top.y}; 
+  }
+
   private placeAbsolute(prefab: string, xLeft: number, yTop: number) {
-    const w = prefabWidthPx(this.mapName, prefab, this.scale);
-    const h = prefabHeightPx(this.mapName, prefab, this.scale);
-    const platform: PlatformDef = {
+    const w = prefabWidthPx(this.map, prefab, this.scale);
+    const h = prefabHeightPx(this.map, prefab, this.scale);
+    const p: PlatformDef = {
       id: String(this.nextId++),
       type: 'platform',
       prefab,
       x: Math.round(xLeft),
       y: Math.round(yTop),
       scale: this.scale,
-      collision: this.buildCollision(prefab, Math.round(xLeft), Math.round(yTop), w, h),
+      collision: this.col(prefab, Math.round(xLeft), Math.round(yTop))
     };
-    this.platforms.push(platform);
-    this.topMostY = Math.min(this.topMostY, platform.y);
+    this.platforms.push(p); 
+    this.topMostY = Math.min(this.topMostY, p.y);
     
     // Generate decorations for this platform
-    this.generateDecorationsFor(platform);
+    this.generateDecorationsFor(p);
     
-    const xCenter = platform.x + w/2;
-    return { xCenter, yTop: platform.y };
+    return {xCenter: p.x + w / 2, yTop: p.y};
   }
 
-  private placeRelative(prefab: string, fromXCenter: number, fromYTop: number, dx: number, dyUp: number) {
-    // For edge-locked prefabs, convert to absolute placement at edges
+  private placeRelative(prefab: string, fromX: number, fromY: number, dx: number, dy: number) {
     if (prefab === PREF_LEFT) {
-      const w = prefabWidthPx(this.mapName, prefab, this.scale);
-      const xLeft = 0;
-      const yTop = fromYTop - dyUp;
-      return this.placeAbsolute(prefab, xLeft, yTop);
+      const w = prefabWidthPx(this.map, prefab, this.scale);
+      return this.placeAbsolute(prefab, 0, fromY - dy);
     }
     if (prefab === PREF_RIGHT) {
-      const w = prefabWidthPx(this.mapName, prefab, this.scale);
-      const xLeft = SCREEN_W - w;
-      const yTop = fromYTop - dyUp;
-      return this.placeAbsolute(prefab, xLeft, yTop);
+      const w = prefabWidthPx(this.map, prefab, this.scale);
+      return this.placeAbsolute(prefab, SCREEN_W - w, fromY - dy);
     }
-
-    // Normal centered placement
-    const xCenter = (fromXCenter + dx + SCREEN_W) % SCREEN_W;
-    const yTop = fromYTop - dyUp;
-
-    const w = prefabWidthPx(this.mapName, prefab, this.scale);
-    const h = prefabHeightPx(this.mapName, prefab, this.scale);
-    const xLeft = Math.round(xCenter - w/2);
-
-    const platform: PlatformDef = {
-      id: String(this.nextId++),
-      type: 'platform',
-      prefab,
-      x: xLeft,
-      y: Math.round(yTop),
-      scale: this.scale,
-      collision: this.buildCollision(prefab, xLeft, Math.round(yTop), w, h),
-    };
-    this.platforms.push(platform);
-    this.topMostY = Math.min(this.topMostY, platform.y);
-    
-    // Generate decorations for this platform
-    this.generateDecorationsFor(platform);
-    
-    return { xCenter, yTop: platform.y };
+    const xCenter = (fromX + dx + SCREEN_W) % SCREEN_W; 
+    const yTop = fromY - dy; 
+    const w = prefabWidthPx(this.map, prefab, this.scale); 
+    return this.placeAbsolute(prefab, Math.round(xCenter - w / 2), yTop);
   }
 
-  private tryPlaceEdgePair(fromXCenter: number, fromYTop: number, dyUpBase: number): boolean {
-    // Reduced frequency by PAIR_CHANCE; this function now optional, pairs are special spice
-    const leftW  = prefabWidthPx(this.mapName, PREF_LEFT,  this.scale);
-    const rightW = prefabWidthPx(this.mapName, PREF_RIGHT, this.scale);
-    const leftCenter  = leftW/2;
-    const rightCenter = SCREEN_W - rightW/2;
-
-    const options: Array<'leftLower'|'rightLower'> = fromXCenter < SCREEN_W*0.5 ? ['leftLower','rightLower'] : ['rightLower','leftLower'];
-
-    const H = maxVerticalReach(PHYSICS.jumpVel, PHYSICS.gravity);
-    const dyUp1 = Math.min(dyUpBase, 0.45 * H);
-
-    for (const perm of options) {
-      if (perm === 'leftLower') {
-        const dx1 = leftCenter - fromXCenter;
-        if (!reachable(dx1, dyUp1)) continue;
-        this.placeAbsolute(PREF_LEFT, 0, fromYTop - dyUp1);
-        this.placeAbsolute(PREF_RIGHT, SCREEN_W - rightW, (fromYTop - dyUp1) - VERT_PAIR_GAP);
-        return true;
-      } else {
-        const dx1 = rightCenter - fromXCenter;
-        if (!reachable(dx1, dyUp1)) continue;
-        this.placeAbsolute(PREF_RIGHT, SCREEN_W - rightW, fromYTop - dyUp1);
-        this.placeAbsolute(PREF_LEFT, 0, (fromYTop - dyUp1) - VERT_PAIR_GAP);
-        return true;
+  private tryEdgePair(fromX: number, fromY: number, dyBase: number): boolean {
+    const leftW = prefabWidthPx(this.map, PREF_LEFT, this.scale);
+    const rightW = prefabWidthPx(this.map, PREF_RIGHT, this.scale);
+    const leftC = leftW / 2;
+    const rightC = SCREEN_W - rightW / 2; 
+    const H = maxVerticalReach(); 
+    const dy1 = Math.min(dyBase, 0.45 * H);
+    const order = fromX < SCREEN_W * 0.5 ? ['left', 'right'] : ['right', 'left'];
+    
+    for (const which of order) {
+      const target = which === 'left' ? leftC : rightC;
+      const dx = target - fromX; 
+      if (!reachable(dx, dy1)) continue;
+      
+      if (which === 'left') { 
+        this.placeAbsolute(PREF_LEFT, 0, fromY - dy1); 
+        this.placeAbsolute(PREF_RIGHT, SCREEN_W - rightW, (fromY - dy1) - VERT_PAIR_GAP); 
+      } else { 
+        this.placeAbsolute(PREF_RIGHT, SCREEN_W - rightW, fromY - dy1); 
+        this.placeAbsolute(PREF_LEFT, 0, (fromY - dy1) - VERT_PAIR_GAP); 
       }
+      return true;
     }
     return false;
   }
 
   private generateAhead(cameraTopY: number): boolean {
-    let changed = false;
-    const targetY = cameraTopY - AHEAD_SCREENS * SCREEN_H;
-    let from = this.findHighestRecent();
+    let changed = false; 
+    const targetY = cameraTopY - AHEAD_SCREENS * SCREEN_H; 
+    let from = this.highest(); 
     if (!from) return false;
-
+    
     let attempts = 0;
     while (this.topMostY > targetY) {
-      const diff = this.takeDifficulty();
-      const dyUp = pickDyForDifficulty(diff, this.rng);
-
-      // Sometimes place a special edge pair (rare now)
+      const diff = (this.bag.length ? this.bag : this.bag = refillBag(this.rng)).pop() as Difficulty;
+      const dy = pickDy(diff, this.rng);
+      
       if (this.rng() < PAIR_CHANCE) {
-        if (this.tryPlaceEdgePair(from.xCenter, from.yTop, dyUp)) {
-          // Continue from upper of the pair (right upper center)
-          const rightW = prefabWidthPx(this.mapName, PREF_RIGHT, this.scale);
-          const upperXCenter = (SCREEN_W - rightW/2);
-          const upperYTop = Math.min(...this.platforms.slice(-2).map(p => p.y));
-          from = { xCenter: upperXCenter, yTop: upperYTop };
-          attempts = 0;
-          changed = true;
-          continue;
+        if (this.tryEdgePair(from.xCenter, from.yTop, dy)) { 
+          const rightW = prefabWidthPx(this.map, PREF_RIGHT, this.scale); 
+          from = {xCenter: SCREEN_W - rightW / 2, yTop: Math.min(...this.platforms.slice(-2).map(p => p.y))}; 
+          attempts = 0; 
+          changed = true; 
+          continue; 
         }
       }
-
-      // Weighted prefab pick (grass-heavy)
-      const prefab = weightedPickPrefab(this.rng);
-
-      // Target X: if edge-locked prefab, force edge center; else use center-biased sampler
-      let targetX: number;
-      if (prefab === PREF_LEFT) {
-        const w = prefabWidthPx(this.mapName, PREF_LEFT, this.scale);
-        targetX = w/2;
-      } else if (prefab === PREF_RIGHT) {
-        const w = prefabWidthPx(this.mapName, PREF_RIGHT, this.scale);
-        targetX = SCREEN_W - w/2;
-      } else {
-        targetX = sampleTargetX(this.rng);
-      }
-
+      
+      const prefab = weightedPrefab(this.rng);
+      const targetX = (prefab === PREF_LEFT) ? (prefabWidthPx(this.map, PREF_LEFT, this.scale) / 2)
+                    : (prefab === PREF_RIGHT) ? (SCREEN_W - prefabWidthPx(this.map, PREF_RIGHT, this.scale) / 2)
+                    : sampleTargetX(this.rng);
       const dx = targetX - from.xCenter;
-
-      if (reachable(dx, dyUp)) {
-        from = this.placeRelative(prefab, from.xCenter, from.yTop, dx, dyUp);
-        attempts = 0;
-        changed = true;
-      } else {
-        attempts++;
-        if (attempts >= MAX_ATTEMPTS) {
-          // Rescue: easy straight-up ledge
-          const rescuePrefab = 'platform-grass-1-final';
-          const dy = 0.35 * maxVerticalReach(PHYSICS.jumpVel, PHYSICS.gravity);
-          from = this.placeRelative(rescuePrefab, from.xCenter, from.yTop, 0, dy);
-          attempts = 0;
-          changed = true;
-        }
+      
+      if (reachable(dx, dy)) { 
+        from = this.placeRelative(prefab, from.xCenter, from.yTop, dx, dy); 
+        attempts = 0; 
+        changed = true; 
+      } else { 
+        attempts += 1; 
+        if (attempts >= MAX_ATTEMPTS) { 
+          from = this.placeRelative('platform-grass-1-final', from.xCenter, from.yTop, 0, 0.35 * maxVerticalReach()); 
+          attempts = 0; 
+          changed = true; 
+        } 
       }
     }
     return changed;
   }
 
-  private findHighestRecent(): { xCenter: number; yTop: number } | null {
-    if (!this.platforms.length) return null;
-    // Highest (smallest y)
-    const top = this.platforms.reduce((a,b) => (a.y < b.y ? a : b));
-    const w = prefabWidthPx(this.mapName, top.prefab, this.scale);
-    const xCenter = top.x + w/2;
-    return { xCenter, yTop: top.y };
-  }
-
-  private startFadeOut(p: PlatformDef) {
-    const now = Date.now();
-    p.fadeOut = { startTime: now, duration: 600, opacity: 1.0 };
-  }
-
-  // ---------------- Public API used by GameScreen ----------------
-
-  getAllPlatforms(): PlatformDef[] { return this.platforms.slice(); }
-  getSolidPlatforms(): PlatformDef[] { return this.platforms.filter(p => p.collision?.solid); }
+  // Public API - PRESERVED WITH FIXES
+  getAllPlatforms() { return this.platforms.slice(); }
+  getSolidPlatforms() { return this.platforms.filter(p => p.collision?.solid); }
   
-  /** death floor coordinate for hazard/lava band rendering */
-  getDeathFloor(): { y: number } { return { y: this.deathFloorY }; }
-  /** alias if your LavaLayer expects a 'getLavaY' */
-  getLavaY(): number { return this.deathFloorY; }
-
-  getPlatformsNearPlayer(x: number, y: number, radius: number, solidsOnly = true): PlatformDef[] {
-    const r = Math.max(8, radius|0);
+  getPlatformsNearPlayer(x: number, y: number, r: number, solidsOnly = true) {
     const out: PlatformDef[] = [];
+    const R = Math.max(8, r | 0);
     for (const p of this.platforms) {
-      if (solidsOnly && !p.collision?.solid) continue;
-      const { x: px, y: py, w, h } = platformBounds(this.mapName, p, this.scale);
-      if (x >= px - r && x <= px + w + r && y >= py - r && y <= py + h + r) out.push(p);
-    }
+      if (solidsOnly && !p.collision?.solid) continue; 
+      const b = bounds(this.map, p, this.scale); 
+      if (x >= b.x - R && x <= b.x + b.w + R && y >= b.y - R && y <= b.y + b.h + R) out.push(p);
+    } 
     return out;
   }
+  
+  isDeathFloor(_p: PlatformDef) { return false; }
 
-  isDeathFloor(_p: PlatformDef): boolean { return false; }
-
-  updateForCamera(newCameraY: number, _playerWorldY: number): boolean {
-    const cameraTopY = newCameraY - SCREEN_H * 0.5;
-    const changed = this.generateAhead(cameraTopY);
-    const culled = this.cullBelow(this.deathFloorY + SCREEN_H * 0.5);
-    return changed || culled;
+  updateForCamera(newCameraY: number, _playerY: number) { 
+    const top = newCameraY - SCREEN_H * 0.5; 
+    const gen = this.generateAhead(top); 
+    const culled = this.cullBelow((this.getDeathFloor()?.y ?? 0) + SCREEN_H * 0.5); 
+    return gen || culled; 
   }
 
-  updateDeathFloor(playerWorldY: number): void {
-    // FIX: Keep lava about 1/2 screen below player but only move UP (follow player's highest point)
-    // In this coordinate system: lower playerWorldY = player climbed higher
-    const newDeathFloorY = playerWorldY + SCREEN_H * 0.5;
-    const oldDeathFloorY = this.deathFloorY;
-    
-    // Only move death floor UP (to lower Y values) - never let it fall back down
-    this.deathFloorY = Math.min(this.deathFloorY, newDeathFloorY);
+  // Death floor (lava) tracking - FIXED TO PRESERVE OBJECT SHAPE FOR GAMESCREEN
+  updateDeathFloor(playerWorldY: number) {
+    if (playerWorldY <= 0) {
+      this.deathFloor = null;
+      this.highestPlayerY = 0;
+      return;
+    }
+    if (playerWorldY < this.highestPlayerY || this.highestPlayerY === 0) this.highestPlayerY = playerWorldY;
+    if (!this.deathFloor) {
+      const spawnY = this.highestPlayerY + SCREEN_H * 0.5; // FIXED: Use 0.5 instead of 600
+      this.deathFloor = { 
+        id: `death_${this.nextId++}`, 
+        type: 'platform', 
+        prefab: 'floor-final', 
+        x: -SCREEN_W / 2, 
+        y: spawnY, 
+        scale: this.scale,
+        collision: { solid: true, topY: spawnY + 40, left: -SCREEN_W / 2, right: SCREEN_W * 1.5, width: SCREEN_W * 2, height: 100 } 
+      };
+    } else {
+      const target = this.highestPlayerY + SCREEN_H * 0.5; // FIXED: Use 0.5 instead of 600
+      // FIXED: Use Math.min for upward movement
+      if (target < this.deathFloor.y) {
+        this.deathFloor.y = target;
+        if (this.deathFloor.collision) this.deathFloor.collision.topY = target + 40;
+      }
+    }
   }
+  
+  getDeathFloor() { return this.deathFloor; }
+  getLavaY() { return this.deathFloor?.y ?? 0; }
 
-  updateHighestPointOnLanding(yTop: number): void {
-    // FIX: Only increment when player reaches a genuinely new high point
-    // Track the highest point the player has ever reached
-    if (!this.highestPlayerY || yTop < this.highestPlayerY) {
-      this.highestPlayerY = yTop;
+  updateHighestPointOnLanding(yTop: number) { 
+    // FIXED: Only increment when player reaches a genuinely new high point
+    if (!this.playerHighestY || yTop < this.playerHighestY) {
+      this.playerHighestY = yTop;
       // Only increment bands when making significant progress (half screen)
       const progressScreens = Math.floor((this.topMostY - yTop) / (SCREEN_H * 0.5));
       if (progressScreens > this.bandsGeneratedAtCurrentLevel) {
@@ -571,23 +476,24 @@ export class EnhancedPlatformManager {
     }
   }
 
-  updateFadeOutAnimations(): boolean {
-    const now = Date.now();
-    let changed = false;
-    for (const p of this.platforms) {
-      if (!p.fadeOut) continue;
-      const t = (now - p.fadeOut.startTime) / p.fadeOut.duration;
-      const newOpacity = Math.max(0, 1 - t);
-      if (newOpacity !== p.fadeOut.opacity) {
-        p.fadeOut.opacity = newOpacity;
-        changed = true;
-      }
+  updateFadeOutAnimations() { 
+    const now = Date.now(); 
+    let changed = false; 
+    for (const p of this.platforms) { 
+      if (!p.fadeOut) continue; 
+      const t = (now - p.fadeOut.startTime) / p.fadeOut.duration; 
+      const op = Math.max(0, 1 - t); 
+      if (op !== p.fadeOut.opacity) { 
+        p.fadeOut.opacity = op; 
+        changed = true; 
+      } 
     }
-    // Remove fully faded and track what was removed
+    
+    // Remove fully faded and track what was removed - PRESERVED
     const beforePlatforms = this.platforms.filter(p => p.type === 'platform').length;
     const beforeDecorations = this.platforms.filter(p => p.type === 'decoration').length;
     
-    this.platforms = this.platforms.filter(p => !p.fadeOut || (p.fadeOut.opacity ?? 1) > 0);
+    this.platforms = this.platforms.filter(p => !p.fadeOut || (p.fadeOut.opacity ?? 1) > 0); 
     
     const afterPlatforms = this.platforms.filter(p => p.type === 'platform').length;
     const afterDecorations = this.platforms.filter(p => p.type === 'decoration').length;
@@ -601,27 +507,27 @@ export class EnhancedPlatformManager {
     return changed || (platformsRemoved + decorationsRemoved > 0);
   }
 
-  private cullBelow(killBelowY: number): boolean {
+  private cullBelow(killBelowY: number) { 
     let changed = false;
     this.platformsFadedThisFrame = 0;
     this.platformsPrunedThisFrame = 0;
     
     // Start fade for items below killBelowY
-    for (const p of this.platforms) {
-      if (p.y > killBelowY && !p.fadeOut) {
-        this.startFadeOut(p);
+    for (const p of this.platforms) { 
+      if (p.y > killBelowY && !p.fadeOut) { 
+        p.fadeOut = {startTime: Date.now(), duration: 600, opacity: 1}; 
         changed = true;
         this.platformsFadedThisFrame++;
-      }
+      } 
     }
     
     // Hard prune items far below (safety, even if fade not ticked)
-    const HARD_PRUNE = killBelowY + SCREEN_H * 2.5;
+    const HARD = killBelowY + SCREEN_H * 2.5; 
     const before = this.platforms.length;
     const beforePlatforms = this.platforms.filter(p => p.type === 'platform').length;
     const beforeDecorations = this.platforms.filter(p => p.type === 'decoration').length;
     
-    this.platforms = this.platforms.filter(p => p.y <= HARD_PRUNE);
+    this.platforms = this.platforms.filter(p => p.y <= HARD); 
     
     const afterPlatforms = this.platforms.filter(p => p.type === 'platform').length;
     const afterDecorations = this.platforms.filter(p => p.type === 'decoration').length;
@@ -636,16 +542,16 @@ export class EnhancedPlatformManager {
     return changed || (this.platforms.length !== before);
   }
 
-  // Debug helpers used in your GameScreen
-  debugPlatformsNearY(_worldY: number, _range = 200): void { /* no-op */ }
-
-  getCurrentChallenge(): { level: string; bandsAtLevel: number; totalBands: number } {
-    const total = Math.max(1, Math.floor((this.topMostY - this.deathFloorY) / SCREEN_H));
+  // Debug - PRESERVED
+  debugPlatformsNearY(_y: number, _r = 200) {} 
+  
+  getCurrentChallenge() { 
+    const total = Math.max(1, Math.floor((this.topMostY - (this.deathFloor?.y ?? (this.topMostY + SCREEN_H))) / SCREEN_H)); 
     return { 
       level: 'Mixed (E/M/H)', 
       bandsAtLevel: this.bandsGeneratedAtCurrentLevel, // Progress screens climbed
       totalBands: total 
-    };
+    }; 
   }
 
   getCullingStats() {

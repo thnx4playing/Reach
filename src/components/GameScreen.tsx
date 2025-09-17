@@ -10,6 +10,7 @@ import SafeTouchBoundary from '../infra/SafeTouchBoundary';
 import { PrefabNode } from '../render/PrefabNode';
 import ParallaxBackground from '../render/ParallaxBackground';
 import HazardBand from '../render/HazardBand';
+import GroundBand from '../render/GroundBand';
 import { PARALLAX } from '../content/parallaxConfig';
 import type { LevelData } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, prefabWidthPx } from '../content/maps';
@@ -818,7 +819,15 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         prunedThisFrame={cullingInfo.prunedThisFrame}
       />
       
-        
+      {/* Ground Band - Dirt with grass top */}
+      <GroundBand
+        width={SCREEN_W}
+        height={Math.max(0, SCREEN_H - floorTopY)}
+        y={floorTopY}
+        opacity={1}
+        timeMs={hazardAnimationTime}
+      />
+      
         {/* Hazard Band - Improved lava rendering */}
         {(() => {
           const df = platformManager.current?.getDeathFloor?.();
