@@ -14,7 +14,7 @@ import { PARALLAX } from '../content/parallaxConfig';
 import type { LevelData } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, prefabWidthPx } from '../content/maps';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
-import { PlatformManager } from '../systems/platform/PlatformManager';
+import { EnhancedPlatformManager } from '../systems/platform/PlatformManager';
 import { checkPlatformCollision } from '../physics/PlatformCollision';
 import type { PlatformDef } from '../systems/platform/types';
 import idleJson from '../../assets/character/dash/Idle_atlas.json';
@@ -25,6 +25,7 @@ import { useHealth } from '../systems/health/HealthContext';
 import HealthBar from './HealthBar';
 import { DeathModal } from '../ui/DeathModal';
 import { useDamageAnimations } from '../systems/health/useDamageAnimations';
+import { ChallengeDebugOverlay } from './ChallengeDebugOverlay';
 
 // Audio system imports
 import { useSound } from '../audio/useSound';
@@ -61,7 +62,7 @@ const JUMP_VELOCITY = JUMP_VEL;
 const ACCEL = 1200;  // INCREASED: Faster acceleration
 const DECEL = 800;   // INCREASED: Faster deceleration  
 const PAD_SIZE = 140;
-const FOOT_OFFSET = 1;
+const FOOT_OFFSET = 0;
 
 interface GameScreenProps {
   levelData: LevelData;
@@ -180,8 +181,15 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const playerWorldY = floorTopY - zRef.current;
 
   // NEW UNIFIED PLATFORM SYSTEM
-  const platformManager = useRef<PlatformManager | null>(null);
+  const platformManager = useRef<EnhancedPlatformManager | null>(null);
   const [allPlatforms, setAllPlatforms] = useState<PlatformDef[]>([]);
+  
+  // Challenge info state
+  const [challengeInfo, setChallengeInfo] = useState({ 
+    level: 'Easy', 
+    bandsAtLevel: 0, 
+    totalBands: 0 
+  });
 
   // World->Screen convert: give us the screen Y from a world Y
   const worldYToScreenY = (worldY: number) =>
@@ -190,7 +198,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // Initialize platform manager
   useEffect(() => {
     if (!platformManager.current) {
-      platformManager.current = new PlatformManager(levelData.mapName as any, floorTopY, 2);
+      platformManager.current = new EnhancedPlatformManager(levelData.mapName as any, floorTopY, 2);
       setAllPlatforms(platformManager.current.getAllPlatforms());
     }
   }, [levelData.mapName, floorTopY]);
@@ -623,6 +631,11 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
             if (platformManager.current && frameCount % 15 === 0) { // Every 15 frames (250ms at 60fps)
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
+              
+              // Update challenge info
+              const challenge = platformManager.current.getCurrentChallenge();
+              setChallengeInfo(challenge);
+              
               if (platformsChanged) {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
               }
@@ -650,6 +663,11 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
             if (platformManager.current && frameCount % 15 === 0) {
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
+              
+              // Update challenge info
+              const challenge = platformManager.current.getCurrentChallenge();
+              setChallengeInfo(challenge);
+              
               if (platformsChanged) {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
               }
@@ -754,6 +772,14 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         height={28} 
         x={SCREEN_W - 160 + 20} 
         y={50}
+      />
+      
+      {/* Challenge Debug Overlay */}
+      <ChallengeDebugOverlay
+        challengeLevel={challengeInfo.level}
+        bandsAtLevel={challengeInfo.bandsAtLevel}
+        totalBands={challengeInfo.totalBands}
+        playerHeight={floorTopY - z}
       />
       
         

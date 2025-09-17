@@ -176,18 +176,18 @@ export const PREFAB_FOOT_INSET: Record<string, number> = {
   'platform-wood-2-right-final': 0,
   'platform-wood-3-final': 0,
   
-  // Decorations (positive inset moves them DOWN onto surface)
-  'tree-large-final': -2,
-  'tree-medium-final': -2,
-  'tree-small-final': -2,
-  'mushroom-red-small-final': 9,   // 14px - 5px = 9px (moved up 5px)
-  'mushroom-green-small-final': 9,
-  'grass-1-final': 12,  // 11px + 1px = 12px (moved back down 1px)
-  'grass-2-final': 12,
-  'grass-3-final': 12,
-  'grass-4-final': 12,
-  'grass-5-final': 12,
-  'grass-6-final': 12,
+  // Decorations (set to 0; PlatformManager handles their Y)
+  'tree-large-final': 0,
+  'tree-medium-final': 0,
+  'tree-small-final': 0,
+  'mushroom-red-small-final': 0,
+  'mushroom-green-small-final': 0,
+  'grass-1-final': 0,
+  'grass-2-final': 0,
+  'grass-3-final': 0,
+  'grass-4-final': 0,
+  'grass-5-final': 0,
+  'grass-6-final': 0,
 };
 
 export function alignPrefabYToSurfaceTop(
