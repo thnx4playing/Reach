@@ -434,29 +434,30 @@ export class EnhancedPlatformManager {
 
   // Death floor (lava) tracking - FIXED TO PRESERVE OBJECT SHAPE FOR GAMESCREEN
   updateDeathFloor(playerWorldY: number) {
-    if (playerWorldY <= 0) {
-      this.deathFloor = null;
-      this.highestPlayerY = 0;
-      return;
+    // Always update the highest point reached (smallest Y value = highest position)
+    if (this.highestPlayerY === 0 || playerWorldY < this.highestPlayerY) {
+      this.highestPlayerY = playerWorldY;
     }
-    if (playerWorldY < this.highestPlayerY || this.highestPlayerY === 0) this.highestPlayerY = playerWorldY;
+    
+    // Calculate where the lava should be (below the player's highest point)
+    const targetLavaY = this.highestPlayerY + SCREEN_H * 0.5;
+    
     if (!this.deathFloor) {
-      const spawnY = this.highestPlayerY + SCREEN_H * 0.5; // FIXED: Use 0.5 instead of 600
+      // Create initial death floor
       this.deathFloor = { 
         id: `death_${this.nextId++}`, 
         type: 'platform', 
         prefab: 'floor-final', 
         x: -SCREEN_W / 2, 
-        y: spawnY, 
-        scale: this.scale,
-        collision: { solid: true, topY: spawnY + 40, left: -SCREEN_W / 2, right: SCREEN_W * 1.5, width: SCREEN_W * 2, height: 100 } 
+        y: targetLavaY, 
+        scale: this.scale, 
+        collision: { solid: true, topY: targetLavaY + 40, left: -SCREEN_W / 2, right: SCREEN_W * 1.5, width: SCREEN_W * 2, height: 100 } 
       };
     } else {
-      const target = this.highestPlayerY + SCREEN_H * 0.5; // FIXED: Use 0.5 instead of 600
-      // FIXED: Use Math.min for upward movement
-      if (target < this.deathFloor.y) {
-        this.deathFloor.y = target;
-        if (this.deathFloor.collision) this.deathFloor.collision.topY = target + 40;
+      // Always move the lava to follow the player's highest point
+      this.deathFloor.y = targetLavaY;
+      if (this.deathFloor.collision) {
+        this.deathFloor.collision.topY = targetLavaY + 40;
       }
     }
   }

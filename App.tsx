@@ -19,7 +19,7 @@ type AppScreen = 'home' | 'game';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
-  const [selectedMap, setSelectedMap] = useState<MapName>('dark');
+  const [selectedMap, setSelectedMap] = useState<MapName>('grassy');
   const [currentLevel, setCurrentLevel] = useState<LevelData | null>(null);
 
   const handleMapSelect = (map: MapName) => {

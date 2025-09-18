@@ -8,10 +8,8 @@ import { DashCharacter } from './DashCharacter';
 import RNGHControls from '../input/RNGHControls';
 import SafeTouchBoundary from '../infra/SafeTouchBoundary';
 import { PrefabNode } from '../render/PrefabNode';
-import ParallaxBackground from '../render/ParallaxBackground';
 import HazardBand from '../render/HazardBand';
 import GroundBand from '../render/GroundBand';
-import { PARALLAX } from '../content/parallaxConfig';
 import type { LevelData } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, prefabWidthPx } from '../content/maps';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
@@ -26,8 +24,6 @@ import { useHealth } from '../systems/health/HealthContext';
 import HealthBar from './HealthBar';
 import { DeathModal } from '../ui/DeathModal';
 import { useDamageAnimations } from '../systems/health/useDamageAnimations';
-import { ChallengeDebugOverlay } from './ChallengeDebugOverlay';
-import { CullingDebugOverlay } from './CullingDebugOverlay';
 
 // Audio system imports
 import { useSound } from '../audio/useSound';
@@ -187,23 +183,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const platformManager = useRef<EnhancedPlatformManager | null>(null);
   const [allPlatforms, setAllPlatforms] = useState<PlatformDef[]>([]);
   
-  // Challenge info state
-  const [challengeInfo, setChallengeInfo] = useState({ 
-    level: 'Easy', 
-    bandsAtLevel: 0, 
-    totalBands: 0 
-  });
-
-  // Culling info state
-  const [cullingInfo, setCullingInfo] = useState({
-    totalPlatforms: 0,
-    totalDecorations: 0,
-    totalCulled: 0,
-    platformsCulled: 0,
-    decorationsCulled: 0,
-    fadedThisFrame: 0,
-    prunedThisFrame: 0
-  });
 
   // World->Screen convert: give us the screen Y from a world Y
   const worldYToScreenY = (worldY: number) =>
@@ -648,13 +627,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
               
-              // Update challenge info
-              const challenge = platformManager.current.getCurrentChallenge();
-              setChallengeInfo(challenge);
-              
-              // Update culling info
-              const culling = platformManager.current.getCullingStats();
-              setCullingInfo(culling);
               
               if (platformsChanged) {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
@@ -684,13 +656,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
               
-              // Update challenge info
-              const challenge = platformManager.current.getCurrentChallenge();
-              setChallengeInfo(challenge);
-              
-              // Update culling info
-              const culling = platformManager.current.getCullingStats();
-              setCullingInfo(culling);
               
               if (platformsChanged) {
                 setAllPlatforms(platformManager.current.getAllPlatforms());
@@ -731,33 +696,46 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         style={styles.canvas}
         pointerEvents="none"
       >
-          {/* Parallax Background with hazard clipping */}
-          {(() => {
-            const df = platformManager.current?.getDeathFloor?.();
-            const hazardTopWorld = df?.y ?? null;
-            const hazardTopScreen = hazardTopWorld != null ? worldYToScreenY(hazardTopWorld) : null;
-            
-            const parallaxVariant = PARALLAX[levelData.mapName as keyof typeof PARALLAX] || PARALLAX.grassy;
-            
-            return (
-              <ParallaxBackground
-                variant={parallaxVariant}
-                cameraY={cameraY}
-                timeSec={elapsedSec}
-                viewport={{ width: SCREEN_W, height: SCREEN_H }}
-                floorTopY={floorTopY} // ADD THIS LINE
-                clipMaxY={
-                  hazardTopScreen != null && hazardTopScreen < SCREEN_H + 100
-                    ? Math.max(0, Math.min(hazardTopScreen + 50, SCREEN_H)) // 50px overlap
-                    : undefined
-                }
-              />
-            );
-          })()}
+          <Rect x={0} y={0} width={SCREEN_W} height={SCREEN_H} color="#87CEEB" />
           
-          {/* Render world under camera transform */}
+{useMemo(() => {
+            const cloudData = [
+              { baseX: SCREEN_W * 0.2, y: SCREEN_H * 0.15, size: 35, speed: 0.8 },
+              { baseX: SCREEN_W * 0.5, y: SCREEN_H * 0.25, size: 40, speed: 1.2 },
+              { baseX: SCREEN_W * 0.8, y: SCREEN_H * 0.2, size: 30, speed: 0.6 },
+              { baseX: SCREEN_W * 0.35, y: SCREEN_H * 0.4, size: 25, speed: 1.0 },
+            ];
+            
+            const animTime = Math.floor(elapsedSec * 15) / 15;
+            
+            return cloudData.map((cloud, i) => {
+              const drift = Math.sin(animTime * 0.1 * cloud.speed + i) * 8;
+              const x = cloud.baseX + drift;
+              
+              return (
+                <Group key={i}>
+                  <Rect 
+                    x={x - cloud.size * 0.5} 
+                    y={cloud.y} 
+                    width={cloud.size} 
+                    height={cloud.size * 0.6} 
+                    color="white" 
+                    opacity={0.8}
+                  />
+                  <Rect 
+                    x={x - cloud.size * 0.3} 
+                    y={cloud.y - cloud.size * 0.2} 
+                    width={cloud.size * 0.6} 
+                    height={cloud.size * 0.6} 
+                    color="white" 
+                    opacity={0.9}
+                  />
+                </Group>
+              );
+            });
+          }, [Math.floor(elapsedSec * 4)])}
+          
           <Group transform={[{ translateY: -cameraY }]}>
-            {/* Platforms - PERFORMANCE: Only render visible platforms */}
             {visiblePlatforms.map((platform) => (
               <PrefabNode
                 key={platform.id}
@@ -771,7 +749,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
             ))}
             
             
-            {/* Character now renders in WORLD space with camera transform */}
             <DashCharacter
               floorTopY={floorTopY}
               posX={xRef.current}
@@ -800,24 +777,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
         y={50}
       />
       
-      {/* Challenge Debug Overlay */}
-      <ChallengeDebugOverlay
-        challengeLevel={challengeInfo.level}
-        bandsAtLevel={challengeInfo.bandsAtLevel}
-        totalBands={challengeInfo.totalBands}
-        playerHeight={floorTopY - z}
-      />
-      
-      {/* Culling Debug Overlay */}
-      <CullingDebugOverlay
-        totalPlatforms={cullingInfo.totalPlatforms}
-        totalDecorations={cullingInfo.totalDecorations}
-        totalCulled={cullingInfo.totalCulled}
-        platformsCulled={cullingInfo.platformsCulled}
-        decorationsCulled={cullingInfo.decorationsCulled}
-        fadedThisFrame={cullingInfo.fadedThisFrame}
-        prunedThisFrame={cullingInfo.prunedThisFrame}
-      />
       
       {/* Ground Band - Dirt with grass top */}
       {(() => {

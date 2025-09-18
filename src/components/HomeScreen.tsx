@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Pressable, Dimensions, Image } from 'react-native';
-import { Canvas } from '@shopify/react-native-skia';
-import { PrefabNode } from '../render/PrefabNode';
+import { StyleSheet, View, Text, Pressable, Dimensions, Image, Modal, FlatList } from 'react-native';
 import type { MapName } from '../content/maps';
 
 const { width, height } = Dimensions.get('window');
@@ -12,7 +10,8 @@ interface HomeScreenProps {
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onMapSelect, onPlay }) => {
-  const [selectedMap, setSelectedMap] = useState<MapName | null>(null);
+  const [selectedMap, setSelectedMap] = useState<MapName>('grassy');
+  const [dropdownVisible, setDropdownVisible] = useState(false);
 
   const maps: { name: MapName; displayName: string; color: string }[] = [
     { name: 'dark', displayName: 'Dark', color: '#2C2C2C' },
@@ -25,13 +24,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onMapSelect, onPlay }) =
   const handleMapSelect = (map: MapName) => {
     setSelectedMap(map);
     onMapSelect(map);
+    setDropdownVisible(false);
   };
+  
+  const toggleDropdown = () => {
+    setDropdownVisible(!dropdownVisible);
+  };
+  
+  const selectedMapData = maps.find(m => m.name === selectedMap);
 
   const handlePlay = () => {
-    if (selectedMap) {
-      onPlay();
-    }
+    onPlay();
   };
+  
+  // Set initial map selection on mount
+  React.useEffect(() => {
+    onMapSelect('grassy');
+  }, [onMapSelect]);
 
   return (
     <View style={styles.container}>
@@ -43,46 +52,59 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onMapSelect, onPlay }) =
       />
       
       <View style={styles.content}>
-        <Text style={styles.title}>Reach!</Text>
-        <Text style={styles.subtitle}>Select a Map</Text>
-        
-        <View style={styles.mapGrid}>
-          {maps.map((map) => (
-            <Pressable
-              key={map.name}
-              style={[
-                styles.mapButton,
-                { backgroundColor: map.color },
-                selectedMap === map.name && styles.selectedMapButton
-              ]}
-              onPress={() => handleMapSelect(map.name)}
-            >
-              <Text style={[
-                styles.mapButtonText,
-                selectedMap === map.name && styles.selectedMapButtonText
-              ]}>
-                {map.displayName}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        
-        <Pressable
-          style={[
-            styles.playButton,
-            !selectedMap && styles.disabledButton
-          ]}
-          onPress={handlePlay}
-          disabled={!selectedMap}
-        >
-          <Text style={[
-            styles.playButtonText,
-            !selectedMap && styles.disabledButtonText
-          ]}>
-            {selectedMap ? 'Play' : 'Select a Map'}
-          </Text>
-        </Pressable>
       </View>
+      
+      {/* Bottom controls */}
+      <View style={styles.bottomControls}>
+        <View style={styles.controlsRow}>
+          <Pressable style={styles.dropdownButton} onPress={toggleDropdown}>
+            <Text style={styles.dropdownButtonText}>
+              {selectedMapData?.displayName || 'Select Map'}
+            </Text>
+            <Text style={styles.dropdownArrow}>▼</Text>
+          </Pressable>
+          
+          <Pressable
+            style={styles.playButton}
+            onPress={handlePlay}
+          >
+            <Text style={styles.playButtonText}>Play</Text>
+          </Pressable>
+        </View>
+      </View>
+      
+      {/* Custom Dropdown Modal */}
+      <Modal
+        visible={dropdownVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDropdownVisible(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay} 
+          onPress={() => setDropdownVisible(false)}
+        >
+          <View style={styles.dropdownModal}>
+            {maps.map((map) => (
+              <Pressable
+                key={map.name}
+                style={[
+                  styles.dropdownItem,
+                  selectedMap === map.name && styles.selectedDropdownItem
+                ]}
+                onPress={() => handleMapSelect(map.name)}
+              >
+                <Text style={[
+                  styles.dropdownItemText,
+                  selectedMap === map.name && styles.selectedDropdownItemText
+                ]}>
+                  {map.displayName}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -102,67 +124,89 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'flex-start',
+  },
+  bottomControls: {
+    position: 'absolute',
+    bottom: 75,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    paddingTop: 60,
     paddingHorizontal: 20,
   },
-  title: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#2C2C2C',
-    marginBottom: 10,
-    textShadowColor: 'rgba(255, 255, 255, 0.8)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
-  },
-  subtitle: {
-    fontSize: 24,
-    color: '#2C2C2C',
-    marginBottom: 40,
-    fontWeight: '600',
-  },
-  mapGrid: {
+  controlsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginBottom: 30,
-    gap: 8,
+    alignItems: 'center',
+    gap: 15,
   },
-  mapButton: {
-    width: 80,
+  dropdownButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    width: 140,
     height: 50,
-    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+  },
+  dropdownButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2C2C2C',
+    flex: 1,
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 3,
+  },
+  dropdownModal: {
+    backgroundColor: 'white',
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: '#4CAF50',
+    minWidth: 160,
+    maxWidth: 200,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 16,
   },
-  selectedMapButton: {
-    borderColor: '#FFD700',
-    transform: [{ scale: 1.05 }],
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
-  mapButtonText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+  selectedDropdownItem: {
+    backgroundColor: '#E8F5E8',
   },
-  selectedMapButtonText: {
-    color: '#FFD700',
-    textShadowColor: 'rgba(0, 0, 0, 1)',
+  dropdownItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2C2C2C',
+    textAlign: 'center',
+  },
+  selectedDropdownItemText: {
+    color: '#4CAF50',
+    fontWeight: '700',
   },
   playButton: {
     backgroundColor: '#4CAF50',
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     paddingVertical: 15,
     borderRadius: 25,
     shadowColor: '#000',
@@ -170,19 +214,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 8,
-  },
-  disabledButton: {
-    backgroundColor: '#CCCCCC',
+    minWidth: 80,
+    alignItems: 'center',
   },
   playButtonText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#FFFFFF',
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
-  },
-  disabledButtonText: {
-    color: '#666666',
   },
 });
