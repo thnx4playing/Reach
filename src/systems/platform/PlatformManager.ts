@@ -81,6 +81,48 @@ function reachable(dx: number, dyUp: number) {
   return Math.abs(dx) <= dxMax * (1 - m);
 }
 
+// PERFORMANCE: Spatial indexing class for platform culling
+class SpatialIndex {
+  private grid = new Map<string, PlatformDef[]>();
+  private cellSize = 200; // Adjust based on your needs
+  
+  private getGridKey(x: number, y: number): string {
+    const gridX = Math.floor(x / this.cellSize);
+    const gridY = Math.floor(y / this.cellSize);
+    return `${gridX},${gridY}`;
+  }
+  
+  addPlatform(platform: PlatformDef) {
+    const key = this.getGridKey(platform.x, platform.y);
+    const cell = this.grid.get(key) || [];
+    cell.push(platform);
+    this.grid.set(key, cell);
+  }
+  
+  getPlatformsNear(x: number, y: number, radius: number): PlatformDef[] {
+    const platforms: PlatformDef[] = [];
+    const cellsToCheck = Math.ceil(radius / this.cellSize);
+    
+    for (let dx = -cellsToCheck; dx <= cellsToCheck; dx++) {
+      for (let dy = -cellsToCheck; dy <= cellsToCheck; dy++) {
+        const checkX = x + dx * this.cellSize;
+        const checkY = y + dy * this.cellSize;
+        const key = this.getGridKey(checkX, checkY);
+        const cell = this.grid.get(key);
+        if (cell) {
+          platforms.push(...cell);
+        }
+      }
+    }
+    
+    return platforms;
+  }
+  
+  clear() {
+    this.grid.clear();
+  }
+}
+
 function pickDy(diff: Difficulty, rng: RNG) {
   const H = maxVerticalReach();
   const r = {E: [.28, .45], M: [.45, .62], H: [.62, .80]}[diff];
@@ -118,6 +160,7 @@ export class EnhancedPlatformManager {
   private scale: number;
   private rng: RNG;
   private bag: Difficulty[] = [];
+  private instanceId: string;
   private nextId = 1;
   private platforms: PlatformDef[] = [];
   private topMostY: number;
@@ -133,10 +176,23 @@ export class EnhancedPlatformManager {
   private totalDecorationsCulled = 0;
   private platformsFadedThisFrame = 0;
   private platformsPrunedThisFrame = 0;
+  
+  // PERFORMANCE: Cache expensive calculations
+  private reachabilityCache = new Map<string, boolean>();
+  private maxCacheSize = 1000;
+  
+  // REMOVED: Decoration pooling system (was causing React key conflicts)
+  
+  // PERFORMANCE: Spatial indexing for platform culling
+  private spatialIndex = new SpatialIndex();
 
   constructor(mapName: MapName, floorTopY: number, scale = 2) {
     this.map = mapName; 
     this.scale = scale;
+    
+    // Create unique instance ID to prevent conflicts across resets
+    this.instanceId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    
     const d = new Date(); 
     const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
     this.rng = makeSeededRNG(seed); 
@@ -145,6 +201,11 @@ export class EnhancedPlatformManager {
 
     // No prefab floor. Start with one centered platform slightly above floor.
     this.seedStarter(floorTopY);
+  }
+
+  // Generate truly unique IDs that won't conflict across resets
+  private generateUniqueId(): string {
+    return `${this.instanceId}_${this.nextId++}`;
   }
 
   private seedStarter(floorTopY: number) {
@@ -156,7 +217,7 @@ export class EnhancedPlatformManager {
     const yTop = floorTopY - dy;
     const xLeft = Math.round(xCenter - w / 2);
     const p: PlatformDef = {
-      id: String(this.nextId++),
+      id: this.generateUniqueId(),
       type: 'platform',
       prefab,
       x: xLeft,
@@ -184,6 +245,8 @@ export class EnhancedPlatformManager {
     return {solid: true, topY, left: x, right: x + w, width: w, height: h};
   }
 
+  // REMOVED: Pooling methods (were causing React key conflicts)
+  
   private generateDecorationsFor(platform: PlatformDef): void {
     if (!platform.collision?.solid) return;
     
@@ -221,7 +284,7 @@ export class EnhancedPlatformManager {
             const treeWorldY = alignPrefabYToSurfaceTop(this.map, treeType, surfaceWorldY, this.scale);
             
             const tree: PlatformDef = {
-              id: String(this.nextId++),
+              id: this.generateUniqueId(), // Fixed: Unique decoration IDs
               type: 'decoration',
               prefab: treeType,
               x: Math.round(treeWorldX),
@@ -229,6 +292,7 @@ export class EnhancedPlatformManager {
               scale: this.scale,
             };
             this.platforms.push(tree);
+            this.spatialIndex.addPlatform(tree);
             occupiedTiles.add(tileIndex);
           }
         }
@@ -250,7 +314,7 @@ export class EnhancedPlatformManager {
           const mushroomWorldY = alignPrefabYToSurfaceTop(this.map, mushroomType, surfaceWorldY, this.scale);
           
           const mushroom: PlatformDef = {
-            id: String(this.nextId++),
+            id: this.generateUniqueId(), // Fixed: Unique decoration IDs
             type: 'decoration',
             prefab: mushroomType,
             x: Math.round(mushroomWorldX),
@@ -258,6 +322,7 @@ export class EnhancedPlatformManager {
             scale: this.scale,
           };
           this.platforms.push(mushroom);
+          this.spatialIndex.addPlatform(mushroom);
           occupiedTiles.add(tileIndex);
         }
       }
@@ -281,7 +346,7 @@ export class EnhancedPlatformManager {
             const grassWorldY = alignPrefabYToSurfaceTop(this.map, grassType, surfaceWorldY, this.scale);
             
             const grass: PlatformDef = {
-              id: String(this.nextId++),
+              id: this.generateUniqueId(), // Fixed: Unique decoration IDs
               type: 'decoration',
               prefab: grassType,
               x: Math.round(grassWorldX),
@@ -289,6 +354,7 @@ export class EnhancedPlatformManager {
               scale: this.scale,
             };
             this.platforms.push(grass);
+            this.spatialIndex.addPlatform(grass);
             occupiedTiles.add(tileIndex);
           }
         }
@@ -307,7 +373,7 @@ export class EnhancedPlatformManager {
     const w = prefabWidthPx(this.map, prefab, this.scale);
     const h = prefabHeightPx(this.map, prefab, this.scale);
     const p: PlatformDef = {
-      id: String(this.nextId++),
+      id: this.generateUniqueId(),
       type: 'platform',
       prefab,
       x: Math.round(xLeft),
@@ -317,6 +383,9 @@ export class EnhancedPlatformManager {
     };
     this.platforms.push(p); 
     this.topMostY = Math.min(this.topMostY, p.y);
+    
+    // PERFORMANCE: Add to spatial index
+    this.spatialIndex.addPlatform(p);
     
     // Generate decorations for this platform
     this.generateDecorationsFor(p);
@@ -365,7 +434,71 @@ export class EnhancedPlatformManager {
     return false;
   }
 
+  // PERFORMANCE: Cache reachability calculations
+  private cachedReachable(dx: number, dyUp: number): boolean {
+    const key = `${Math.round(dx)},${Math.round(dyUp)}`;
+    
+    if (this.reachabilityCache.has(key)) {
+      return this.reachabilityCache.get(key)!;
+    }
+    
+    const result = reachable(dx, dyUp);
+    
+    // Limit cache size to prevent memory bloat
+    if (this.reachabilityCache.size > this.maxCacheSize) {
+      const firstKey = this.reachabilityCache.keys().next().value;
+      if (firstKey !== undefined) {
+        this.reachabilityCache.delete(firstKey);
+      }
+    }
+    
+    this.reachabilityCache.set(key, result);
+    return result;
+  }
+  
+  // PERFORMANCE: Batch platform generation to reduce per-frame cost
+  private generateBatch(targetY: number, batchSize = 5): boolean {
+    let generated = 0;
+    let from = this.highest();
+    if (!from) return false;
+    
+    while (this.topMostY > targetY && generated < batchSize) {
+      const diff = (this.bag.length ? this.bag : this.bag = refillBag(this.rng)).pop() as Difficulty;
+      const dy = pickDy(diff, this.rng);
+      
+      if (this.rng() < PAIR_CHANCE) {
+        if (this.tryEdgePair(from.xCenter, from.yTop, dy)) { 
+          const rightW = prefabWidthPx(this.map, PREF_RIGHT, this.scale); 
+          from = {xCenter: SCREEN_W - rightW / 2, yTop: Math.min(...this.platforms.slice(-2).map(p => p.y))}; 
+          generated++;
+          continue; 
+        }
+      }
+      
+      const prefab = weightedPrefab(this.rng);
+      const targetX = (prefab === PREF_LEFT) ? (prefabWidthPx(this.map, PREF_LEFT, this.scale) / 2)
+                    : (prefab === PREF_RIGHT) ? (SCREEN_W - prefabWidthPx(this.map, PREF_RIGHT, this.scale) / 2)
+                    : sampleTargetX(this.rng);
+      const dx = targetX - from.xCenter;
+      
+      if (this.cachedReachable(dx, dy)) { 
+        from = this.placeRelative(prefab, from.xCenter, from.yTop, dx, dy); 
+        generated++;
+      } else { 
+        from = this.placeRelative('platform-grass-1-final', from.xCenter, from.yTop, 0, 0.35 * maxVerticalReach()); 
+        generated++;
+      }
+    }
+    
+    return generated > 0;
+  }
+  
   private generateAhead(cameraTopY: number): boolean {
+    // PERFORMANCE: Use batch generation instead of generating all at once
+    return this.generateBatch(cameraTopY - AHEAD_SCREENS * SCREEN_H);
+  }
+  
+  private generateAheadOld(cameraTopY: number): boolean {
     let changed = false; 
     const targetY = cameraTopY - AHEAD_SCREENS * SCREEN_H; 
     let from = this.highest(); 
@@ -392,7 +525,7 @@ export class EnhancedPlatformManager {
                     : sampleTargetX(this.rng);
       const dx = targetX - from.xCenter;
       
-      if (reachable(dx, dy)) { 
+      if (this.cachedReachable(dx, dy)) { 
         from = this.placeRelative(prefab, from.xCenter, from.yTop, dx, dy); 
         attempts = 0; 
         changed = true; 
@@ -413,9 +546,12 @@ export class EnhancedPlatformManager {
   getSolidPlatforms() { return this.platforms.filter(p => p.collision?.solid); }
   
   getPlatformsNearPlayer(x: number, y: number, r: number, solidsOnly = true) {
+    // PERFORMANCE: Use spatial index for faster lookups
+    const nearbyPlatforms = this.spatialIndex.getPlatformsNear(x, y, r);
     const out: PlatformDef[] = [];
     const R = Math.max(8, r | 0);
-    for (const p of this.platforms) {
+    
+    for (const p of nearbyPlatforms) {
       if (solidsOnly && !p.collision?.solid) continue; 
       const b = bounds(this.map, p, this.scale); 
       if (x >= b.x - R && x <= b.x + b.w + R && y >= b.y - R && y <= b.y + b.h + R) out.push(p);
@@ -445,7 +581,7 @@ export class EnhancedPlatformManager {
     if (!this.deathFloor) {
       // Create initial death floor
       this.deathFloor = { 
-        id: `death_${this.nextId++}`, 
+        id: this.generateUniqueId(), // Fixed: Unique death floor ID 
         type: 'platform', 
         prefab: 'floor-final', 
         x: -SCREEN_W / 2, 
@@ -494,6 +630,8 @@ export class EnhancedPlatformManager {
     const beforePlatforms = this.platforms.filter(p => p.type === 'platform').length;
     const beforeDecorations = this.platforms.filter(p => p.type === 'decoration').length;
     
+    // Remove fully faded platforms
+    
     this.platforms = this.platforms.filter(p => !p.fadeOut || (p.fadeOut.opacity ?? 1) > 0); 
     
     const afterPlatforms = this.platforms.filter(p => p.type === 'platform').length;
@@ -528,7 +666,15 @@ export class EnhancedPlatformManager {
     const beforePlatforms = this.platforms.filter(p => p.type === 'platform').length;
     const beforeDecorations = this.platforms.filter(p => p.type === 'decoration').length;
     
+    // Hard prune platforms that are far below
+    
     this.platforms = this.platforms.filter(p => p.y <= HARD); 
+    
+    // PERFORMANCE: Clear and rebuild spatial index after culling
+    this.spatialIndex.clear();
+    for (const platform of this.platforms) {
+      this.spatialIndex.addPlatform(platform);
+    }
     
     const afterPlatforms = this.platforms.filter(p => p.type === 'platform').length;
     const afterDecorations = this.platforms.filter(p => p.type === 'decoration').length;

@@ -7,6 +7,7 @@ import { DashCharacter } from './DashCharacter';
 import RNGHControls from '../input/RNGHControls';
 import SafeTouchBoundary from '../infra/SafeTouchBoundary';
 import { PrefabNode } from '../render/PrefabNode';
+import { PlatformRenderer } from './PlatformRenderer';
 import HazardBand from '../render/HazardBand';
 import GroundBand from '../render/GroundBand';
 import type { LevelData } from '../content/levels';
@@ -17,6 +18,7 @@ import { checkPlatformCollision } from '../physics/PlatformCollision';
 import type { PlatformDef } from '../systems/platform/types';
 import idleJson from '../../assets/character/dash/Idle_atlas.json';
 import { dbg } from '../utils/dbg';
+import { useThrottledAnimation } from '../hooks/useThrottledAnimation';
 
 // Health system imports
 import { useHealth } from '../systems/health/HealthContext';
@@ -160,6 +162,10 @@ const GameComponent: React.FC<{
   const [dirX, setDirX] = useState(0);
   const [speedLevel, setSpeedLevel] = useState<'idle'|'run'>('idle');
   
+  // PERFORMANCE: Cache player box calculation
+  const playerBoxRef = useRef<any>(null);
+  const [needsBoxUpdate, setNeedsBoxUpdate] = useState(true);
+  
   // Refs for physics - Initialize to starting values
   const xRef = useRef(SCREEN_W * 0.5);
   const zRef = useRef(0);
@@ -222,7 +228,17 @@ const GameComponent: React.FC<{
   useEffect(() => {
     console.log('Initializing new platform manager...');
     platformManager.current = new EnhancedPlatformManager(levelData.mapName as any, floorTopY, 2);
-    setAllPlatforms(platformManager.current.getAllPlatforms());
+    
+    // Force clear any existing platforms to prevent key conflicts
+    setAllPlatforms([]);
+    
+    // Then set the new platforms
+    setTimeout(() => {
+      if (platformManager.current) {
+        setAllPlatforms(platformManager.current.getAllPlatforms());
+      }
+    }, 0);
+    
   }, [levelData.mapName, floorTopY]); // No dependency on resetKey needed - component will be fresh
 
   // PERFORMANCE OPTIMIZATION: Viewport culling - only render visible platforms
@@ -275,6 +291,9 @@ const GameComponent: React.FC<{
   
   // Add this state to prevent collision spam:
   const collisionCooldownRef = useRef<number>(0);
+  
+  // PERFORMANCE: Throttle platform collision checks
+  const collisionCheckRef = useRef(0);
 
   // Pad callback
   const onPad = useCallback((o: { dirX: -1|0|1; magX: number }) => {
@@ -350,10 +369,9 @@ const GameComponent: React.FC<{
 
       // PERFORMANCE: Removed extensive validation - trust the refs
       
-      // PERFORMANCE: Cache getPlayerBox result and only recalculate when needed
+      // PERFORMANCE: Optimized player box calculation with throttling
       let box = currentPlayerBox;
-      if (!box || frameCount % 2 === 0) { // Only recalculate every 2nd frame
-        const boxStart = performance.now();
+      if (!box || needsBoxUpdate || frameCount % 3 === 0) { // Only recalculate every 3rd frame or when needed
         box = getPlayerBox({
           xRefIsLeftEdge: true,
           x: xRef.current,
@@ -363,8 +381,8 @@ const GameComponent: React.FC<{
           colW: COL_W,
           colH: COL_H,
         });
-        const boxTime = performance.now() - boxStart;
         setCurrentPlayerBox(box);
+        setNeedsBoxUpdate(false);
       }
       
       // PERFORMANCE: Optimized state update frequency for smooth animation
@@ -412,16 +430,18 @@ const GameComponent: React.FC<{
       // Update horizontal position
       xRef.current += vxRef.current * dt;
 
-      // Screen wrap
+      // Screen wrap - trigger box update when wrapping
       const spriteW = CHAR_W;
       const spriteCenter = xRef.current + spriteW * 0.5;
       
       if (spriteCenter < 0) {
         xRef.current += SCREEN_W;
         didWrapRef.current = true;
+        setNeedsBoxUpdate(true); // Force box recalculation after wrap
       } else if (spriteCenter > SCREEN_W) {
         xRef.current -= SCREEN_W;
         didWrapRef.current = true;
+        setNeedsBoxUpdate(true); // Force box recalculation after wrap
       }
 
       const newBoxStart = performance.now();
@@ -482,8 +502,9 @@ const GameComponent: React.FC<{
       // ==== ROBUST PLATFORM COLLISION (Replace existing collision code) ====
       // This goes AFTER vertical physics but BEFORE floor collision
 
-      // Check for platform collisions when falling (more lenient speed threshold)
-      if (vzRef.current < -20) { // Lower threshold - even slow falling should check
+      // PERFORMANCE: Only check collisions every 2nd frame for better performance
+      collisionCheckRef.current++;
+      if (collisionCheckRef.current % 2 === 0 && vzRef.current < -20) { // Lower threshold - even slow falling should check
         
         // Get player position
         const playerWorldX = xRef.current + CHAR_W / 2;
@@ -630,7 +651,7 @@ const GameComponent: React.FC<{
         onGroundRef.current = false;
         consumeJump(jumpStateRef.current);
         playJumpSound();
-        
+        setNeedsBoxUpdate(true); // Force box recalculation after jump
       }
 
 
@@ -651,9 +672,8 @@ const GameComponent: React.FC<{
           if (Math.abs(newCameraY - cameraY) > 1) { // Only update if significant change
             setCameraY(newCameraY);
             
-            // Throttle platform generation to prevent frame drops
-            // Only update platforms every 15 frames to reduce performance impact
-            if (platformManager.current && frameCount % 15 === 0) { // Every 15 frames (250ms at 60fps)
+            // PERFORMANCE: Less frequent camera updates for platform generation
+            if (platformManager.current && frameCount % 30 === 0) { // Reduced from 15 to 30 frames
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
               
@@ -682,7 +702,7 @@ const GameComponent: React.FC<{
           if (Math.abs(newCameraY - cameraY) > 1) {
             setCameraY(newCameraY);
             
-            if (platformManager.current && frameCount % 15 === 0) {
+            if (platformManager.current && frameCount % 30 === 0) {
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
               
@@ -766,17 +786,12 @@ const GameComponent: React.FC<{
           }, [Math.floor(elapsedSec * 4)])}
           
           <Group transform={[{ translateY: -cameraY }]}>
-            {visiblePlatforms.map((platform) => (
-              <PrefabNode
-                key={platform.id}
-                map={levelData.mapName}
-                name={platform.prefab}
-                x={platform.x}
-                y={platform.y}
-                scale={platform.scale}
-                opacity={platform.fadeOut?.opacity ?? 1.0}
-              />
-            ))}
+            {/* PERFORMANCE: Use memoized platform renderer */}
+            <PlatformRenderer 
+              platforms={visiblePlatforms}
+              mapName={levelData.mapName}
+              opacity={1.0}
+            />
             
             
             <DashCharacter
