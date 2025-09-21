@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Text, Pressable } from 'react-native';
 import { Canvas, Rect, Group } from '@shopify/react-native-skia';
@@ -69,46 +68,85 @@ interface GameScreenProps {
 
 // Inner game component that uses health hooks
 const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
+  // Health system integration
+  const { isDead, bars, takeDamage, hits, sys, reset: resetHealth } = useHealth();
+  
+  // Audio system integration
+  const { playJumpSound, playDamageSound, playDeathSound, playFireDeathSound } = useSound();
+  const maxHits = sys.state.maxHits;
+  const { isHurt } = useDamageAnimations();
+
+  // Create a key that changes when we want to force a complete reset
+  const [resetKey, setResetKey] = useState(0);
+  
   // Handlers for death modal
   const handleRestart = useCallback(() => {
+    console.log('Restarting game...');
+    
+    // Reset health first
     resetHealth();
     
-    // Reset player position to spawn point
-    xRef.current = SCREEN_W * 0.5;
-    zRef.current = 0;
-    vxRef.current = 0;
-    vzRef.current = 0;
-    dirXRef.current = 0;
-    speedRef.current = 'idle';
-    onGroundRef.current = true;
+    // Force a complete component reset by changing the key
+    // This will unmount and remount the entire component tree
+    setResetKey(prev => prev + 1);
     
-    // Reset fall damage state
-    peakZRef.current = 0;
-    fallingRef.current = false;
-    vzPrevRef.current = 0;
-    onGroundPrevRef.current = true;
-    
-    // Reset jump state
-    if (jumpStateRef.current) {
-      jumpStateRef.current = initJumpState();
-    }
-    
-    // Update state variables to trigger re-render
-    setX(SCREEN_W * 0.5);
-    setZ(0);
-    setDirX(0);
-    setSpeedLevel('idle');
-    setCameraY(0);
-    setCameraX(0);
-    setFrameCount(0);
-    setElapsedSec(0);
-    
-  }, []);
+  }, [resetHealth]);
 
   const handleMainMenu = useCallback(() => {
     onBack();
   }, [onBack]);
 
+  return (
+    <GameComponent 
+      key={resetKey} // This key forces a complete reset when changed
+      levelData={levelData}
+      onRestart={handleRestart}
+      onMainMenu={handleMainMenu}
+      isDead={isDead}
+      bars={bars}
+      takeDamage={takeDamage}
+      hits={hits}
+      maxHits={maxHits}
+      isHurt={isHurt}
+      playJumpSound={playJumpSound}
+      playDamageSound={playDamageSound}
+      playDeathSound={playDeathSound}
+      playFireDeathSound={playFireDeathSound}
+    />
+  );
+};
+
+// Separate component that will be completely reset when key changes
+const GameComponent: React.FC<{
+  levelData: LevelData;
+  onRestart: () => void;
+  onMainMenu: () => void;
+  isDead: boolean;
+  bars: number;
+  takeDamage: (n?: number) => boolean;
+  hits: number;
+  maxHits: number;
+  isHurt: boolean;
+  playJumpSound: () => Promise<void>;
+  playDamageSound: () => Promise<void>;
+  playDeathSound: () => Promise<void>;
+  playFireDeathSound: () => Promise<void>;
+}> = ({ 
+  levelData, 
+  onRestart, 
+  onMainMenu, 
+  isDead, 
+  bars, 
+  takeDamage, 
+  hits, 
+  maxHits, 
+  isHurt,
+  playJumpSound,
+  playDamageSound,
+  playDeathSound,
+  playFireDeathSound
+}) => {
+  
   const [cameraX, setCameraX] = useState(0);
   const [cameraY, setCameraY] = useState(0);
   const [currentPlayerBox, setCurrentPlayerBox] = useState<{left: number; right: number; top: number; bottom: number; cx: number; feetY: number; w: number; h: number} | null>(null);
@@ -122,7 +160,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const [dirX, setDirX] = useState(0);
   const [speedLevel, setSpeedLevel] = useState<'idle'|'run'>('idle');
   
-  // Refs for physics
+  // Refs for physics - Initialize to starting values
   const xRef = useRef(SCREEN_W * 0.5);
   const zRef = useRef(0);
   const vxRef = useRef(0);
@@ -132,7 +170,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const onGroundRef = useRef(true);
   const didWrapRef = useRef(false);
   const feetYRef = useRef(levelData?.floorTopY ?? 0);
-  const frameCountRef = useRef(0); // Shared frame count for debug logging
+  const frameCountRef = useRef(0);
   
   // Fall damage state machine (z-based)
   const peakZRef = useRef<number>(0);
@@ -141,18 +179,10 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const onGroundPrevRef = useRef<boolean>(true);
 
   const FALL_THRESHOLD = SCREEN_H / 5;
-
-  // Health system integration
-  const { isDead, bars, takeDamage, hits, sys, reset: resetHealth } = useHealth();
   
   // Track previous death state to detect when player dies
   const prevIsDeadRef = useRef(isDead);
   const deathTypeRef = useRef<'fire' | 'normal' | null>(null);
-  
-  // Audio system integration
-  const { playJumpSound, playDamageSound, playDeathSound, playFireDeathSound } = useSound();
-  const maxHits = sys.state.maxHits;
-  const { isHurt } = useDamageAnimations();
   
   // Update feetY ref with current player position
   const feetY = currentPlayerBox?.feetY ?? (levelData?.floorTopY ?? 0);
@@ -179,7 +209,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // Calculate player's world Y position
   const playerWorldY = floorTopY - zRef.current;
 
-  // NEW UNIFIED PLATFORM SYSTEM
+  // NEW UNIFIED PLATFORM SYSTEM - Reset on component mount
   const platformManager = useRef<EnhancedPlatformManager | null>(null);
   const [allPlatforms, setAllPlatforms] = useState<PlatformDef[]>([]);
   
@@ -188,13 +218,12 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const worldYToScreenY = (worldY: number) =>
     SCREEN_H - (floorTopY - worldY) - cameraY;
 
-  // Initialize platform manager
+  // Initialize platform manager - This will be fresh on each reset
   useEffect(() => {
-    if (!platformManager.current) {
-      platformManager.current = new EnhancedPlatformManager(levelData.mapName as any, floorTopY, 2);
-      setAllPlatforms(platformManager.current.getAllPlatforms());
-    }
-  }, [levelData.mapName, floorTopY]);
+    console.log('Initializing new platform manager...');
+    platformManager.current = new EnhancedPlatformManager(levelData.mapName as any, floorTopY, 2);
+    setAllPlatforms(platformManager.current.getAllPlatforms());
+  }, [levelData.mapName, floorTopY]); // No dependency on resetKey needed - component will be fresh
 
   // PERFORMANCE OPTIMIZATION: Viewport culling - only render visible platforms
   const visiblePlatforms = useMemo(() => {
@@ -237,7 +266,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   const CEIL_PAD = 0.5;
   const CROSS_PAD = Math.max(1, Math.round(0.10 * TILE));
 
-  // Jump controller with buffer + coyote
+  // Jump controller with buffer + coyote - Initialize fresh
   const jumpStateRef = useRef(initJumpState());
 
   // Diagnostic refs for vz tracking
@@ -265,15 +294,16 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
     noteJumpPressed(jumpStateRef.current);
   }, []);
 
-
-
-  // SIMPLIFIED: No more complex platform slabs - just use platforms directly
-
-  // One-time spawn on floor
+  // One-time spawn on floor - This runs fresh on each component mount
   useEffect(() => {
+    console.log('Setting initial player position...');
     zRef.current = 0;
     setZ(0);
-  }, []);
+    xRef.current = SCREEN_W * 0.5;
+    setX(SCREEN_W * 0.5);
+    setCameraY(0);
+    setCameraX(0);
+  }, []); // Empty dependency - runs once per component mount
 
   // Detect when player dies and play appropriate death sound
   useEffect(() => {
@@ -687,7 +717,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, []); // Minimal dependencies
+  }, []); // Empty dependency - fresh on each component mount
 
   return (
     <SafeTouchBoundary>
@@ -836,8 +866,8 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
 
       {/* Death modal */}
       <DeathModal 
-        onRestart={handleRestart}
-        onMainMenu={handleMainMenu}
+        onRestart={onRestart}
+        onMainMenu={onMainMenu}
       />
       
       {/* Controls overlay */}
