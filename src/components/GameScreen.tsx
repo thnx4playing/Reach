@@ -224,6 +224,32 @@ const GameComponent: React.FC<{
   const worldYToScreenY = (worldY: number) =>
     SCREEN_H - (floorTopY - worldY) - cameraY;
 
+  // FIX: Use refs to avoid dependency issues
+  const lastUpdateTimeRef = useRef(0);
+  const allPlatformsRef = useRef<PlatformDef[]>([]);
+  
+  // Update refs when state changes
+  useEffect(() => {
+    allPlatformsRef.current = allPlatforms;
+  }, [allPlatforms]);
+  
+  // Stable update function using refs
+  const updatePlatforms = useCallback((newPlatforms: PlatformDef[]) => {
+    const now = Date.now();
+    
+    // Throttle platform updates to max 30 FPS
+    if (now - lastUpdateTimeRef.current < 33) return;
+    
+    // Only update if the array actually changed (not just reordered)
+    const current = allPlatformsRef.current;
+    if (newPlatforms.length !== current.length || 
+        newPlatforms[0]?.id !== current[0]?.id ||
+        newPlatforms[newPlatforms.length - 1]?.id !== current[current.length - 1]?.id) {
+      setAllPlatforms(newPlatforms);
+      lastUpdateTimeRef.current = now;
+    }
+  }, []); // Stable reference with no dependencies
+
   // Initialize platform manager - This will be fresh on each reset
   useEffect(() => {
     console.log('Initializing new platform manager...');
@@ -235,27 +261,33 @@ const GameComponent: React.FC<{
     // Then set the new platforms
     setTimeout(() => {
       if (platformManager.current) {
-        setAllPlatforms(platformManager.current.getAllPlatforms());
+        updatePlatforms(platformManager.current.getAllPlatforms());
       }
     }, 0);
     
-  }, [levelData.mapName, floorTopY]); // No dependency on resetKey needed - component will be fresh
+  }, [levelData.mapName, floorTopY]); // FIXED: Remove updatePlatforms dependency to prevent infinite loop
 
-  // PERFORMANCE OPTIMIZATION: Viewport culling - only render visible platforms
+  // FIX: More efficient visibility culling with memoization
   const visiblePlatforms = useMemo(() => {
     if (!allPlatforms.length) return [];
     
-    const viewportTop = cameraY - SCREEN_H * 0.5; // 50% margin above camera
-    const viewportBottom = cameraY + SCREEN_H * 1.5; // 50% margin below camera
+    // Cache the calculation to avoid repeated work
+    const viewportTop = cameraY - SCREEN_H * 0.5;
+    const viewportBottom = cameraY + SCREEN_H * 1.5;
     
-    return allPlatforms.filter(platform => {
-      const platformTop = platform.y;
+    // Use a more efficient filter
+    const visible = [];
+    for (let i = 0; i < allPlatforms.length; i++) {
+      const platform = allPlatforms[i];
       const platformBottom = platform.y + (platform.collision?.height || 32);
       
-      // Platform is visible if it overlaps with viewport
-      return platformBottom > viewportTop && platformTop < viewportBottom;
-    });
-  }, [allPlatforms, cameraY]);
+      if (platformBottom > viewportTop && platform.y < viewportBottom) {
+        visible.push(platform);
+      }
+    }
+    
+    return visible;
+  }, [allPlatforms, Math.floor(cameraY / 10)]); // Round cameraY to reduce recalculations
 
   // Add this after platformManager initialization to validate the setup:
   useEffect(() => {
@@ -673,13 +705,12 @@ const GameComponent: React.FC<{
             setCameraY(newCameraY);
             
             // PERFORMANCE: Less frequent camera updates for platform generation
-            if (platformManager.current && frameCount % 30 === 0) { // Reduced from 15 to 30 frames
+            if (platformManager.current && frameCount % 60 === 0) { // FIX: Only every 60 frames = 1 second
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
               
-              
               if (platformsChanged) {
-                setAllPlatforms(platformManager.current.getAllPlatforms());
+                updatePlatforms(platformManager.current.getAllPlatforms());
               }
             }
             
@@ -687,7 +718,7 @@ const GameComponent: React.FC<{
             if (platformManager.current) {
               const fadeChanged = platformManager.current.updateFadeOutAnimations();
               if (fadeChanged) {
-                setAllPlatforms(platformManager.current.getAllPlatforms());
+                updatePlatforms(platformManager.current.getAllPlatforms());
               }
             }
           }
@@ -702,13 +733,12 @@ const GameComponent: React.FC<{
           if (Math.abs(newCameraY - cameraY) > 1) {
             setCameraY(newCameraY);
             
-            if (platformManager.current && frameCount % 30 === 0) {
+            if (platformManager.current && frameCount % 60 === 0) { // FIX: Only every 60 frames = 1 second
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
               
-              
               if (platformsChanged) {
-                setAllPlatforms(platformManager.current.getAllPlatforms());
+                updatePlatforms(platformManager.current.getAllPlatforms());
               }
             }
             
@@ -716,7 +746,7 @@ const GameComponent: React.FC<{
             if (platformManager.current) {
               const fadeChanged = platformManager.current.updateFadeOutAnimations();
               if (fadeChanged) {
-                setAllPlatforms(platformManager.current.getAllPlatforms());
+                updatePlatforms(platformManager.current.getAllPlatforms());
               }
             }
           }
@@ -737,7 +767,73 @@ const GameComponent: React.FC<{
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, []); // Empty dependency - fresh on each component mount
+  }, []); // FIXED: Empty dependency to prevent infinite loop
+  
+  // FIX: Add performance monitoring
+  useEffect(() => {
+    if (!__DEV__) return;
+    
+    let startTime = Date.now();
+    let frameCount = 0;
+    let lastMemory = 0;
+    
+    const monitorPerformance = () => {
+      frameCount++;
+      
+      if (frameCount % 300 === 0) { // Every 5 seconds at 60fps
+        const now = Date.now();
+        const elapsed = (now - startTime) / 1000;
+        const height = Math.abs(zRef.current);
+        const platforms = allPlatforms.length;
+        const visible = visiblePlatforms.length;
+        
+        // Memory usage (if available)
+        const memory = (performance as any).memory?.usedJSHeapSize || 0;
+        const memoryMB = Math.round(memory / 1024 / 1024);
+        const memoryDelta = memoryMB - lastMemory;
+        lastMemory = memoryMB;
+        
+        console.log(`[ACCUMULATION DEBUG] Time: ${Math.round(elapsed)}s, Height: ${Math.round(height)}px`);
+        console.log(`  Platforms: ${platforms} total, ${visible} visible`);
+        console.log(`  Memory: ${memoryMB}MB (+${memoryDelta}MB)`);
+        
+        // Check for potential issues
+        if (platforms > 1000) {
+          console.warn(`⚠️  HIGH PLATFORM COUNT: ${platforms} - potential memory leak`);
+        }
+        
+        if (memoryDelta > 5) {
+          console.warn(`⚠️  HIGH MEMORY GROWTH: +${memoryDelta}MB in 5 seconds`);
+        }
+        
+        // Platform manager stats
+        if (platformManager.current) {
+          const stats = (platformManager.current as any).getPlatformStats?.();
+          const cullingStats = (platformManager.current as any).getCullingStats?.();
+          const spatialStats = (platformManager.current as any).spatialIndex?.getStats?.();
+          
+          console.log(`  Platform Stats:`, stats);
+          console.log(`  Culling Stats:`, cullingStats);
+          console.log(`  Spatial Stats:`, spatialStats);
+          
+          // Check cache sizes
+          if ((platformManager.current as any).reachabilityCache) {
+            const cacheSize = (platformManager.current as any).reachabilityCache.size;
+            console.log(`  Cache Size: ${cacheSize}`);
+            
+            if (cacheSize > 500) {
+              console.warn(`⚠️  LARGE CACHE: ${cacheSize} entries - potential memory leak`);
+            }
+          }
+        }
+        
+        console.log('---');
+      }
+    };
+    
+    const interval = setInterval(monitorPerformance, 16); // Check every frame
+    return () => clearInterval(interval);
+  }, [allPlatforms.length, visiblePlatforms.length]);
 
   return (
     <SafeTouchBoundary>
