@@ -153,6 +153,7 @@ const GameComponent: React.FC<{
   const [cameraY, setCameraY] = useState(0);
   const [currentPlayerBox, setCurrentPlayerBox] = useState<{left: number; right: number; top: number; bottom: number; cx: number; feetY: number; w: number; h: number} | null>(null);
   const [frameCount, setFrameCount] = useState(0);
+  const frameCountRef = useRef(0);
   const [elapsedSec, setElapsedSec] = useState(0); // you can keep this for your existing debug
   const [timeMs, setTimeMs] = useState(0);
   const timeMsRef = useRef(0);
@@ -185,7 +186,6 @@ const GameComponent: React.FC<{
   const onGroundRef = useRef(true);
   const didWrapRef = useRef(false);
   const feetYRef = useRef(levelData?.floorTopY ?? 0);
-  const frameCountRef = useRef(0);
   
   // Fall damage state machine (z-based)
   const peakZRef = useRef<number>(0);
@@ -434,9 +434,11 @@ const GameComponent: React.FC<{
         setNeedsBoxUpdate(false);
       }
       
-      // PERFORMANCE: Optimized state update frequency for smooth animation
+      // PERFORMANCE: Safe frame counter management using modulo operations
+      frameCountRef.current = (frameCountRef.current + 1) % 100000; // Safe modulo to prevent overflow
+      
       if (frameCount % 2 === 0) { // Every 2 frames for smooth animation
-        setFrameCount(prev => prev + 1);
+        setFrameCount(prev => (prev + 1) % 100000); // Safe modulo instead of hard reset
         
         // Update hazard animation time
         if (frameCount % 3 === 0) { // Update every 3 frames for smooth animation

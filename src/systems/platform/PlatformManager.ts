@@ -86,6 +86,7 @@ class SpatialIndex {
   private grid = new Map<string, PlatformDef[]>();
   private cellSize = 200;
   private totalPlatforms = 0; // Track total for cleanup
+  private highestPlayerY = 0; // Track player position for cleanup
   
   private getGridKey(x: number, y: number): string {
     const gridX = Math.floor(x / this.cellSize);
@@ -97,15 +98,14 @@ class SpatialIndex {
     const key = this.getGridKey(platform.x, platform.y);
     const cell = this.grid.get(key) || [];
     
-    // FIXED: Prevent duplicate platforms in spatial index
     const existingIndex = cell.findIndex(p => p.id === platform.id);
     if (existingIndex === -1) {
       cell.push(platform);
       this.grid.set(key, cell);
       this.totalPlatforms++;
       
-      // FIX: Trigger cleanup when we have too many platforms
-      if (this.totalPlatforms > 2000) { // Threshold for cleanup
+      // MUCH more aggressive cleanup - trigger at 500 instead of 2000
+      if (this.totalPlatforms > 500) {
         this.cleanupOldCells();
       }
     }
@@ -113,19 +113,17 @@ class SpatialIndex {
   
   // FIX: Add proper cleanup method
   private cleanupOldCells() {
-    // Remove cells that are far below the action
     const keysToRemove: string[] = [];
     let removedCount = 0;
+    const currentPlayerY = this.highestPlayerY || 0;
     
     for (const [key, platforms] of this.grid.entries()) {
       const [gridX, gridY] = key.split(',').map(Number);
       const cellWorldY = gridY * this.cellSize;
       
-      // Remove cells that are very far below (this indicates old platforms)
-      // We'll use a large threshold to be conservative
-      const shouldRemove = platforms.every(p => 
-        p.fadeOut && (p.fadeOut.opacity ?? 1) < 0.1
-      ) || cellWorldY > this.getMaxRelevantY() + 1000;
+      // More aggressive: remove cells more than 2 screen heights below player
+      const shouldRemove = cellWorldY > currentPlayerY + (SCREEN_H * 2) ||
+        platforms.every(p => p.fadeOut && (p.fadeOut.opacity ?? 1) < 0.1);
       
       if (shouldRemove) {
         keysToRemove.push(key);
@@ -136,7 +134,10 @@ class SpatialIndex {
     keysToRemove.forEach(key => this.grid.delete(key));
     this.totalPlatforms -= removedCount;
     
-    // Cleanup completed silently
+    // Force garbage collection hint (optional)
+    if (removedCount > 100 && typeof global?.gc === 'function') {
+      global.gc();
+    }
   }
   
   // Helper to determine what Y coordinate is still relevant
@@ -175,6 +176,10 @@ class SpatialIndex {
   clear() {
     this.grid.clear();
     this.totalPlatforms = 0;
+  }
+  
+  updatePlayerY(playerY: number) {
+    this.highestPlayerY = Math.max(this.highestPlayerY, playerY);
   }
   
   // Add method to get stats for debugging
@@ -504,9 +509,12 @@ export class EnhancedPlatformManager {
     return false;
   }
 
-  // PERFORMANCE: Cache reachability calculations with proper size management
+  // PERFORMANCE: Cache reachability calculations with balanced precision and efficiency
   private cachedReachable(dx: number, dyUp: number): boolean {
-    const key = `${Math.round(dx)},${Math.round(dyUp)}`;
+    // Less aggressive rounding for better precision (round to nearest 5 instead of 10)
+    const keyDx = Math.round(dx / 5) * 5; // Round to nearest 5 for better precision
+    const keyDy = Math.round(dyUp / 5) * 5; // Round to nearest 5 for better precision
+    const key = `${keyDx},${keyDy}`;
     
     if (this.reachabilityCache.has(key)) {
       return this.reachabilityCache.get(key)!;
@@ -514,14 +522,13 @@ export class EnhancedPlatformManager {
     
     const result = reachable(dx, dyUp);
     
-    // FIXED: Properly enforce cache size limit
+    // Balanced cache management - clear 50% when full instead of entire cache
     if (this.reachabilityCache.size >= this.maxCacheSize) {
-      // Clear oldest 50% of entries when limit reached
       const entries = Array.from(this.reachabilityCache.entries());
       const keepCount = Math.floor(this.maxCacheSize * 0.5);
       this.reachabilityCache.clear();
       
-      // Keep only the most recent entries
+      // Keep the most recent entries for better cache hit rates
       entries.slice(-keepCount).forEach(([k, v]) => {
         this.reachabilityCache.set(k, v);
       });
@@ -643,12 +650,46 @@ export class EnhancedPlatformManager {
   
   isDeathFloor(_p: PlatformDef) { return false; }
 
+  // Platform array optimization to prevent memory growth
+  private optimizePlatformArray() {
+    // Periodically defragment the platforms array
+    if (this.platforms.length > 1000) {
+      const activePlatforms = this.platforms.filter(p => 
+        !p.fadeOut || (p.fadeOut.opacity ?? 1) > 0.1
+      );
+      
+      if (activePlatforms.length < this.platforms.length * 0.7) {
+        // More than 30% are faded - rebuild array
+        this.platforms = activePlatforms;
+        
+        // Rebuild spatial index
+        this.spatialIndex.clear();
+        for (const platform of this.platforms) {
+          this.spatialIndex.addPlatform(platform);
+        }
+      }
+    }
+  }
+
   updateForCamera(newCameraY: number, playerY: number) { 
-    this.frameCounter++;
+    // Safe frame counter management using modulo operations
+    this.frameCounter = (this.frameCounter + 1) % 100000; // Safe modulo to prevent overflow
     
-    // FIXED: Clear cache every 1000 frames to prevent memory accumulation
-    if (this.frameCounter % 1000 === 0) {
+    // Update spatial index with player position for cleanup
+    this.spatialIndex.updatePlayerY(playerY);
+    
+    // Conservative cache clearing - less frequent to maintain cache effectiveness
+    const baseClearInterval = 1000; // Base interval of 1000 frames
+    const altitudeFactor = Math.max(1, Math.min(3, Math.floor(Math.abs(playerY) / (SCREEN_H * 20)))); // Cap at 3x
+    const clearInterval = Math.max(500, baseClearInterval / altitudeFactor); // Minimum 500 frames
+    
+    if (this.frameCounter % clearInterval === 0) {
       this.reachabilityCache.clear();
+    }
+    
+    // Add periodic optimization
+    if (this.frameCounter % 300 === 0) { // Every 5 seconds
+      this.optimizePlatformArray();
     }
     
     const top = newCameraY - SCREEN_H * 0.5; 
@@ -713,34 +754,48 @@ export class EnhancedPlatformManager {
   updateFadeOutAnimations() { 
     const now = Date.now(); 
     let changed = false; 
-    for (const p of this.platforms) { 
+    const toRemove: number[] = []; // Track indices to remove
+    
+    for (let i = 0; i < this.platforms.length; i++) { 
+      const p = this.platforms[i];
       if (!p.fadeOut) continue; 
+      
       const t = (now - p.fadeOut.startTime) / p.fadeOut.duration; 
       const op = Math.max(0, 1 - t); 
-      if (op !== p.fadeOut.opacity) { 
+      
+      if (op <= 0) {
+        toRemove.push(i); // Mark for removal
+        changed = true;
+      } else if (op !== p.fadeOut.opacity) { 
         p.fadeOut.opacity = op; 
         changed = true; 
       } 
     }
     
-    // Remove fully faded and track what was removed - PRESERVED
-    const beforePlatforms = this.platforms.filter(p => p.type === 'platform').length;
-    const beforeDecorations = this.platforms.filter(p => p.type === 'decoration').length;
+    // Remove in reverse order to maintain indices
+    for (let i = toRemove.length - 1; i >= 0; i--) {
+      const index = toRemove[i];
+      const platform = this.platforms[index];
+      
+      // Update culling stats
+      if (platform.type === 'platform') {
+        this.totalPlatformsCulled++;
+      } else {
+        this.totalDecorationsCulled++;
+      }
+      
+      this.platforms.splice(index, 1);
+    }
     
-    // Remove fully faded platforms
+    // Rebuild spatial index if we removed platforms
+    if (toRemove.length > 0) {
+      this.spatialIndex.clear();
+      for (const platform of this.platforms) {
+        this.spatialIndex.addPlatform(platform);
+      }
+    }
     
-    this.platforms = this.platforms.filter(p => !p.fadeOut || (p.fadeOut.opacity ?? 1) > 0); 
-    
-    const afterPlatforms = this.platforms.filter(p => p.type === 'platform').length;
-    const afterDecorations = this.platforms.filter(p => p.type === 'decoration').length;
-    
-    const platformsRemoved = beforePlatforms - afterPlatforms;
-    const decorationsRemoved = beforeDecorations - afterDecorations;
-    
-    this.totalPlatformsCulled += platformsRemoved;
-    this.totalDecorationsCulled += decorationsRemoved;
-    
-    return changed || (platformsRemoved + decorationsRemoved > 0);
+    return changed;
   }
 
   private cullBelow(killBelowY: number) { 

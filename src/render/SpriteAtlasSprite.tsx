@@ -61,9 +61,13 @@ export default function SpriteAtlasSprite({
   }
 
   if (__DEV__) {
-    (globalThis as any).__dashDraws = ((globalThis as any).__dashDraws ?? 0) + 1;
-    const frameID = (globalThis as any).__dashFrameID ?? 0;
-    // Diagnostic counter still active but logging disabled to reduce console spam
+    // Safe debug counter management with modulo operations
+    const currentDraws = (globalThis as any).__dashDraws ?? 0;
+    (globalThis as any).__dashDraws = (currentDraws + 1) % 1000000; // Safe modulo to prevent overflow
+    
+    // Optional: Only track frame ID for debugging if needed
+    // const frameID = (globalThis as any).__dashFrameID ?? 0;
+    // Diagnostic counter active but logging disabled to reduce console spam
     // console.log('DASH_DRAW', { frameID, draws: (globalThis as any).__dashDraws, tag, frame, scale, flipX });
   }
 
