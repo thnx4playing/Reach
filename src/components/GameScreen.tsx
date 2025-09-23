@@ -22,9 +22,11 @@ import { useThrottledAnimation } from '../hooks/useThrottledAnimation';
 
 // Health system imports
 import { useHealth } from '../systems/health/HealthContext';
-import HealthBar from './HealthBar';
+import ScoreTimeHUD from '../ui/ScoreTimeHUD';
+import SkiaHealthBar from '../ui/SkiaHealthBar';
 import { DeathModal } from '../ui/DeathModal';
 import { useDamageAnimations } from '../systems/health/useDamageAnimations';
+
 
 // Audio system imports
 import { useSound } from '../audio/useSound';
@@ -83,8 +85,6 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   
   // Handlers for death modal
   const handleRestart = useCallback(() => {
-    console.log('Restarting game...');
-    
     // Reset health first
     resetHealth();
     
@@ -153,8 +153,17 @@ const GameComponent: React.FC<{
   const [cameraY, setCameraY] = useState(0);
   const [currentPlayerBox, setCurrentPlayerBox] = useState<{left: number; right: number; top: number; bottom: number; cx: number; feetY: number; w: number; h: number} | null>(null);
   const [frameCount, setFrameCount] = useState(0);
-  const [elapsedSec, setElapsedSec] = useState(0);
+  const [elapsedSec, setElapsedSec] = useState(0); // you can keep this for your existing debug
+  const [timeMs, setTimeMs] = useState(0);
+  const timeMsRef = useRef(0);
+  const [score, setScore] = useState(0);
+  const [maxHeightPx, setMaxHeightPx] = useState(0);
+  const maxHeightRef = useRef(0);
+  const SCORE_DIVISOR = 5; // ← tune freely (px per point)
+  const [rightCardW, setRightCardW] = useState(0);  // width of a single right card
+  const [rightHudH, setRightHudH] = useState(0);    // total height of (Score + Time)
   const [hazardAnimationTime, setHazardAnimationTime] = useState(0);
+
 
   // State variables
   const [x, setX] = useState(SCREEN_W * 0.5);
@@ -252,7 +261,6 @@ const GameComponent: React.FC<{
 
   // Initialize platform manager - This will be fresh on each reset
   useEffect(() => {
-    console.log('Initializing new platform manager...');
     platformManager.current = new EnhancedPlatformManager(levelData.mapName as any, floorTopY, 2);
     
     // Force clear any existing platforms to prevent key conflicts
@@ -266,6 +274,7 @@ const GameComponent: React.FC<{
     }, 0);
     
   }, [levelData.mapName, floorTopY]); // FIXED: Remove updatePlatforms dependency to prevent infinite loop
+
 
   // FIX: More efficient visibility culling with memoization
   const visiblePlatforms = useMemo(() => {
@@ -345,9 +354,17 @@ const GameComponent: React.FC<{
     noteJumpPressed(jumpStateRef.current);
   }, []);
 
+  // Reset timer/score on fresh mount (restart changes key, so this runs again)
+  useEffect(() => {
+    timeMsRef.current = 0;
+    maxHeightRef.current = 0;
+    setTimeMs(0);
+    setMaxHeightPx(0);
+    setScore(0);
+  }, []);
+
   // One-time spawn on floor - This runs fresh on each component mount
   useEffect(() => {
-    console.log('Setting initial player position...');
     zRef.current = 0;
     setZ(0);
     xRef.current = SCREEN_W * 0.5;
@@ -426,6 +443,23 @@ const GameComponent: React.FC<{
           setHazardAnimationTime(t);
         }
         
+        // ==== TIMER & SCORE ====
+        // Count up only while alive
+        if (!isDead) {
+          timeMsRef.current += dt * 1000;
+        }
+        // Track the maximum world height reached (z grows upward)
+        if (zRef.current > maxHeightRef.current) {
+          maxHeightRef.current = zRef.current;
+        }
+        // Throttle HUD state updates to keep re-renders cheap
+        if (frameCount % 3 === 0) {
+          const maxPx = Math.max(0, Math.round(maxHeightRef.current));
+          setMaxHeightPx(maxPx);
+          setScore(Math.ceil(maxPx / SCORE_DIVISOR));
+          setTimeMs(Math.round(timeMsRef.current));
+        }
+
         // Only update state if values have changed significantly to reduce re-renders
         const newX = Math.round(xRef.current);
         const newZ = Math.round(zRef.current);
@@ -762,6 +796,7 @@ const GameComponent: React.FC<{
         }
       }
 
+
       raf = requestAnimationFrame(loop);
     };
 
@@ -769,78 +804,14 @@ const GameComponent: React.FC<{
     return () => cancelAnimationFrame(raf);
   }, []); // FIXED: Empty dependency to prevent infinite loop
   
-  // FIX: Add performance monitoring
-  useEffect(() => {
-    if (!__DEV__) return;
-    
-    let startTime = Date.now();
-    let frameCount = 0;
-    let lastMemory = 0;
-    
-    const monitorPerformance = () => {
-      frameCount++;
-      
-      if (frameCount % 300 === 0) { // Every 5 seconds at 60fps
-        const now = Date.now();
-        const elapsed = (now - startTime) / 1000;
-        const height = Math.abs(zRef.current);
-        const platforms = allPlatforms.length;
-        const visible = visiblePlatforms.length;
-        
-        // Memory usage (if available)
-        const memory = (performance as any).memory?.usedJSHeapSize || 0;
-        const memoryMB = Math.round(memory / 1024 / 1024);
-        const memoryDelta = memoryMB - lastMemory;
-        lastMemory = memoryMB;
-        
-        console.log(`[ACCUMULATION DEBUG] Time: ${Math.round(elapsed)}s, Height: ${Math.round(height)}px`);
-        console.log(`  Platforms: ${platforms} total, ${visible} visible`);
-        console.log(`  Memory: ${memoryMB}MB (+${memoryDelta}MB)`);
-        
-        // Check for potential issues
-        if (platforms > 1000) {
-          console.warn(`⚠️  HIGH PLATFORM COUNT: ${platforms} - potential memory leak`);
-        }
-        
-        if (memoryDelta > 5) {
-          console.warn(`⚠️  HIGH MEMORY GROWTH: +${memoryDelta}MB in 5 seconds`);
-        }
-        
-        // Platform manager stats
-        if (platformManager.current) {
-          const stats = (platformManager.current as any).getPlatformStats?.();
-          const cullingStats = (platformManager.current as any).getCullingStats?.();
-          const spatialStats = (platformManager.current as any).spatialIndex?.getStats?.();
-          
-          console.log(`  Platform Stats:`, stats);
-          console.log(`  Culling Stats:`, cullingStats);
-          console.log(`  Spatial Stats:`, spatialStats);
-          
-          // Check cache sizes
-          if ((platformManager.current as any).reachabilityCache) {
-            const cacheSize = (platformManager.current as any).reachabilityCache.size;
-            console.log(`  Cache Size: ${cacheSize}`);
-            
-            if (cacheSize > 500) {
-              console.warn(`⚠️  LARGE CACHE: ${cacheSize} entries - potential memory leak`);
-            }
-          }
-        }
-        
-        console.log('---');
-      }
-    };
-    
-    const interval = setInterval(monitorPerformance, 16); // Check every frame
-    return () => clearInterval(interval);
-  }, [allPlatforms.length, visiblePlatforms.length]);
+  // REMOVED: Performance monitoring debug logging (was causing console spam)
 
   return (
     <SafeTouchBoundary>
       <View style={styles.root}>
       <Canvas 
         style={styles.canvas}
-        pointerEvents="none"
+        pointerEvents="box-none"
       >
           <Rect x={0} y={0} width={SCREEN_W} height={SCREEN_H} color="#87CEEB" />
           
@@ -909,14 +880,33 @@ const GameComponent: React.FC<{
          </Canvas>
       
       
-      {/* Health Bar */}
-      <HealthBar 
-        health={((maxHits - hits) / maxHits) * 100} 
-        width={160} 
-        height={28} 
-        x={SCREEN_W - 160 + 20} 
-        y={50}
+      {/* Right stack: SCORE + TIME */}
+      <ScoreTimeHUD
+        score={score}
+        heightPx={maxHeightPx}
+        timeMs={timeMs}
+        anchor="right"
+        top={50}
+        onBoxSize={(w) => setRightCardW(w)}
+        onMeasured={(h) => setRightHudH(h)}
       />
+
+      {/* Float the Skia HP bar directly beneath TIME (no box) */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          right: 12,
+          top: 50 + rightHudH + 8,   // 8px gap below the TIME card
+          zIndex: 9998,
+        }}
+      >
+        <SkiaHealthBar
+          width={Math.max(120, rightCardW)}
+          height={20}
+          health={((maxHits - hits) / maxHits) * 100}
+        />
+      </View>
       
       
       {/* Ground Band - Dirt with grass top */}
@@ -991,6 +981,7 @@ const GameComponent: React.FC<{
           disabled={isDead}
         />
       </View>
+
     </View>
     </SafeTouchBoundary>
   );

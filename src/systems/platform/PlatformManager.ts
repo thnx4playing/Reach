@@ -136,9 +136,7 @@ class SpatialIndex {
     keysToRemove.forEach(key => this.grid.delete(key));
     this.totalPlatforms -= removedCount;
     
-    if (removedCount > 0) {
-      console.log(`[SPATIAL] Cleaned up ${removedCount} platforms from ${keysToRemove.length} cells`);
-    }
+    // Cleanup completed silently
   }
   
   // Helper to determine what Y coordinate is still relevant
@@ -651,7 +649,6 @@ export class EnhancedPlatformManager {
     // FIXED: Clear cache every 1000 frames to prevent memory accumulation
     if (this.frameCounter % 1000 === 0) {
       this.reachabilityCache.clear();
-      console.log('[PERF] Cleared reachability cache at frame', this.frameCounter);
     }
     
     const top = newCameraY - SCREEN_H * 0.5; 
@@ -821,8 +818,6 @@ export class EnhancedPlatformManager {
     const removed = beforeCount - afterCount;
     
     if (removed > 0) {
-      console.log(`[CLEANUP] Removed ${removed} platforms (${beforeCount} -> ${afterCount})`);
-      
       // Rebuild spatial index after cleanup
       this.spatialIndex.clear();
       for (const platform of this.platforms) {
