@@ -10,6 +10,7 @@ import { PrefabNode } from '../render/PrefabNode';
 import { PlatformRenderer } from './PlatformRenderer';
 import HazardBand from '../render/HazardBand';
 import GroundBand from '../render/GroundBand';
+import FireballLayer from '../render/FireballLayer';
 import type { LevelData } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, prefabWidthPx } from '../content/maps';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
@@ -965,7 +966,41 @@ const GameComponent: React.FC<{
           );
         })()}
       
-
+      {/* Fireballs above lava */}
+      {(() => {
+        const df = platformManager.current?.getDeathFloor?.();
+        const lavaYWorld = df?.y ?? null;
+        if (lavaYWorld == null) return null;
+        
+        // Calculate player AABB in world coordinates for collision detection
+        const playerAABBWorld = currentPlayerBox ? {
+          left: currentPlayerBox.left,
+          right: currentPlayerBox.right,
+          top: currentPlayerBox.top,    // smaller worldY value
+          bottom: currentPlayerBox.bottom, // larger worldY value
+        } : {
+          left: 0, right: 0, top: 0, bottom: 0
+        };
+        
+        return (
+          <FireballLayer
+            clockMs={hazardAnimationTime}
+            lavaYWorld={lavaYWorld}
+            worldYToScreenY={worldYToScreenY}
+            screenW={SCREEN_W}
+            screenH={SCREEN_H}
+            playerAABBWorld={playerAABBWorld}
+            onPlayerHit={takeDamage}
+            maxConcurrent={2}           // allow up to 2 at once
+            spawnMinMs={10000}          // 10–20 seconds between waves
+            spawnMaxMs={20000}
+            peakTargetScreenY={96}      // keep apex near top
+            damagePerHit={1}
+            speedScale={0.66}          // ≈ 1/3 slower; try 0.6–0.75 range
+            smoothAlpha={0.25}         // 0.2–0.35 for gentle smoothing
+          />
+        );
+      })()}
 
       {/* Death modal */}
       <DeathModal 
