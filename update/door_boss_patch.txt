@@ -1,0 +1,145 @@
+*** PATCH INSTRUCTIONS (apply manually or with your editor) ***
+
+1) In src/components/GameScreen.tsx add these imports near the top:
+
+import Doorway, { playerOverlapsDoor } from '../features/Doorway';
+import BossRoom from '../features/BossRoom';
+import BossDemon from '../features/BossDemon';
+import BossProjectiles, { BossProjectile } from '../features/BossProjectiles';
+import { DOORWAY_SPAWN_Y, DOORWAY_WIDTH, DOORWAY_HEIGHT } from '../config/gameplay';
+
+2) Add a local state block (just under other useState/useRef):
+
+  const [mode, setMode] = useState<'tower'|'bossroom'>('tower');
+  const doorSpawnYWorld = -DOORWAY_SPAWN_Y; // going up is negative world Y
+  const doorXWorld = (prefabWidthPx(levelData.mapName) - DOORWAY_WIDTH) * 0.5; // center door on map width
+
+  const [bossProjectiles, setBossProjectiles] = useState<BossProjectile[]>([]);
+  const nextProjIdRef = useRef(1);
+
+  const spawnBossProjectile = useCallback((p:{x:number;y:number;vx:number;vy:number;lifeMs:number}) => {
+    const id = nextProjIdRef.current++;
+    setBossProjectiles(prev => [...prev, { id, bornAt: Date.now(), ...p }]);
+  }, []);
+
+3) Ensure you have player world coordinates and bounding box handy (add near your existing physics vars):
+
+  const playerWorldX = xRef.current + CHAR_W * 0.5;
+  const playerWorldY = floorTopY - zRef.current;
+  const playerBBoxWorld = {
+    left: xRef.current + CHAR_W*0.22,
+    right: xRef.current + CHAR_W*0.78,
+    top: playerWorldY - CHAR_H,
+    bottom: playerWorldY,
+  };
+
+4) Render the doorway ONLY in tower mode (inside your <Canvas> … render tree):
+
+  {mode === 'tower' && (
+    <Doorway
+      doorWorldX={doorXWorld}
+      doorWorldY={doorSpawnYWorld}
+      worldYToScreenY={worldYToScreenY}
+      xToScreen={xToScreen}
+      cameraY={cameraY}
+      screenW={SCREEN_W}
+      screenH={SCREEN_H}
+    />
+  )}
+
+5) When in tower mode, detect overlap and teleport to boss room (in your main update/useEffect tick where you already read player position). Add:
+
+  if (mode === 'tower') {
+    const touching = playerOverlapsDoor(
+      playerWorldX, playerWorldY,
+      doorXWorld, doorSpawnYWorld
+    );
+    if (touching) {
+      setMode('bossroom');
+      // snap camera so floor is visible; also clear any fireballs, etc.
+      setBossProjectiles([]);
+      // (Optional) re-center player on the new room
+      xRef.current = (prefabWidthPx(levelData.mapName) - CHAR_W) * 0.5;
+      zRef.current = - (doorSpawnYWorld - floorTopY) + 64; // place above new floor
+    }
+  }
+
+6) In your render, when mode === 'bossroom', draw a full-width floor band and a few fixed platforms.
+   You already use <PlatformRenderer /> — we can feed it a small array:
+
+  const bossRoomPlatforms = useMemo(() => {
+    if (mode !== 'bossroom') return [];
+    const W = prefabWidthPx(levelData.mapName);
+    const cx = W*0.5;
+    return [
+      // 6–7 simple slabs (w=120) at varying heights
+      { id: 'b1', x: cx-220, y: floorTopY-160, w: 120, h: 20, type: 'wood' },
+      { id: 'b2', x: cx+100, y: floorTopY-180, w: 120, h: 20, type: 'wood' },
+      { id: 'b3', x: cx-20,  y: floorTopY-260, w: 120, h: 20, type: 'wood' },
+      { id: 'b4', x: cx-260, y: floorTopY-300, w: 120, h: 20, type: 'wood' },
+      { id: 'b5', x: cx+160, y: floorTopY-340, w: 120, h: 20, type: 'wood' },
+      { id: 'b6', x: cx-120, y: floorTopY-420, w: 120, h: 20, type: 'wood' },
+      { id: 'b7', x: cx+ 20, y: floorTopY-500, w: 120, h: 20, type: 'wood' },
+    ] as any;
+  }, [mode, floorTopY, levelData.mapName]);
+
+  // Render boss room floor band (visual) and the fixed platforms via the existing renderer
+  {mode === 'bossroom' && (
+    <BossRoom
+      floorYWorld={floorTopY}
+      screenW={SCREEN_W}
+      screenH={SCREEN_H}
+      xToScreen={xToScreen}
+      worldYToScreenY={worldYToScreenY}
+      tileW={getTileSize(levelData.mapName)}
+      roomWidthWorld={prefabWidthPx(levelData.mapName)}
+      platforms={bossRoomPlatforms as any}
+    />
+  )}
+  {mode === 'bossroom' && (
+    <PlatformRenderer
+      platforms={bossRoomPlatforms as any}
+      opacity={1}
+      mapName={levelData.mapName as any}
+    />
+  )}
+
+7) Still in bossroom mode, spawn and render the boss + his projectiles. Put this near your other render layers:
+
+  {mode === 'bossroom' && (
+    <BossDemon
+      xWorld={prefabWidthPx(levelData.mapName)*0.5}
+      yWorld={floorTopY - 420}
+      worldYToScreenY={worldYToScreenY}
+      xToScreen={xToScreen}
+      screenW={SCREEN_W}
+      screenH={SCREEN_H}
+      playerX={playerWorldX}
+      playerY={playerWorldY}
+      onShoot={(p) => spawnBossProjectile(p)}
+    />
+  )}
+
+  {mode === 'bossroom' && (
+    <BossProjectiles
+      projectiles={bossProjectiles}
+      setProjectiles={setBossProjectiles}
+      xToScreen={xToScreen}
+      worldYToScreenY={worldYToScreenY}
+      screenW={SCREEN_W}
+      screenH={SCREEN_H}
+      playerBBoxWorld={playerBBoxWorld}
+      onPlayerHit={(dmg) => handlePlayerDamage(dmg)} // You already have a damage path; reuse it here.
+    />
+  )}
+
+8) Culling: when mode === 'bossroom', skip generating new scrolling platforms and let your PlatformManager cull everything below automatically.
+   In whatever update path calls `platformManager.updateForCamera(cameraY, ...)`, gate it:
+     if (mode === 'tower') { platformManager.updateForCamera(cameraY, ...); }
+
+9) Tuning:
+   - For test runs, keep DOORWAY_SPAWN_Y = 1000 (easy). For production, set it to 15000 in src/config/gameplay.ts.
+   - Projectile rate is randomized between 5–10s; tweak in gameplay.ts.
+   - To disable boss temporarily, wrap the BossDemon/BossProjectiles JSX in a flag.
+
+*** End of patch ***

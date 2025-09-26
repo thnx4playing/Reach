@@ -262,42 +262,30 @@ const GameComponent: React.FC<{
 
   // Initialize platform manager - This will be fresh on each reset
   useEffect(() => {
-    platformManager.current = new EnhancedPlatformManager(levelData.mapName as any, floorTopY, 2);
-    
-    // Force clear any existing platforms to prevent key conflicts
-    setAllPlatforms([]);
-    
-    // Then set the new platforms
-    setTimeout(() => {
-      if (platformManager.current) {
-        updatePlatforms(platformManager.current.getAllPlatforms());
-      }
-    }, 0);
+    const mgr = new EnhancedPlatformManager(levelData.mapName as any, floorTopY, 2);
+    platformManager.current = mgr;
+
+    const bootCamY = 0; // Initial camera Y
+    const bootPlayerY = 0; // Initial player Y
+
+    // One-time seed: bypass throttle and movement gating
+    mgr.updateForCamera(bootCamY, { force: true, playerY: bootPlayerY });
+
+    // Now publish to state once so the first frame has content
+    updatePlatforms(mgr.getAllPlatforms());
     
   }, [levelData.mapName, floorTopY]); // FIXED: Remove updatePlatforms dependency to prevent infinite loop
 
 
-  // FIX: More efficient visibility culling with memoization
+  // PERFORMANCE: O(cells) instead of O(N) platform queries
   const visiblePlatforms = useMemo(() => {
-    if (!allPlatforms.length) return [];
-    
-    // Cache the calculation to avoid repeated work
-    const viewportTop = cameraY - SCREEN_H * 0.5;
-    const viewportBottom = cameraY + SCREEN_H * 1.5;
-    
-    // Use a more efficient filter
-    const visible = [];
-    for (let i = 0; i < allPlatforms.length; i++) {
-      const platform = allPlatforms[i];
-      const platformBottom = platform.y + (platform.collision?.height || 32);
-      
-      if (platformBottom > viewportTop && platform.y < viewportBottom) {
-        visible.push(platform);
-      }
-    }
-    
-    return visible;
-  }, [allPlatforms, Math.floor(cameraY / 10)]); // Round cameraY to reduce recalculations
+    const top = cameraY - SCREEN_H * 0.5;
+    const bottom = cameraY + SCREEN_H * 1.5;
+    return platformManager.current
+      ? platformManager.current.getPlatformsInRect(top, bottom)
+      : [];
+    // Note: do NOT depend on allPlatforms here—tie to camera only
+  }, [Math.floor(cameraY / 8)]);
 
   // Add this after platformManager initialization to validate the setup:
   useEffect(() => {
@@ -593,8 +581,9 @@ const GameComponent: React.FC<{
           
           const collision = platform.collision;
           
-          // Skip floor platforms (let floor collision handle these)
-          if (collision.topY >= floorTopY - 10) continue;
+          // No prefab floor anymore — don't skip near-floor pads.
+          // (This was making the starter platform non-collidable.)
+          // if (collision.topY >= floorTopY - 10) continue;
           
           // SPECIAL HANDLING FOR DEATH FLOOR - Much tighter collision
           if (platformManager.current?.isDeathFloor(platform)) {
@@ -744,7 +733,7 @@ const GameComponent: React.FC<{
             // PERFORMANCE: Less frequent camera updates for platform generation
             if (platformManager.current && frameCount % 60 === 0) { // FIX: Only every 60 frames = 1 second
               const playerWorldY = floorTopY - zRef.current;
-              const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
+              const platformsChanged = platformManager.current.updateForCamera(newCameraY, { playerY: playerWorldY });
               
               if (platformsChanged) {
                 updatePlatforms(platformManager.current.getAllPlatforms());
@@ -772,7 +761,7 @@ const GameComponent: React.FC<{
             
             if (platformManager.current && frameCount % 60 === 0) { // FIX: Only every 60 frames = 1 second
               const playerWorldY = floorTopY - zRef.current;
-              const platformsChanged = platformManager.current.updateForCamera(newCameraY, playerWorldY);
+              const platformsChanged = platformManager.current.updateForCamera(newCameraY, { playerY: playerWorldY });
               
               if (platformsChanged) {
                 updatePlatforms(platformManager.current.getAllPlatforms());

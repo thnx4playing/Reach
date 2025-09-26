@@ -246,9 +246,41 @@ export class EnhancedPlatformManager {
   private platformsFadedThisFrame = 0;
   private platformsPrunedThisFrame = 0;
   
+  // PERFORMANCE: Track only fading platforms instead of scanning all
+  private fading = new Set<string>();
+  
+  // PERFORMANCE: Only dedup when needed
+  private sawDup = false;
+  
+  // STARTUP PROTECTION: Track camera movement to prevent ghost platforms
+  private initialCameraY: number | null = null;
+  private startupProtectVisible = true; // active only pre–camera-move
+  
+  // STARTUP PROTECTION: Extra bands for protection
+  private static readonly STARTUP_PROTECT_EXTRA_BELOW = SCREEN_H * 0.9; // protect a band below the screen
+  private static readonly STARTUP_PROTECT_EXTRA_ABOVE = 0;              // we don't need extra above
+  
   // PERFORMANCE: Cache expensive calculations
   private reachabilityCache = new Map<string, boolean>();
   private maxCacheSize = 1000;
+  
+  // STARTUP PROTECTION: Helper to decide if a platform should be protected during startup
+  private isStartupProtected(p: PlatformDef, camY: number): boolean {
+    if (!this.startupProtectVisible) return false;
+
+    const viewportTop    = camY - SCREEN_H * 0.5;
+    const viewportBottom = camY + SCREEN_H * 0.5;
+
+    const pTop    = p.y;
+    const pHeight = p.collision?.height || 32;
+    const pBottom = pTop + pHeight;
+
+    // Protect anything on screen, plus a cushion below the screen
+    const protectTop    = viewportTop    - EnhancedPlatformManager.STARTUP_PROTECT_EXTRA_ABOVE;
+    const protectBottom = viewportBottom + EnhancedPlatformManager.STARTUP_PROTECT_EXTRA_BELOW;
+
+    return pBottom > protectTop && pTop < protectBottom;
+  }
   
   // REMOVED: Decoration pooling system (was causing React key conflicts)
   
@@ -283,28 +315,46 @@ export class EnhancedPlatformManager {
     return `${this.instanceId}_${this.nextId++}`;
   }
 
-  private seedStarter(floorTopY: number) {
-    const H = maxVerticalReach();
-    const dy = 0.34 * H;
-    const prefab = 'platform-grass-3-final';
-    const w = prefabWidthPx(this.map, prefab, this.scale);
-    const xCenter = SCREEN_W * 0.5;
-    const yTop = floorTopY - dy;
-    const xLeft = Math.round(xCenter - w / 2);
+  // Single source of truth for making a platform from a prefab
+  private makePlatformFromPrefab(prefab: string, x: number, y: number): PlatformDef {
+    const id = this.generateUniqueId();
+    const col = this.col(prefab, x, y);     // your existing collision builder
+
+    // Use the collision object as-is (it already has all required properties)
+    const collision = col;
+
     const p: PlatformDef = {
-      id: this.generateUniqueId(),
+      id,
       type: 'platform',
       prefab,
-      x: xLeft,
-      y: Math.round(yTop),
+      x,
+      y,
       scale: this.scale,
-      collision: this.col(prefab, xLeft, Math.round(yTop))
+      collision,
     };
-    this.platforms.push(p); 
+
+    // keep all indices in sync exactly like generateAhead(...)
+    this.platforms.push(p);
+    this.spatialIndex.addPlatform(p);
+    if (this.generateDecorationsFor) this.generateDecorationsFor(p);
+
+    // book-keeping used by your generator
     this.topMostY = Math.min(this.topMostY, p.y);
-    
-    // Generate decorations for starter platform
-    this.generateDecorationsFor(p);
+
+    return p;
+  }
+
+  private seedStarter(floorTopY: number) {
+    const H  = maxVerticalReach();
+    const dy = 0.34 * H;
+
+    const prefab   = 'platform-grass-3-final'; // same as before
+    const w        = prefabWidthPx(this.map, prefab, this.scale);
+    const xCenter  = SCREEN_W * 0.5;
+    const yTop     = Math.round(floorTopY - dy);
+    const xLeft    = Math.round(xCenter - w / 2);
+
+    this.makePlatformFromPrefab(prefab, xLeft, yTop);
   }
 
   private col(prefab: string, x: number, yTop: number): PlatformDef['collision'] {
@@ -625,9 +675,14 @@ export class EnhancedPlatformManager {
 
   // Public API - PRESERVED WITH FIXES
   getAllPlatforms() { 
-    // FIXED: Remove any duplicate platforms by ID to prevent React key conflicts
+    // PERFORMANCE: Only dedup in dev builds or when we detect a duplicate once
+    if (!__DEV__ && !this.sawDup) return this.platforms;
+    
     const uniquePlatforms = new Map<string, PlatformDef>();
     for (const platform of this.platforms) {
+      if (uniquePlatforms.has(platform.id)) {
+        this.sawDup = true; // Mark that we've seen a duplicate
+      }
       uniquePlatforms.set(platform.id, platform);
     }
     return Array.from(uniquePlatforms.values());
@@ -642,6 +697,20 @@ export class EnhancedPlatformManager {
     
     for (const p of nearbyPlatforms) {
       if (solidsOnly && !p.collision?.solid) continue; 
+      
+      // when deciding if a platform is a "ghost" during collision:
+      // During startup, never treat platforms as ghosts
+      if (this.startupProtectVisible) {
+        // During startup, all platforms are solid
+        const b = bounds(this.map, p, this.scale); 
+        if (x >= b.x - R && x <= b.x + b.w + R && y >= b.y - R && y <= b.y + b.h + R) out.push(p);
+        continue;
+      }
+      
+      // After startup, use normal ghost logic
+      const isGhost = p.fadeOut ? (p.fadeOut.opacity ?? 1) < 0.05 : false;
+      if (isGhost) continue; // skip from collision
+      
       const b = bounds(this.map, p, this.scale); 
       if (x >= b.x - R && x <= b.x + b.w + R && y >= b.y - R && y <= b.y + b.h + R) out.push(p);
     } 
@@ -671,27 +740,40 @@ export class EnhancedPlatformManager {
     }
   }
 
-  updateForCamera(newCameraY: number, playerY: number) { 
-    // Safe frame counter management using modulo operations
-    this.frameCounter = (this.frameCounter + 1) % 100000; // Safe modulo to prevent overflow
+  updateForCamera(newCameraY: number, opts: { force?: boolean; playerY?: number } = {}) {
+    const { force = false, playerY = 0 } = opts;
     
-    // Update spatial index with player position for cleanup
-    this.spatialIndex.updatePlayerY(playerY);
-    
-    // Conservative cache clearing - less frequent to maintain cache effectiveness
-    const baseClearInterval = 1000; // Base interval of 1000 frames
-    const altitudeFactor = Math.max(1, Math.min(3, Math.floor(Math.abs(playerY) / (SCREEN_H * 20)))); // Cap at 3x
-    const clearInterval = Math.max(500, baseClearInterval / altitudeFactor); // Minimum 500 frames
-    
-    if (this.frameCounter % clearInterval === 0) {
-      this.reachabilityCache.clear();
+    // remember first camera and drop protection once camera actually moves
+    if (this.initialCameraY === null) this.initialCameraY = newCameraY;
+    // Only disable startup protection when camera moves significantly (not just player movement)
+    // Use a very conservative threshold to ensure platforms stay solid during initial gameplay
+    if (this.startupProtectVisible && Math.abs(newCameraY - this.initialCameraY) > 200) {
+      this.startupProtectVisible = false; // camera has started—normal rules resume
     }
     
-    // Add periodic optimization
-    if (this.frameCounter % 300 === 0) { // Every 5 seconds
-      this.optimizePlatformArray();
+    // if not forced, keep your existing throttle/movement gating
+    if (!force) {
+      // Safe frame counter management using modulo operations
+      this.frameCounter = (this.frameCounter + 1) % 100000; // Safe modulo to prevent overflow
+      
+      // Update spatial index with player position for cleanup
+      this.spatialIndex.updatePlayerY(playerY);
+      
+      // Conservative cache clearing - less frequent to maintain cache effectiveness
+      const baseClearInterval = 1000; // Base interval of 1000 frames
+      const altitudeFactor = Math.max(1, Math.min(3, Math.floor(Math.abs(playerY) / (SCREEN_H * 20)))); // Cap at 3x
+      const clearInterval = Math.max(500, baseClearInterval / altitudeFactor); // Minimum 500 frames
+      
+      if (this.frameCounter % clearInterval === 0) {
+        this.reachabilityCache.clear();
+      }
+      
+      // Add periodic optimization
+      if (this.frameCounter % 300 === 0) { // Every 5 seconds
+        this.optimizePlatformArray();
+      }
     }
-    
+
     const top = newCameraY - SCREEN_H * 0.5; 
     const gen = this.generateAhead(top); 
     
@@ -699,10 +781,11 @@ export class EnhancedPlatformManager {
     const currentHeight = Math.abs(playerY);
     if (currentHeight - this.lastCleanupHeight > SCREEN_H * 2) { // Every 2 screen heights
       this.performAggressiveCleanup(playerY);
+      this.clampHistoryAround(playerY, newCameraY); // PERFORMANCE: Aggressive height-based clamping
       this.lastCleanupHeight = currentHeight;
     }
     
-    const culled = this.cullBelow((this.getDeathFloor()?.y ?? 0) + SCREEN_H * 0.5); 
+    const culled = this.cullBelow(newCameraY); 
     return gen || culled; 
   }
 
@@ -751,94 +834,107 @@ export class EnhancedPlatformManager {
     }
   }
 
-  updateFadeOutAnimations() { 
-    const now = Date.now(); 
-    let changed = false; 
-    const toRemove: number[] = []; // Track indices to remove
-    
-    for (let i = 0; i < this.platforms.length; i++) { 
-      const p = this.platforms[i];
-      if (!p.fadeOut) continue; 
-      
-      const t = (now - p.fadeOut.startTime) / p.fadeOut.duration; 
-      const op = Math.max(0, 1 - t); 
-      
+  updateFadeOutAnimations() {
+    if (this.fading.size === 0) return false;
+
+    const now = Date.now();
+    let changed = false;
+    const done: string[] = [];
+
+    for (const id of this.fading) {
+      const p = this.platforms.find(x => x.id === id);
+      if (!p || !p.fadeOut) { done.push(id); continue; }
+
+      const t = (now - p.fadeOut.startTime) / p.fadeOut.duration;
+      const op = Math.max(0, 1 - t);
       if (op <= 0) {
-        toRemove.push(i); // Mark for removal
+        // remove from platforms
+        const idx = this.platforms.indexOf(p);
+        if (idx >= 0) {
+          // Update culling stats
+          if (p.type === 'platform') {
+            this.totalPlatformsCulled++;
+          } else {
+            this.totalDecorationsCulled++;
+          }
+          this.platforms.splice(idx, 1);
+        }
+        done.push(id);
         changed = true;
-      } else if (op !== p.fadeOut.opacity) { 
-        p.fadeOut.opacity = op; 
-        changed = true; 
-      } 
-    }
-    
-    // Remove in reverse order to maintain indices
-    for (let i = toRemove.length - 1; i >= 0; i--) {
-      const index = toRemove[i];
-      const platform = this.platforms[index];
-      
-      // Update culling stats
-      if (platform.type === 'platform') {
-        this.totalPlatformsCulled++;
-      } else {
-        this.totalDecorationsCulled++;
+      } else if (op !== p.fadeOut.opacity) {
+        p.fadeOut.opacity = op;
+        changed = true;
       }
-      
-      this.platforms.splice(index, 1);
     }
-    
-    // Rebuild spatial index if we removed platforms
-    if (toRemove.length > 0) {
+
+    for (const id of done) this.fading.delete(id);
+
+    // Rebuild index only if we removed something
+    if (done.length) {
       this.spatialIndex.clear();
-      for (const platform of this.platforms) {
-        this.spatialIndex.addPlatform(platform);
-      }
+      for (const platform of this.platforms) this.spatialIndex.addPlatform(platform);
     }
-    
     return changed;
   }
 
-  private cullBelow(killBelowY: number) { 
+  private cullBelow(cameraY: number) {
+    const viewportBottom = cameraY + SCREEN_H * 0.5;
+
+    // your normal thresholds (post-startup these behave as before)
+    const fadeStartY = viewportBottom + SCREEN_H * 0.2;
+    const hardKillY  = viewportBottom + SCREEN_H * 0.9;
+
+    const keep: PlatformDef[] = [];
     let changed = false;
     this.platformsFadedThisFrame = 0;
     this.platformsPrunedThisFrame = 0;
-    
-    // Start fade for items below killBelowY
-    for (const p of this.platforms) { 
-      if (p.y > killBelowY && !p.fadeOut) { 
-        p.fadeOut = {startTime: Date.now(), duration: 600, opacity: 1}; 
+
+    for (const p of this.platforms) {
+      // --- Startup: hard protect visible + near-bottom platforms
+      if (this.isStartupProtected(p, cameraY)) {
+        if (p.fadeOut) { 
+          p.fadeOut = undefined; 
+          this.fading.delete(p.id); 
+          changed = true;
+        }
+        keep.push(p);
+        continue;
+      }
+
+      // --- Normal behavior (after first camera move)
+      if (p.y >= hardKillY) {
+        this.fading.delete(p.id);
+        // drop it
+        this.platformsPrunedThisFrame++;
+        if (p.type === 'platform') {
+          this.totalPlatformsCulled++;
+        } else {
+          this.totalDecorationsCulled++;
+        }
         changed = true;
-        this.platformsFadedThisFrame++;
-      } 
+        continue;
+      }
+
+      if (p.y >= fadeStartY) {
+        if (!p.fadeOut) {
+          p.fadeOut = { startTime: Date.now(), duration: 600, opacity: 1 };
+          this.fading.add(p.id);
+          this.platformsFadedThisFrame++;
+          changed = true;
+        }
+      }
+
+      keep.push(p);
+    }
+
+    if (keep.length !== this.platforms.length) {
+      this.platforms = keep;
+      this.spatialIndex.clear();
+      for (const q of this.platforms) this.spatialIndex.addPlatform(q);
+      changed = true;
     }
     
-    // Hard prune items far below (safety, even if fade not ticked)
-    const HARD = killBelowY + SCREEN_H * 2.5; 
-    const before = this.platforms.length;
-    const beforePlatforms = this.platforms.filter(p => p.type === 'platform').length;
-    const beforeDecorations = this.platforms.filter(p => p.type === 'decoration').length;
-    
-    // Hard prune platforms that are far below
-    
-    this.platforms = this.platforms.filter(p => p.y <= HARD); 
-    
-    // PERFORMANCE: Clear and rebuild spatial index after culling
-    this.spatialIndex.clear();
-    for (const platform of this.platforms) {
-      this.spatialIndex.addPlatform(platform);
-    }
-    
-    const afterPlatforms = this.platforms.filter(p => p.type === 'platform').length;
-    const afterDecorations = this.platforms.filter(p => p.type === 'decoration').length;
-    
-    const platformsPruned = beforePlatforms - afterPlatforms;
-    const decorationsPruned = beforeDecorations - afterDecorations;
-    
-    this.platformsPrunedThisFrame = platformsPruned + decorationsPruned;
-    this.totalPlatformsCulled += platformsPruned;
-    this.totalDecorationsCulled += decorationsPruned;
-    
-    return changed || (this.platforms.length !== before);
+    return changed;
   }
 
   // Debug - PRESERVED
@@ -860,6 +956,13 @@ export class EnhancedPlatformManager {
     
     // Remove platforms that are definitely out of reach
     this.platforms = this.platforms.filter(platform => {
+      // PERFORMANCE: Favor dropping decorations quickly
+      if (platform.type === 'decoration') {
+        return platform.y < cleanupThreshold || 
+               (platform.fadeOut && (platform.fadeOut.opacity ?? 1) > 0.5) ||
+               this.isDeathFloor(platform);
+      }
+      
       // Keep platforms that are:
       // 1. Above the cleanup threshold, OR
       // 2. Still fading out and visible, OR  
@@ -904,5 +1007,63 @@ export class EnhancedPlatformManager {
       fadedThisFrame: this.platformsFadedThisFrame,
       prunedThisFrame: this.platformsPrunedThisFrame
     };
+  }
+
+  // PERFORMANCE: O(cells) instead of O(N) platform queries
+  getPlatformsInRect(topY: number, bottomY: number): PlatformDef[] {
+    // cover full width; we only care about Y window here
+    const cell = this.spatialIndex;
+    const cellSize = (cell as any).cellSize ?? 200;
+
+    const out: PlatformDef[] = [];
+    const seen = new Set<string>();
+
+    // Walk only vertical strip of grid rows intersecting viewport
+    const firstRow = Math.floor((topY - cellSize) / cellSize);
+    const lastRow  = Math.floor((bottomY + cellSize) / cellSize);
+
+    for (let gy = firstRow; gy <= lastRow; gy++) {
+      // Check a few columns across screen width; two or three is enough
+      for (let gx of [-1, 0, 1]) {
+        const key = `${gx},${gy}`;
+        const bucket = (cell as any).grid?.get(key) as PlatformDef[] | undefined;
+        if (!bucket) continue;
+        for (const p of bucket) {
+          if (seen.has(p.id)) continue;
+          const pBottom = p.y + (p.collision?.height || 32);
+          // final clip to viewport band
+          if (pBottom > topY && p.y < bottomY) {
+            seen.add(p.id);
+            out.push(p);
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  // PERFORMANCE: Aggressive height-based platform history clamping
+  private clampHistoryAround(playerY: number, cameraY: number) {
+    const viewportTop    = cameraY - SCREEN_H * 0.5;
+    const viewportBottom = cameraY + SCREEN_H * 0.5;
+
+    let clampTop    = viewportTop  - SCREEN_H * 1.5;
+    let clampBottom = viewportBottom + SCREEN_H * 3.0;
+
+    if (this.startupProtectVisible) {
+      // wider band so the bottom pad survives until first movement
+      clampTop    = viewportTop  - SCREEN_H * 2.5;
+      clampBottom = viewportBottom + SCREEN_H * 4.0;
+    }
+
+    const before = this.platforms.length;
+    this.platforms = this.platforms.filter(p =>
+      (p.y >= clampTop && p.y <= clampBottom) || this.isDeathFloor(p)
+    );
+
+    if (this.platforms.length !== before) {
+      this.spatialIndex.clear();
+      for (const p of this.platforms) this.spatialIndex.addPlatform(p);
+    }
   }
 }

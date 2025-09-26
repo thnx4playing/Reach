@@ -10,7 +10,11 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.thnx4playing.reach",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,6 +22,12 @@
         "backgroundColor": "#ffffff"
       }
     },
-    "plugins": []
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "0a6b60db-bdec-4a5a-9f47-de0aa8c06b44"
+      }
+    },
+    "owner": "thnx4playing"
   }
 }
