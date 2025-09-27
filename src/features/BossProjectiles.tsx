@@ -1,65 +1,77 @@
 // src/features/BossProjectiles.tsx
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Group, Circle, Image as SkImageComp } from '@shopify/react-native-skia';
 import { useImage } from '@shopify/react-native-skia';
 import { BOSS_DAMAGE_PER_HIT } from '../config/gameplay';
 
 export type BossProjectile = {
   id: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
+  x: number; y: number;
+  vx: number; vy: number;
   lifeMs: number;
   bornAt: number;
 };
 
 type Props = {
   projectiles: BossProjectile[];
-  setProjectiles: (updater: (prev: BossProjectile[]) => BossProjectile[]) => void;
-  xToScreen: (x:number)=>number;
-  worldYToScreenY: (y:number)=>number;
+  setProjectiles: React.Dispatch<React.SetStateAction<BossProjectile[]>>;
+  xToScreen: (xWorld: number) => number;
+  worldYToScreenY: (yWorld: number) => number;
   screenW: number;
   screenH: number;
   playerBBoxWorld: { left:number; right:number; top:number; bottom:number };
-  onPlayerHit: (damage:number)=>void;
+  onPlayerHit: (dmg: number) => void;
 };
 
+const TEX = require('../../assets/character/demon/projectile.png') as number;
+
 export default function BossProjectiles({
-  projectiles, setProjectiles, xToScreen, worldYToScreenY, screenW, screenH,
-  playerBBoxWorld, onPlayerHit
+  projectiles, setProjectiles, xToScreen, worldYToScreenY, screenW, screenH, playerBBoxWorld, onPlayerHit
 }: Props) {
-  const tex = useImage(require('../../assets/character/demon/projectile.png'));
-  const lastRef = useRef<number>(Date.now());
+  const tex = useImage(TEX);
+  const enabledRef = useRef(true);
 
-  // integrate simple motion
-  const now = Date.now();
-  const dt = Math.min(0.033, (now - lastRef.current) / 1000);
-  lastRef.current = now;
+  // Integrate motion & handle lifetime / collisions
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+    const step = (now: number) => {
+      const dt = Math.min(0.033, (now - last) / 1000);
+      last = now;
 
-  const next: BossProjectile[] = [];
-  for (const p of projectiles) {
-    const nx = p.x + p.vx * dt;
-    const ny = p.y + p.vy * dt;
-    const nl = p.lifeMs - (now - p.bornAt);
-    if (nl > 0) {
-      // collision
-      if (rectContains(playerBBoxWorld, nx, ny)) {
-        onPlayerHit(BOSS_DAMAGE_PER_HIT);
-        continue;
+      if (enabledRef.current) {
+        setProjectiles(prev => {
+          const out: BossProjectile[] = [];
+          for (const p of prev) {
+            // integrate
+            const nx = p.x + p.vx * dt;
+            const ny = p.y + p.vy * dt;
+            const life = p.lifeMs - (now - p.bornAt);
+
+            // player collision (world space)
+            if (rectContains(playerBBoxWorld, nx, ny)) {
+              onPlayerHit(BOSS_DAMAGE_PER_HIT);
+              continue; // consume projectile
+            }
+
+            // cull if expired or far outside room bounds
+            const sx = xToScreen(nx);
+            const sy = worldYToScreenY(ny);
+            const offscreen = sx < -64 || sx > screenW + 64 || sy < -64 || sy > screenH + 64;
+
+            if (life > 0 && !offscreen) {
+              out.push({ ...p, x: nx, y: ny });
+            }
+          }
+          return out;
+        });
       }
-      // cull in screen space
-      const sx = xToScreen(nx);
-      const sy = worldYToScreenY(ny);
-      if (sx < -120 || sx > screenW+120 || sy < -140 || sy > screenH+160) {
-        // keep moving for a bit anyway
-      }
-      next.push({ ...p, x: nx, y: ny });
-    }
-  }
-  if (next.length !== projectiles.length) {
-    setTimeout(() => setProjectiles(() => next), 0);
-  }
+
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [setProjectiles, xToScreen, worldYToScreenY, screenW, screenH, playerBBoxWorld, onPlayerHit]);
 
   return (
     <Group>
@@ -67,8 +79,7 @@ export default function BossProjectiles({
         const sx = xToScreen(p.x);
         const sy = worldYToScreenY(p.y);
         if (tex) {
-          // draw textured
-          return <SkImageComp key={p.id} image={tex} x={sx-12} y={sy-8} width={24} height={16} />;
+          return <SkImageComp key={p.id} image={tex} x={sx - 12} y={sy - 8} width={24} height={16} />;
         }
         return <Circle key={p.id} cx={sx} cy={sy} r={6} color="#d44" />;
       })}
