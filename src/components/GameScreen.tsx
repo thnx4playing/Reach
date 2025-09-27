@@ -213,17 +213,32 @@ const GameComponent: React.FC<{
   useEffect(() => { bossPlatformsRef.current = bossPlatforms; }, [bossPlatforms]);
 
   function createBossPlatforms(floorTopY: number, mapW: number): BossPlat[] {
-    // prefab width of your 3-block (adjust if different)
-    const W = 144; 
+    // Use the actual prefab width for collision accuracy
+    const W = prefabWidthPx(levelData.mapName, 'platform-grass-3-final'); // 96px (3 tiles × 16px × 2 scale)
     const H = 24;
 
-    const cx = Math.round(mapW * 0.5);
-    // horizontally spread them around center
-    const xs = [cx - 220, cx + 100, cx - 20, cx - 260, cx + 160, cx - 120, cx + 20];
-    // heights above floor (tweak freely)
-    const ys = [160, 190, 250, 300, 360, 430, 500];
+    // Arrange platforms: 2 left, 3 middle, 2 right at different heights
+    const screenCenter = SCREEN_W * 0.5;
+    const margin = 120; // margin from screen edges
+    const leftZone = screenCenter - 150;   // left side
+    const rightZone = screenCenter + 150;  // right side
+    const middleZone = screenCenter;       // center
+    
+    // X positions: 2 left, 3 middle, 2 right (all within screen bounds)
+    const xs = [
+      leftZone - 60,    // left 1
+      leftZone + 20,    // left 2
+      middleZone - 80,  // middle 1
+      middleZone,       // middle 2
+      middleZone + 80,  // middle 3
+      rightZone - 20,   // right 1
+      rightZone + 60,   // right 2
+    ];
+    
+    // Y positions: all at different heights, staggered
+    const ys = [120, 280, 200, 360, 480, 160, 400];
 
-    return ys.map((dy, i) => ({
+    const platforms = ys.map((dy, i) => ({
       id: `boss-plf-${i}`,
       x: xs[i],
       y: floorTopY - dy,
@@ -231,6 +246,8 @@ const GameComponent: React.FC<{
       h: H,
       prefab: BOSS_PREFAB,
     }));
+    
+    return platforms;
   }
 
   // Single place to decide if hazards are allowed to kill us
@@ -353,6 +370,7 @@ const GameComponent: React.FC<{
     top: playerWorldY - COL_H,
     bottom: playerWorldY,
   };
+  
 
   // Door position is now frozen in doorPos state
 
@@ -418,11 +436,6 @@ const GameComponent: React.FC<{
     // Note: do NOT depend on allPlatforms here—tie to camera only
   }, [Math.floor(cameraY / 8)]);
 
-  // Same prefabbed floor as tower map, but for bossroom render
-  const bossFloorPieces = useMemo(
-    () => makeStaticFloor(levelData.mapName as any, SCREEN_W, SCREEN_H, SCALE),
-    [levelData.mapName]
-  );
 
   // Convert boss platform rects to PlatformDef for the renderer
   const bossDisplayPlatforms = useMemo<PlatformDef[]>(() => {
@@ -1148,77 +1161,64 @@ const GameComponent: React.FC<{
             
             {/* Boss room platforms - render using same prefab as tower */}
             {mode === 'bossroom' && bossPlatforms.map(p => (
-              <PrefabNode key={p.id} map={levelData.mapName} name={p.prefab} x={p.x} y={p.y} />
+              <PrefabNode key={p.id} map="grassy" name={p.prefab} x={p.x} y={p.y} />
             ))}
-            
-            {/* Boss room floor - use same GroundBand as original map */}
+
+            {/* Boss demon and projectiles */}
             {mode === 'bossroom' && (() => {
-              // Use the same world->screen conversion as the original GroundBand
-              const groundScreenY = worldYToScreenY(floorTopY);
-              // Adjust upward to align grass lip exactly under character's feet
-              const adjustedGroundY = groundScreenY - 30; // Move up 30px to align better
-              const groundH = Math.max(0, SCREEN_H - adjustedGroundY);
+              // Ensure numeric player world coordinates for boss
+              const safePlayerWorldX = Number(xRef.current) + Number(CHAR_W) / 2;
+              const safePlayerWorldY = Number(floorTopY) - Number(zRef.current);
               
               return (
-                <GroundBand
-                  width={SCREEN_W}
-                  height={groundH}
-                  y={adjustedGroundY}
-                  opacity={1}
-                  timeMs={hazardAnimationTime}
+                <BossDemon
+                  xWorld={prefabWidthPx(levelData.mapName, 'platform-grass-3-final')*0.5}
+                  yWorld={floorTopY - 420}
+                  worldYToScreenY={worldYToScreenY}
+                  xToScreen={(x) => x}
+                  screenW={SCREEN_W}
+                  screenH={SCREEN_H}
+                  playerX={safePlayerWorldX}
+                  playerY={safePlayerWorldY}
+                  onShoot={({x, y, vx, vy, lifeMs}) => {
+                    setBossShots(s => {
+                      const newShot = {
+                        id: projIdRef.current++,
+                        x, y, vx, vy, lifeMs,
+                        bornAt: Date.now(),
+                        r: 6 + Math.random() * 6,   // size like the Skia lava balls
+                      };
+                      return s.concat([newShot]);
+                    });
+                  }}
                 />
               );
             })()}
-            
-            {/* Boss room floor art (same tiles as tower) */}
-            {mode === 'bossroom' && bossFloorPieces.map((piece, i) => (
-              <PrefabNode
-                key={`bossfloor-${i}`}
-                map={levelData.mapName}
-                name={piece.prefab}
-                x={piece.x}
-                y={piece.y}
-                scale={piece.scale}
-                opacity={1}
-              />
-            ))}
 
-            {/* Boss room platforms (visible) */}
-            {mode === 'bossroom' && (
-              <PlatformRenderer
-                platforms={bossDisplayPlatforms}
-                mapName={levelData.mapName}
-                opacity={1}
-              />
-            )}
-
-            {/* Boss demon and projectiles */}
-            {mode === 'bossroom' && (
-              <BossDemon
-                xWorld={prefabWidthPx(levelData.mapName, 'platform-grass-3-final')*0.5}
-                yWorld={floorTopY - 420}
-                worldYToScreenY={worldYToScreenY}
-                xToScreen={(x) => x}
-                screenW={SCREEN_W}
-                screenH={SCREEN_H}
-                playerX={playerWorldX}
-                playerY={playerWorldY}
-                onShoot={(p) => spawnBossProjectile(p)}
-              />
-            )}
-
-            {mode === 'bossroom' && (
-              <BossProjectiles
-                projectiles={bossShots}
-                setProjectiles={setBossShots}
-                xToScreen={(x) => x}
-                worldYToScreenY={worldYToScreenY}
-                screenW={SCREEN_W}
-                screenH={SCREEN_H}
-                playerBBoxWorld={playerBBoxWorld}
-                onPlayerHit={(dmg) => takeDamage(dmg)}
-              />
-            )}
+            {mode === 'bossroom' && (() => {
+              // Ensure numeric player world coordinates for projectiles
+              const safePlayerWorldX = Number(xRef.current) + Number(CHAR_W) / 2;
+              const safePlayerWorldY = Number(floorTopY) - Number(zRef.current);
+              const safePlayerBBoxWorld = {
+                left: safePlayerWorldX - Number(COL_W) / 2,
+                right: safePlayerWorldX + Number(COL_W) / 2,
+                top: safePlayerWorldY - Number(COL_H),
+                bottom: safePlayerWorldY,
+              };
+              
+              return (
+                <BossProjectiles
+                  projectiles={bossShots}
+                  setProjectiles={setBossShots}
+                  xToScreen={(x) => x}
+                  worldYToScreenY={worldYToScreenY}
+                  screenW={SCREEN_W}
+                  screenH={SCREEN_H}
+                  playerBBoxWorld={safePlayerBBoxWorld}
+                  onPlayerHit={(dmg) => takeDamage(dmg)}
+                />
+              );
+            })()}
             
             <DashCharacter
               floorTopY={floorTopY}
@@ -1268,8 +1268,8 @@ const GameComponent: React.FC<{
       </View>
       
       
-      {/* Ground Band - Dirt with grass top - only in tower mode */}
-      {mode === 'tower' && (() => {
+      {/* Ground Band - Dirt with grass top - both tower and boss room modes */}
+      {(() => {
         // Use the same world->screen conversion as HazardBand for consistency
         const groundScreenY = worldYToScreenY(floorTopY);
         // Adjust upward to align grass lip exactly under character's feet
