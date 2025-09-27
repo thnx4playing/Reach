@@ -12,7 +12,7 @@ import HazardBand from '../render/HazardBand';
 import GroundBand from '../render/GroundBand';
 import FireballLayer from '../render/FireballLayer';
 import type { LevelData } from '../content/levels';
-import { MAPS, getPrefab, getTileSize, prefabWidthPx } from '../content/maps';
+import { MAPS, getPrefab, getTileSize } from '../content/maps';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
 import { EnhancedPlatformManager } from '../systems/platform/PlatformManager';
 import { checkPlatformCollision } from '../physics/PlatformCollision';
@@ -31,6 +31,14 @@ import { useDamageAnimations } from '../systems/health/useDamageAnimations';
 
 // Audio system imports
 import { useSound } from '../audio/useSound';
+
+// Boss system imports
+import DoorSprite, { pointInDoor } from '../features/DoorSprite';
+import BossRoom from '../features/BossRoom';
+import BossDemon from '../features/BossDemon';
+import BossProjectiles, { BossProjectile } from '../features/BossProjectiles';
+import { DOORWAY_SPAWN_Y, DOORWAY_WIDTH, DOORWAY_HEIGHT, DOORWAY_POSITION_OFFSET } from '../config/gameplay';
+import { prefabWidthPx, alignPrefabYToSurfaceTop } from '../content/maps';
 
 // debug flag
 const VCOLLECT = __DEV__;
@@ -166,6 +174,126 @@ const GameComponent: React.FC<{
   const [rightHudH, setRightHudH] = useState(0);    // total height of (Score + Time)
   const [hazardAnimationTime, setHazardAnimationTime] = useState(0);
 
+  // Boss system state
+  const [mode, setMode] = useState<'tower'|'bossroom'>('tower');
+  
+  // ===== Door anchored to existing 3-block grass platform =====
+  const DOOR_TARGET_Y_WORLD = -DOORWAY_SPAWN_Y; // world up is negative
+  const [doorAnchor, setDoorAnchor] = useState<null | { id: string; x: number; y: number; w: number }>(null);
+  
+  // Calculate door position from anchor (same as used for rendering)
+  const doorWorldX = doorAnchor ? Math.round(doorAnchor.x + (doorAnchor.w - DOORWAY_WIDTH) * 0.5) : 0;
+  const doorWorldY = doorAnchor ? Math.round(doorAnchor.y - DOORWAY_HEIGHT + DOORWAY_POSITION_OFFSET) : 0;
+  
+  
+  // Use ref to access current doorAnchor in game loop
+  const doorAnchorRef = useRef(doorAnchor);
+  doorAnchorRef.current = doorAnchor;
+  
+  // === Boss-room helpers & guards ===
+  const hazardSuppressUntilMsRef = useRef(0); // blocks lava/fall deaths briefly
+  const hasTeleportedRef = useRef(false);     // prevents multi-trigger on door overlap
+
+  // toggle for rendering/moving player bullets and enemy projectiles
+  const bossProjectilesEnabledRef = useRef(false);
+
+  // Prefab id your normal map uses for a 3-block platform
+  const BOSS_PREFAB = 'platform-grass-3-final';
+
+  // Build 6–7 fixed platforms using the SAME prefab as tower.
+  // We keep them centered and staggered above the floor.
+  type BossPlat = { id: string; x: number; y: number; w: number; h: number; prefab: string };
+  const [bossPlatforms, setBossPlatforms] = useState<BossPlat[]>([]);
+
+  function createBossPlatforms(floorTopY: number, mapW: number): BossPlat[] {
+    // prefab width of your 3-block (adjust if different)
+    const W = 144; 
+    const H = 24;
+
+    const cx = Math.round(mapW * 0.5);
+    // horizontally spread them around center
+    const xs = [cx - 220, cx + 100, cx - 20, cx - 260, cx + 160, cx - 120, cx + 20];
+    // heights above floor (tweak freely)
+    const ys = [160, 190, 250, 300, 360, 430, 500];
+
+    return ys.map((dy, i) => ({
+      id: `boss-plf-${i}`,
+      x: xs[i],
+      y: floorTopY - dy,
+      w: W,
+      h: H,
+      prefab: BOSS_PREFAB,
+    }));
+  }
+
+  // Single place to decide if hazards are allowed to kill us
+  function hazardsActive(mode: string) {
+    const now = Date.now();
+    const suppressUntil = hazardSuppressUntilMsRef.current;
+    const isSuppressed = now < suppressUntil;
+    const isBossroom = mode === 'bossroom';
+    const result = !isBossroom && !isSuppressed;
+    
+    if (__DEV__ && (isBossroom || isSuppressed)) {
+      console.log('hazardsActive check', { mode, now, suppressUntil, isSuppressed, isBossroom, result });
+    }
+    
+    return result;
+  }
+
+  // Enable boss projectiles only after the room is set up
+  useEffect(() => {
+    if (mode === 'bossroom') {
+      // tiny delay to ensure platforms/camera are ready
+      const t = setTimeout(() => { bossProjectilesEnabledRef.current = true; }, 300);
+      return () => clearTimeout(t);
+    } else {
+      bossProjectilesEnabledRef.current = false;
+    }
+  }, [mode]);
+
+  const [bossProjectiles, setBossProjectiles] = useState<BossProjectile[]>([]);
+  const nextProjIdRef = useRef(1);
+
+  const spawnBossProjectile = useCallback((p:{x:number;y:number;vx:number;vy:number;lifeMs:number}) => {
+    const id = nextProjIdRef.current++;
+    setBossProjectiles(prev => [...prev, { id, bornAt: Date.now(), ...p }]);
+  }, []);
+
+  // Prefab id for the 3-block grass platform (adjust if your id differs)
+  const THREE_BLOCK_PREFAB = 'platform-grass-3-final';
+
+  function findNearestThreeBlockAbove(mgr: any, targetY: number) {
+    if (!mgr) return null;
+    
+    console.log('Searching for 3-block platform above Y:', targetY);
+    
+    // Get all platforms and filter for 3-block grass platforms above target
+    const allPlatforms = mgr.getAllPlatforms();
+    console.log('Total platforms available:', allPlatforms.length);
+    
+    const threeBlockPlatforms = allPlatforms.filter(p => (p.prefab ?? p.name) === THREE_BLOCK_PREFAB);
+    console.log('3-block platforms found:', threeBlockPlatforms.length);
+    
+    // Filter for platforms ABOVE the target (remember: up is negative, so y <= targetY means above)
+    const aboveTarget = threeBlockPlatforms.filter(p => p.y <= targetY);
+    console.log('3-block platforms above target Y', targetY, ':', aboveTarget.length);
+    
+    if (aboveTarget.length === 0) {
+      console.log('No 3-block platforms found above target Y:', targetY);
+      return null;
+    }
+    
+    // Sort by Y descending (closest above = largest Y value)
+    const sorted = aboveTarget.sort((a, b) => b.y - a.y);
+    const closest = sorted[0];
+    
+    const w = closest.collision?.width ?? closest.w ?? closest.width ?? 144;
+    console.log('Selected platform:', { id: closest.id, x: closest.x, y: closest.y, w });
+    
+    return { id: closest.id, x: closest.x, y: closest.y, w };
+  }
+
 
   // State variables
   const [x, setX] = useState(SCREEN_W * 0.5);
@@ -224,6 +352,17 @@ const GameComponent: React.FC<{
 
   // Calculate player's world Y position
   const playerWorldY = floorTopY - zRef.current;
+
+  // Boss system: player world coordinates and bounding box
+  const playerWorldX = xRef.current + 16; // CHAR_W * 0.5 (assuming 32px char width)
+  const playerBBoxWorld = {
+    left: xRef.current + 7,   // CHAR_W*0.22 (assuming 32px char width)
+    right: xRef.current + 25,  // CHAR_W*0.78
+    top: playerWorldY - 32,   // CHAR_H (assuming 32px char height)
+    bottom: playerWorldY,
+  };
+
+  // Door position is now frozen in doorPos state
 
   // NEW UNIFIED PLATFORM SYSTEM - Reset on component mount
   const platformManager = useRef<EnhancedPlatformManager | null>(null);
@@ -286,6 +425,48 @@ const GameComponent: React.FC<{
       : [];
     // Note: do NOT depend on allPlatforms here—tie to camera only
   }, [Math.floor(cameraY / 8)]);
+
+  // Find and anchor the door to a 3-block platform
+  useEffect(() => {
+    console.log('Door useEffect triggered, doorAnchor:', !!doorAnchor, 'visiblePlatforms:', visiblePlatforms.length);
+    
+    if (doorAnchor) {
+      console.log('Door anchor already set, returning');
+      return; // already found
+    }
+
+    const mgr = platformManager.current;
+    if (!mgr) {
+      console.log('PlatformManager not ready');
+      return;
+    }
+
+    console.log('Searching for door anchor...');
+    const a = findNearestThreeBlockAbove(mgr, DOOR_TARGET_Y_WORLD);
+    if (a) {
+      console.log('Door anchor found:', a);
+      setDoorAnchor(a);
+    } else {
+      console.log('No door anchor found');
+    }
+  }, [visiblePlatforms, DOOR_TARGET_Y_WORLD]);
+
+  // Boss room platforms
+  const bossRoomPlatforms = useMemo(() => {
+    if (mode !== 'bossroom') return [];
+    const W = prefabWidthPx(levelData.mapName, 'platform-grass-3-final');
+    const cx = W*0.5;
+    return [
+      // 6–7 simple slabs (w=120) at varying heights
+      { id: 'b1', x: cx-220, y: floorTopY-160, w: 120, h: 20, type: 'wood' },
+      { id: 'b2', x: cx+100, y: floorTopY-180, w: 120, h: 20, type: 'wood' },
+      { id: 'b3', x: cx-20,  y: floorTopY-260, w: 120, h: 20, type: 'wood' },
+      { id: 'b4', x: cx-260, y: floorTopY-300, w: 120, h: 20, type: 'wood' },
+      { id: 'b5', x: cx+160, y: floorTopY-340, w: 120, h: 20, type: 'wood' },
+      { id: 'b6', x: cx-120, y: floorTopY-420, w: 120, h: 20, type: 'wood' },
+      { id: 'b7', x: cx+ 20, y: floorTopY-500, w: 120, h: 20, type: 'wood' },
+    ] as any;
+  }, [mode, floorTopY, levelData.mapName]);
 
   // Add this after platformManager initialization to validate the setup:
   useEffect(() => {
@@ -532,16 +713,23 @@ const GameComponent: React.FC<{
 
       // ==== DIRECT HAZARD BAND DEATH CHECK ====
       // Check if player has fallen into the hazard band area (more reliable than platform collision)
-      const deathFloor = platformManager.current?.getDeathFloor();
-      if (deathFloor && !isDead) {
+      const deathFloor = platformManager.current?.getDeathFloor?.();
+      if (deathFloor && !isDead && hazardsActive(mode)) {
         const hazardTopWorld = deathFloor.y;
         const playerWorldY = floorTopY - zRef.current;
-        
-        // Player dies if they fall 40px into the hazard band area
         if (playerWorldY >= hazardTopWorld + 40) {
+          console.log('HAZARD DEATH TRIGGERED', { 
+            mode, 
+            playerWorldY, 
+            hazardTopWorld, 
+            hazardsActive: hazardsActive(mode),
+            hasTeleported: hasTeleportedRef.current,
+            suppressUntil: hazardSuppressUntilMsRef.current,
+            now: Date.now()
+          });
           deathTypeRef.current = 'fire';
           takeDamage(999);
-          return; // Stop physics processing
+          return;
         }
       }
 
@@ -574,9 +762,58 @@ const GameComponent: React.FC<{
           200 // Increased search radius
         ) || [];
         
+    // Add boss room collision slabs
+    const bossCollision = mode === 'bossroom'
+      ? [
+          // Boss room floor
+          {
+            id: 'boss-floor',
+            x: -SCREEN_W,
+            y: floorTopY,
+            w: SCREEN_W * 3,
+            h: 32, // Standard floor height
+            type: 'platform' as const,
+            collision: {
+              left: -SCREEN_W,
+              right: SCREEN_W * 2,
+              topY: floorTopY,
+              solid: true,
+              width: SCREEN_W * 3,
+              height: 32
+            },
+            prefab: 'floor',
+            scale: 1
+          },
+          // Boss platforms
+          ...bossPlatforms.map(p => ({ 
+            id: p.id, 
+            x: p.x, 
+            y: p.y, 
+            w: p.w, 
+            h: p.h, 
+            type: 'platform' as const,
+            collision: { 
+              left: p.x, 
+              right: p.x + p.w, 
+              topY: p.y, 
+              solid: true,
+              width: p.w,
+              height: p.h
+            },
+            prefab: p.prefab,
+            scale: 1
+          }))
+        ]
+      : [];
+
+        const platformsForCollision = [
+          ...nearbyPlatforms,   // your normal generated platforms
+          ...bossCollision,     // add boss room slabs only in bossroom
+        ];
+        
         
         // Check each platform
-        for (const platform of nearbyPlatforms) {
+        for (const platform of platformsForCollision) {
           if (!platform.collision?.solid) continue;
           
           const collision = platform.collision;
@@ -586,7 +823,7 @@ const GameComponent: React.FC<{
           // if (collision.topY >= floorTopY - 10) continue;
           
           // SPECIAL HANDLING FOR DEATH FLOOR - Much tighter collision
-          if (platformManager.current?.isDeathFloor(platform)) {
+          if (platformManager.current?.isDeathFloor(platform) && hazardsActive(mode)) {
             // Check horizontal overlap (normal)
             const playerLeft = playerWorldX - COL_W / 2;
             const playerRight = playerWorldX + COL_W / 2;
@@ -599,6 +836,7 @@ const GameComponent: React.FC<{
               
               // Only kill when player is AT or BELOW the death floor surface
               if (distanceToSurface >= -5 && distanceToSurface <= 10) {
+                console.log('DEATH FLOOR COLLISION TRIGGERED', { mode, distanceToSurface, hazardsActive: hazardsActive(mode) });
                 deathTypeRef.current = 'fire';
                 takeDamage(999);
                 return;
@@ -669,6 +907,89 @@ const GameComponent: React.FC<{
         onGroundRef.current = false;
       }
 
+    // ===== Door teleport AABB (world space) =====
+    console.log('Game loop running, mode:', mode, 'doorAnchor:', !!doorAnchorRef.current);
+    if (mode === 'tower' && doorAnchorRef.current) {
+      console.log('Door collision check running, doorAnchor:', doorAnchorRef.current);
+      // Use your existing player AABB if available; otherwise compute one
+      const box = currentPlayerBox ?? getPlayerBox({
+        xRefIsLeftEdge: true,
+        x: xRef.current,
+        z: zRef.current,
+        floorTopY,
+        charW: CHAR_W,
+        colW: COL_W,
+        colH: COL_H,
+      });
+
+      // Calculate door position from current anchor (same as used for rendering)
+      const currentDoorWorldX = Math.round(doorAnchorRef.current.x + (doorAnchorRef.current.w - DOORWAY_WIDTH) * 0.5);
+      const currentDoorWorldY = Math.round(doorAnchorRef.current.y - DOORWAY_HEIGHT + DOORWAY_POSITION_OFFSET);
+
+      const PAD = 6; // a little forgiveness feels better
+      const L = currentDoorWorldX - PAD;
+      const R = currentDoorWorldX + DOORWAY_WIDTH + PAD;
+      const T = currentDoorWorldY - PAD;
+      const B = currentDoorWorldY + DOORWAY_HEIGHT + PAD;
+
+      const overlap =
+        box.right  >= L &&
+        box.left   <= R &&
+        box.bottom >= T &&
+        box.top    <= B;
+
+      // Debug collision detection
+      console.log('DOOR AABB CHECK', {
+        playerBox: { left: box.left, right: box.right, top: box.top, bottom: box.bottom },
+        doorRect: { L, R, T, B },
+        doorWorldX: currentDoorWorldX, doorWorldY: currentDoorWorldY,
+        doorAnchor: doorAnchorRef.current,
+        playerWorldX, playerWorldY,
+        overlap,
+        hasTeleported: hasTeleportedRef.current
+      });
+
+      if (overlap && !hasTeleportedRef.current) {
+        hasTeleportedRef.current = true;
+
+        console.log('TELEPORT TRIGGERED - switching to bossroom');
+        console.log('Current mode before teleport:', mode);
+
+        // 1) briefly suppress hazards so this frame can't kill us
+        hazardSuppressUntilMsRef.current = Date.now() + 1000;
+
+        // 2) enter boss room
+        setMode('bossroom');
+        console.log('setMode("bossroom") called');
+
+        // 3) stop any tower projectiles; enable boss projectiles later
+        setBossProjectiles?.([]);
+        bossProjectilesEnabledRef.current = false;
+
+        // 4) spawn fixed boss platforms using the SAME prefab as tower
+        const mapW = prefabWidthPx(levelData.mapName, 'platform-grass-3-final');
+        setBossPlatforms(createBossPlatforms(floorTopY, mapW));
+
+        // 5) re-center player on the room
+        xRef.current = Math.round((mapW - CHAR_W) * 0.5);
+        zRef.current = 64; // stand a bit above the floor
+      }
+    } else {
+      // Reset guard when not in tower or door no longer present
+      hasTeleportedRef.current = false;
+    }
+    
+    // TEMPORARY: Reset teleport guard every 5 seconds for testing
+    if (frameCount % 300 === 0) { // 5 seconds at 60fps
+      hasTeleportedRef.current = false;
+      console.log('Teleport guard reset for testing');
+    }
+    
+    // Debug: Log mode changes
+    if (frameCount % 60 === 0) { // Every second
+      console.log('Current mode:', mode, 'hasTeleported:', hasTeleportedRef.current);
+    }
+
       // ==== SIMPLIFIED FLOOR COLLISION ====
       if (zRef.current < 0) {
         zRef.current = 0;
@@ -731,7 +1052,7 @@ const GameComponent: React.FC<{
             setCameraY(newCameraY);
             
             // PERFORMANCE: Less frequent camera updates for platform generation
-            if (platformManager.current && frameCount % 60 === 0) { // FIX: Only every 60 frames = 1 second
+            if (platformManager.current && frameCount % 60 === 0 && mode === 'tower') { // FIX: Only every 60 frames = 1 second
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, { playerY: playerWorldY });
               
@@ -759,7 +1080,7 @@ const GameComponent: React.FC<{
           if (Math.abs(newCameraY - cameraY) > 1) {
             setCameraY(newCameraY);
             
-            if (platformManager.current && frameCount % 60 === 0) { // FIX: Only every 60 frames = 1 second
+            if (platformManager.current && frameCount % 60 === 0 && mode === 'tower') { // FIX: Only every 60 frames = 1 second
               const playerWorldY = floorTopY - zRef.current;
               const platformsChanged = platformManager.current.updateForCamera(newCameraY, { playerY: playerWorldY });
               
@@ -781,7 +1102,7 @@ const GameComponent: React.FC<{
       }
 
       // Update fade-out animations every frame for smooth animation (runs regardless of camera movement)
-      if (platformManager.current) {
+      if (platformManager.current && mode === 'tower') {
         const fadeChanged = platformManager.current.updateFadeOutAnimations();
         if (fadeChanged) {
           setAllPlatforms(platformManager.current.getAllPlatforms());
@@ -845,13 +1166,78 @@ const GameComponent: React.FC<{
           }, [Math.floor(elapsedSec * 4)])}
           
           <Group transform={[{ translateY: -cameraY }]}>
-            {/* PERFORMANCE: Use memoized platform renderer */}
-            <PlatformRenderer 
-              platforms={visiblePlatforms}
-              mapName={levelData.mapName}
-              opacity={1.0}
-            />
+            {/* PERFORMANCE: Use memoized platform renderer - only in tower mode */}
+            {mode === 'tower' && (
+              <PlatformRenderer 
+                platforms={visiblePlatforms}
+                mapName={levelData.mapName}
+                opacity={1.0}
+              />
+            )}
             
+            {/* Doorway rendering - only in tower mode */}
+            {mode === 'tower' && doorAnchor && (
+              <DoorSprite
+                doorWorldX={doorWorldX}
+                doorWorldY={doorWorldY}
+                xToScreen={(x) => x}
+                worldYToScreenY={worldYToScreenY}
+                screenW={SCREEN_W}
+                screenH={SCREEN_H}
+              />
+            )}
+            
+            {/* Boss room platforms - render using same prefab as tower */}
+            {mode === 'bossroom' && bossPlatforms.map(p => (
+              <PrefabNode key={p.id} map={levelData.mapName} name={p.prefab} x={p.x} y={p.y} />
+            ))}
+            
+            {/* Boss room floor - use same GroundBand as original map */}
+            {mode === 'bossroom' && (() => {
+              // Use the same world->screen conversion as the original GroundBand
+              const groundScreenY = worldYToScreenY(floorTopY);
+              // Adjust upward to align grass lip exactly under character's feet
+              const adjustedGroundY = groundScreenY - 30; // Move up 30px to align better
+              const groundH = Math.max(0, SCREEN_H - adjustedGroundY);
+              
+              return (
+                <GroundBand
+                  width={SCREEN_W}
+                  height={groundH}
+                  y={adjustedGroundY}
+                  opacity={1}
+                  timeMs={hazardAnimationTime}
+                />
+              );
+            })()}
+            
+            {/* Boss demon and projectiles */}
+            {mode === 'bossroom' && (
+              <BossDemon
+                xWorld={prefabWidthPx(levelData.mapName, 'platform-grass-3-final')*0.5}
+                yWorld={floorTopY - 420}
+                worldYToScreenY={worldYToScreenY}
+                xToScreen={(x) => x}
+                screenW={SCREEN_W}
+                screenH={SCREEN_H}
+                playerX={playerWorldX}
+                playerY={playerWorldY}
+                onShoot={(p) => spawnBossProjectile(p)}
+              />
+            )}
+
+            {mode === 'bossroom' && (
+              <BossProjectiles
+                projectiles={bossProjectiles}
+                setProjectiles={setBossProjectiles}
+                xToScreen={(x) => x}
+                worldYToScreenY={worldYToScreenY}
+                screenW={SCREEN_W}
+                screenH={SCREEN_H}
+                playerBBoxWorld={playerBBoxWorld}
+                onPlayerHit={(dmg) => takeDamage(dmg)}
+              />
+            )}
             
             <DashCharacter
               floorTopY={floorTopY}
@@ -901,8 +1287,8 @@ const GameComponent: React.FC<{
       </View>
       
       
-      {/* Ground Band - Dirt with grass top */}
-      {(() => {
+      {/* Ground Band - Dirt with grass top - only in tower mode */}
+      {mode === 'tower' && (() => {
         // Use the same world->screen conversion as HazardBand for consistency
         const groundScreenY = worldYToScreenY(floorTopY);
         // Adjust upward to align grass lip exactly under character's feet
@@ -921,11 +1307,9 @@ const GameComponent: React.FC<{
       })()}
       
         {/* Hazard Band - Improved lava rendering */}
-        {(() => {
+        {mode !== 'bossroom' && (() => {
           const df = platformManager.current?.getDeathFloor?.();
           const hazardTopWorld = df?.y ?? null;
-          
-          
           if (hazardTopWorld == null) return null;
           
           // Convert world Y to screen Y
@@ -955,8 +1339,8 @@ const GameComponent: React.FC<{
           );
         })()}
       
-      {/* Fireballs above lava */}
-      {(() => {
+      {/* Fireballs above lava - only in tower mode */}
+      {mode === 'tower' && (() => {
         const df = platformManager.current?.getDeathFloor?.();
         const lavaYWorld = df?.y ?? null;
         if (lavaYWorld == null) return null;

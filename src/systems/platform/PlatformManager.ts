@@ -689,6 +689,11 @@ export class EnhancedPlatformManager {
   }
   getSolidPlatforms() { return this.platforms.filter(p => p.collision?.solid); }
   
+  getPlatformsNear(x: number, y: number, radius: number): PlatformDef[] {
+    // Use spatial index for fast lookups
+    return this.spatialIndex.getPlatformsNear(x, y, radius);
+  }
+
   getPlatformsNearPlayer(x: number, y: number, r: number, solidsOnly = true) {
     // PERFORMANCE: Use spatial index for faster lookups
     const nearbyPlatforms = this.spatialIndex.getPlatformsNear(x, y, r);

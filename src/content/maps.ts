@@ -188,6 +188,9 @@ export const PREFAB_FOOT_INSET: Record<string, number> = {
   'grass-4-final': 12,
   'grass-5-final': 12,
   'grass-6-final': 12,
+  
+  // Door (needs to sit on platform surface)
+  'door': 0, // No foot inset needed - door should sit flush
 };
 
 export function alignPrefabYToSurfaceTop(
