@@ -13,6 +13,11 @@ import jumpJson   from '../../assets/character/dash/Jump_atlas.json';
 import hurtJson   from '../../assets/character/dash/Hurt-Damaged_atlas.json';
 import deathJson  from '../../assets/character/dash/Death_atlas.json';
 
+// Boss room animations
+import swordIdleJson   from '../../assets/character/dash/Sword_Idle_atlas.json';
+import katanaRunJson   from '../../assets/character/dash/Katana_Run_atlas.json';
+import swordAttackJson from '../../assets/character/dash/Sword_Attack_atlas.json';
+
 const idlePng  = require('../../assets/character/dash/Idle_atlas.png') as number;
 const walkPng  = require('../../assets/character/dash/Walk_atlas.png') as number;
 const runPng   = require('../../assets/character/dash/Run_atlas.png') as number;
@@ -20,7 +25,12 @@ const jumpPng  = require('../../assets/character/dash/Jump_atlas.png') as number
 const hurtPng  = require('../../assets/character/dash/Hurt-Damaged_atlas.png') as number;
 const deathPng = require('../../assets/character/dash/Death_atlas.png') as number;
 
-type AnimationState = 'idle'|'walk'|'run'|'jump'|'hurt'|'death';
+// Boss room animation assets
+const swordIdlePng   = require('../../assets/character/dash/Sword_Idle_atlas.png') as number;
+const katanaRunPng   = require('../../assets/character/dash/Katana_Run_atlas.png') as number;
+const swordAttackPng = require('../../assets/character/dash/Sword_Attack_atlas.png') as number;
+
+type AnimationState = 'idle'|'walk'|'run'|'jump'|'hurt'|'death'|'attack';
 
 type InputState = {
   vx?: number;
@@ -40,6 +50,8 @@ type Props = {
   footOffset?: number; // NEW - tunable foot offset
   isHurt?: boolean;    // NEW - override to hurt animation
   isDead?: boolean;    // NEW - override to death animation
+  isBossRoom?: boolean; // NEW - use boss room animations
+  isAttacking?: boolean; // NEW - override to attack animation
 };
 
 function sortFramesNumeric(keys: string[]) {
@@ -66,12 +78,15 @@ const WALK_OUT = 1;  // leave walk below this speed (lower than WALK_IN)
 const RUN_IN = 80;   // enter run above this speed (more responsive)
 const RUN_OUT = 60;  // leave run below this speed (lower than RUN_IN)
 
-function pickState(input?: InputState, prevState?: AnimationState, isHurt?: boolean, isDead?: boolean): AnimationState {
+function pickState(input?: InputState, prevState?: AnimationState, isHurt?: boolean, isDead?: boolean, isAttackingProp?: boolean): AnimationState {
   // Death animation takes highest priority
   if (isDead) return 'death';
   
   // Hurt animation takes priority over everything else (except death)
   if (isHurt) return 'hurt';
+  
+  // Attack animation takes priority over movement (except death/hurt)
+  if (isAttackingProp) return 'attack';
   
   const vx = Math.abs(input?.vx ?? 0);
   const dirX = Math.abs(input?.dirX ?? 0);
@@ -101,7 +116,8 @@ function pickState(input?: InputState, prevState?: AnimationState, isHurt?: bool
   return 'run';
 }
 
-export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 2, input, id = "Dash@World", footOffset = 2, isHurt = false, isDead = false }) => {
+export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 2, input, id = "Dash@World", footOffset = 2, isHurt = false, isDead = false, isBossRoom = false, isAttacking = false }) => {
+  // Regular animations
   const idle  = useAnim(idleJson,  idlePng,  10);
   const walk  = useAnim(walkJson,  walkPng,  12);
   const run   = useAnim(runJson,   runPng,   16);
@@ -109,11 +125,16 @@ export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 
   const hurt  = useAnim(hurtJson,  hurtPng,  12);
   const death = useAnim(deathJson, deathPng, 10);
 
+  // Boss room animations
+  const swordIdle   = useAnim(swordIdleJson,   swordIdlePng,   10);
+  const katanaRun   = useAnim(katanaRunJson,   katanaRunPng,   16);
+  const swordAttack = useAnim(swordAttackJson, swordAttackPng, 12);
+
   // Mount count guard removed to clean up code
 
   // Track previous state for hysteresis
   const [prevState, setPrevState] = useState<AnimationState>('idle');
-  const state = pickState(input, prevState, isHurt, isDead);
+  const state = pickState(input, prevState, isHurt, isDead, isAttacking);
   
   
   // Update previous state when current state changes
@@ -121,13 +142,14 @@ export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 
     setPrevState(state);
   }, [state]);
 
-  // Select animation based on state - EXACTLY ONE animation selected
+  // Select animation based on state and boss room mode
   const current = state === 'death' ? death :
                   state === 'hurt' ? hurt :
+                  state === 'attack' ? swordAttack :
                   state === 'jump' ? jump :
-                  state === 'walk' ? walk :
-                  state === 'run' ? run :
-                  idle; // fallback
+                  state === 'walk' ? (isBossRoom ? swordIdle : walk) : // Boss room uses sword idle for walk
+                  state === 'run' ? (isBossRoom ? katanaRun : run) :   // Boss room uses katana run
+                  (isBossRoom ? swordIdle : idle); // Boss room uses sword idle for idle
 
   // Keep last non-zero facing so Idle doesn't snap
   const [facingLeft, setFacingLeft] = useState(false);
@@ -139,9 +161,10 @@ export const DashCharacter: React.FC<Props> = ({ floorTopY, posX, lift, scale = 
   const isJumping = state === 'jump';
   const isHurting = state === 'hurt';
   const isDying = state === 'death';
+  const isAttackingState = state === 'attack';
   const frameName = useAnimator(current.frames, current.fps, {
-    loop: !isJumping && !isHurting && !isDying,  // idle/run loop, jump/hurt/death do not
-    holdOnEnd: isJumping || isHurting || isDying // hold last frame for jump/hurt/death
+    loop: !isJumping && !isHurting && !isDying && !isAttackingState,  // idle/run loop, jump/hurt/death/attack do not
+    holdOnEnd: isJumping || isHurting || isDying || isAttackingState // hold last frame for jump/hurt/death/attack
   });
   const fr = current.json.frames[frameName] || { x: 0, y: 0, w: 48, h: 48 };
 

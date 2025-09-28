@@ -32,6 +32,7 @@ export class SoundManager {
       await this.loadSound('damage', require('../../assets/sounds/damage.wav'));
       await this.loadSound('death', require('../../assets/sounds/death.wav'));
       await this.loadSound('fire-death', require('../../assets/sounds/fire-death.wav'));
+      await this.loadSound('fireball', require('../../assets/sounds/fireball.wav'));
 
       this.isInitialized = true;
       console.log('[SoundManager] Initialized successfully');
@@ -78,7 +79,7 @@ export class SoundManager {
   }
 
   public async playJumpSound(): Promise<void> {
-    await this.playSound('jump', 0.7); // Slightly quieter for jump
+    await this.playSound('jump', 0.35); // Much quieter for jump (50% of previous)
   }
 
   public async playDamageSound(): Promise<void> {
@@ -91,6 +92,10 @@ export class SoundManager {
 
   public async playFireDeathSound(): Promise<void> {
     await this.playSound('fire-death', 0.9); // Fire death sound for lava hazard
+  }
+
+  public async playFireballSound(): Promise<void> {
+    await this.playSound('fireball', 0.8); // Fireball launch sound
   }
 
   public async cleanup(): Promise<void> {

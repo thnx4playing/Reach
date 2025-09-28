@@ -4,6 +4,7 @@ import SpriteAtlasSprite from '../render/SpriteAtlasSprite';
 import {
   BOSS_PROJECTILE_SPEED,
 } from '../config/gameplay';
+import { soundManager } from '../audio/SoundManager';
 
 type Props = {
   xWorld: number;
@@ -163,6 +164,7 @@ export default function BossDemon(props: Props) {
         const vy = (dy / len) * BOSS_PROJECTILE_SPEED;
         
         props.onShoot({ x: cxWorld, y: cyWorld, vx, vy, lifeMs: 6000 });
+        soundManager.playFireballSound(); // Play fireball sound when boss shoots
         nextShotAt.current = now + randInt(3000, 6000); // every 3–6s
       }
 

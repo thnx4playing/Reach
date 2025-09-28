@@ -5,6 +5,7 @@ import { Canvas, Rect, Group } from '@shopify/react-native-skia';
 import { makeStaticFloor } from '../content/floor';
 import { DashCharacter } from './DashCharacter';
 import RNGHControls from '../input/RNGHControls';
+import BossRoomControls from '../input/BossRoomControls';
 import SafeTouchBoundary from '../infra/SafeTouchBoundary';
 import { PrefabNode } from '../render/PrefabNode';
 import { PlatformRenderer } from './PlatformRenderer';
@@ -309,6 +310,7 @@ const GameComponent: React.FC<{
   const [z, setZ] = useState(0);
   const [dirX, setDirX] = useState(0);
   const [speedLevel, setSpeedLevel] = useState<'idle'|'run'>('idle');
+  const [isAttacking, setIsAttacking] = useState(false);
   
   // PERFORMANCE: Cache player box calculation
   const playerBoxRef = useRef<any>(null);
@@ -523,6 +525,15 @@ const GameComponent: React.FC<{
     }
     noteJumpPressed(jumpStateRef.current);
   }, []);
+
+  // Attack callback for boss room
+  const requestAttack = useCallback(() => {
+    if (mode === 'bossroom') {
+      setIsAttacking(true);
+      // Reset attack state after animation duration (adjust timing as needed)
+      setTimeout(() => setIsAttacking(false), 500);
+    }
+  }, [mode]);
 
   // Reset timer/score on fresh mount (restart changes key, so this runs again)
   useEffect(() => {
@@ -1170,6 +1181,7 @@ const GameComponent: React.FC<{
               const safePlayerWorldX = Number(xRef.current) + Number(CHAR_W) / 2;
               const safePlayerWorldY = Number(floorTopY) - Number(zRef.current);
               
+              
               return (
                 <BossDemon
                   xWorld={prefabWidthPx(levelData.mapName, 'platform-grass-3-final')*0.5}
@@ -1206,6 +1218,7 @@ const GameComponent: React.FC<{
                 bottom: safePlayerWorldY,
               };
               
+              
               return (
                 <BossProjectiles
                   projectiles={bossShots}
@@ -1228,6 +1241,8 @@ const GameComponent: React.FC<{
               footOffset={FOOT_OFFSET}
               isHurt={isHurt}
               isDead={isDead}
+              isBossRoom={mode === 'bossroom'}
+              isAttacking={isAttacking}
               input={{
                 vx: vxRef.current,
                 dirX: dirX as -1 | 0 | 1,
@@ -1364,13 +1379,24 @@ const GameComponent: React.FC<{
       
       {/* Controls overlay */}
       <View style={[StyleSheet.absoluteFill, { zIndex: 10 }]} pointerEvents="auto">
-        <RNGHControls
-          size={PAD_SIZE}
-          margin={20}
-          onPad={onPad}
-          onJump={requestJump}
-          disabled={isDead}
-        />
+        {mode === 'bossroom' ? (
+          <BossRoomControls
+            size={PAD_SIZE}
+            margin={20}
+            onPad={onPad}
+            onJump={requestJump}
+            onAttack={requestAttack}
+            disabled={isDead}
+          />
+        ) : (
+          <RNGHControls
+            size={PAD_SIZE}
+            margin={20}
+            onPad={onPad}
+            onJump={requestJump}
+            disabled={isDead}
+          />
+        )}
       </View>
 
     </View>

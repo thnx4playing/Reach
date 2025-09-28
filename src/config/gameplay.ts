@@ -15,4 +15,4 @@ export const BOSSROOM_PLATFORM_COUNT = 7;
 export const BOSS_FIRE_COOLDOWN_MIN = 5000;
 export const BOSS_FIRE_COOLDOWN_MAX = 10000;
 export const BOSS_PROJECTILE_SPEED  = 320;
-export const BOSS_DAMAGE_PER_HIT    = 10;
+export const BOSS_DAMAGE_PER_HIT    = 1;

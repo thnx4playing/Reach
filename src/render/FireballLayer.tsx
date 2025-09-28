@@ -2,6 +2,7 @@
 import React, { useRef } from "react";
 import { View } from "react-native";
 import { Canvas, Group, Circle } from "@shopify/react-native-skia";
+import { soundManager } from "../audio/SoundManager";
 
 /**
  * World Y increases downward; gravity is +.
@@ -151,6 +152,9 @@ export default function FireballLayer({
         vy,
         r,
       });
+
+      // Play fireball sound effect
+      soundManager.playFireballSound();
     }
 
     nextSpawnAtMsRef.current =
