@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useReducer } from 'react';
-import { useImage, Rect, Group } from '@shopify/react-native-skia';
+import { useImage } from '@shopify/react-native-skia';
 import SpriteAtlasSprite from '../render/SpriteAtlasSprite';
 import {
   BOSS_PROJECTILE_SPEED,
@@ -313,10 +313,7 @@ export default function BossDemon(props: Props) {
       if (deathFrameRef.current >= total - 1) {
         if (!deathNotifiedRef.current) {
           deathNotifiedRef.current = true;
-          // Hold the last frame for 1 second before despawning
-          setTimeout(() => {
-            props.onDeathDone?.();   // tell parent to remove the boss
-          }, 1000);
+          props.onDeathDone?.();   // tell parent to remove the boss
         }
         return;                    // stop ticking
       }
@@ -361,83 +358,14 @@ export default function BossDemon(props: Props) {
   const baseY      = props.worldYToScreenY(props.yWorld + cyBias.current);
   const flipX      = props.playerX < (props.xWorld + cxBias.current);
 
-  // Calculate hitbox positions for debug visualization
-  const cxWorld = props.xWorld + cxBias.current;
-  const cyFeet = props.yWorld + cyBias.current;
-  const W = FW * SCALE;
-  const H = FH * SCALE;
-  const cY = cyFeet - H * 0.5;
-
-  // Hitbox dimensions (same as in RAF loop)
-  const SOLID_FX = 0.60; // 60% width
-  const SOLID_FY = 0.70; // 70% height
-  const HURT_FX = 0.50;  // 50% width
-  const HURT_FY = 0.55;  // 55% height
-
-  const solidW = W * SOLID_FX, solidH = H * SOLID_FY;
-  const hurtW = W * HURT_FX, hurtH = H * HURT_FY;
-
-  // Convert to screen coordinates
-  const visualLeft = props.xToScreen(cxWorld - W * 0.5);
-  const visualTop = props.worldYToScreenY(cY - H * 0.5);
-  const visualWidth = W;
-  const visualHeight = H;
-
-  const solidLeft = props.xToScreen(cxWorld - solidW * 0.5);
-  const solidTop = props.worldYToScreenY(cY - solidH * 0.5);
-  const solidWidth = solidW;
-  const solidHeight = solidH;
-
-  const hurtLeft = props.xToScreen(cxWorld - hurtW * 0.5);
-  const hurtTop = props.worldYToScreenY(cY - hurtH * 0.5);
-  const hurtWidth = hurtW;
-  const hurtHeight = hurtH;
-
   return (
-    <Group>
-      {/* Boss Sprite */}
-      <SpriteAtlasSprite
-        image={sheet}
-        frame={{ x: frame * FW, y: 0, w: FW, h: FH, pivotX: 0.5, pivotY: 1 }} // normalized pivots
-        x={leftScreen}
-        baselineY={baseY}
-        scale={SCALE}
-        flipX={flipX}
-      />
-      
-      {/* Debug Hitboxes */}
-      {/* Visual (full sprite) - Green outline */}
-      <Rect
-        x={visualLeft}
-        y={visualTop}
-        width={visualWidth}
-        height={visualHeight}
-        color="rgba(0, 255, 0, 0.3)"
-        style="stroke"
-        strokeWidth={2}
-      />
-      
-      {/* Solid (collision) - Blue outline */}
-      <Rect
-        x={solidLeft}
-        y={solidTop}
-        width={solidWidth}
-        height={solidHeight}
-        color="rgba(0, 0, 255, 0.5)"
-        style="stroke"
-        strokeWidth={2}
-      />
-      
-      {/* Hurt (damage) - Red outline */}
-      <Rect
-        x={hurtLeft}
-        y={hurtTop}
-        width={hurtWidth}
-        height={hurtHeight}
-        color="rgba(255, 0, 0, 0.7)"
-        style="stroke"
-        strokeWidth={2}
-      />
-    </Group>
+    <SpriteAtlasSprite
+      image={sheet}
+      frame={{ x: frame * FW, y: 0, w: FW, h: FH, pivotX: 0.5, pivotY: 1 }} // normalized pivots
+      x={leftScreen}
+      baselineY={baseY}
+      scale={SCALE}
+      flipX={flipX}
+    />
   );
 }
