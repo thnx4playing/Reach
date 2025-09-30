@@ -4,11 +4,10 @@ import { Group, Image as SkImage, useImage } from '@shopify/react-native-skia';
 
 type Props = {
   screenW: number;
-  screenH?: number;       // optional; used only for nicer default sizing
-  yOffset?: number;       // top padding in px
-  hearts: number;         // current hearts (0..maxHearts)
-  maxHearts?: number;     // default 5
-  title?: string;         // unused here; we use eva.png
+  screenH?: number;
+  yOffset?: number;
+  hearts: number;         // current hearts (0..5)
+  maxHearts?: number;
 };
 
 function clamp(n: number, a: number, b: number) { return Math.max(a, Math.min(b, n)); }
@@ -20,76 +19,41 @@ export default React.memo(function BossHUD({
   hearts,
   maxHearts = 5,
 }: Props) {
-  const heartImg = useImage(require('../../assets/misc/boss-heart.png'));
-  const heartEmptyImg = useImage(require('../../assets/misc/boss-heart-empty.png'));
-  const evaImg   = useImage(require('../../assets/misc/eva.png'));
+  // Load all 6 health states (5 full -> 0 full)
+  const health1 = useImage(require('../../assets/ui/boss-health-1.png')); // 5 hearts
+  const health2 = useImage(require('../../assets/ui/boss-health-2.png')); // 4 hearts
+  const health3 = useImage(require('../../assets/ui/boss-health-3.png')); // 3 hearts
+  const health4 = useImage(require('../../assets/ui/boss-health-4.png')); // 2 hearts
+  const health5 = useImage(require('../../assets/ui/boss-health-5.png')); // 1 heart
+  const health6 = useImage(require('../../assets/ui/boss-health-6.png')); // 0 hearts
 
-  // Always call useMemo to maintain hook order
-  const renderData = useMemo(() => {
-    // Wait for images before computing
-    if (!heartImg || !heartEmptyImg || !evaImg) return null;
+  // Pick the right image based on current hearts
+  let healthImg = health1;
+  if (hearts === 4) healthImg = health2;
+  else if (hearts === 3) healthImg = health3;
+  else if (hearts === 2) healthImg = health4;
+  else if (hearts === 1) healthImg = health5;
+  else if (hearts === 0) healthImg = health6;
 
-    // ---- Title (EVA) sizing ----
-    const evaNaturalW = evaImg.width();
-    const evaNaturalH = evaImg.height();
-    // Try to keep the EVA title within ~30% of screen width, with sensible caps, then make 100% larger
-    const evaTargetW = clamp(Math.round(screenW * 0.28), 90, 260) * 2.0; // 100% larger (double size)
-    const evaScale   = evaTargetW / evaNaturalW;
-    const evaW       = Math.round(evaNaturalW * evaScale);
-    const evaH       = Math.round(evaNaturalH * evaScale);
-    const evaX       = Math.round((screenW - evaW) / 2) + 10; // Move right 10px total (6 + 4)
-    const evaY       = yOffset + 4; // Move up 16px total (was +20, now +4)
+  // Wait for image to load
+  if (!healthImg) return null;
 
-    // ---- Hearts row sizing ----
-    const heartNaturalW = heartImg.width();
-    const heartNaturalH = heartImg.height();
-
-    // Heart height ~6.75% of screen height; clamp for consistency (50% larger hearts)
-    const heartTargetH = clamp(Math.round(screenH * 0.0675), 27, 48);
-    const heartScale   = heartTargetH / heartNaturalH;
-    const heartW       = Math.round(heartNaturalW * heartScale);
-    const heartH       = heartTargetH;
-
-    // Gap between hearts (~8% of heart width - much closer together)
-    const gap = Math.round(heartW * 0.08);
-
-    const totalRowW = maxHearts * heartW + (maxHearts - 1) * gap;
-    const heartsStartX = Math.round((screenW - totalRowW) / 2);
-    const heartsY = evaY + evaH - 29; // moved up 35px total (was +6, now -29)
-
-    // Precompute heart positions; hearts<=maxHearts
-    const heartPositions = Array.from({ length: maxHearts }, (_, i) => ({
-      x: heartsStartX + i * (heartW + gap),
-      y: heartsY,
-      filled: i < hearts,
-    }));
-
-    return {
-      evaX, evaY, evaW, evaH,
-      heartW, heartH,
-      heartPositions
-    };
-  }, [screenW, screenH, yOffset, hearts, maxHearts, heartImg, heartEmptyImg, evaImg]);
-
-  // Wait for images before rendering
-  if (!renderData) return null;
+  // Auto-scale to fit screen
+  const naturalW = healthImg.width();
+  const naturalH = healthImg.height();
+  
+  // Target width ~40% of screen, with caps
+  const targetW = clamp(Math.round(screenW * 0.4), 120, 320);
+  const scale = targetW / naturalW;
+  const w = Math.round(naturalW * scale);
+  const h = Math.round(naturalH * scale);
+  
+  const x = Math.round((screenW - w) / 2);
+  const y = yOffset;
 
   return (
     <Group>
-      {/* Title */}
-      <SkImage image={evaImg} x={renderData.evaX} y={renderData.evaY} width={renderData.evaW} height={renderData.evaH} />
-
-      {/* Hearts */}
-      {renderData.heartPositions.map((h, idx) => (
-        <SkImage
-          key={idx}
-          image={h.filled ? heartImg : heartEmptyImg}
-          x={h.x}
-          y={h.y}
-          width={renderData.heartW}
-          height={renderData.heartH}
-        />
-      ))}
+      <SkImage image={healthImg} x={x} y={y} width={w} height={h} />
     </Group>
   );
 }, (a, b) =>

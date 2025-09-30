@@ -39,6 +39,8 @@ import BossDemon from '../features/BossDemon';
 import BossProjectiles, { BossProjectile } from '../features/BossProjectiles';
 import PlayerProjectiles, { PlayerProjectile } from '../features/PlayerProjectiles';
 import BossHUD from '../features/BossHUD';
+import HeartPickup from '../features/HeartPickup';
+import { soundManager } from '../audio/SoundManager';
 import { DOORWAY_SPAWN_Y, DOORWAY_WIDTH, DOORWAY_HEIGHT, DOORWAY_POSITION_OFFSET, PLAYER_PROJECTILE_SPEED, PLAYER_PROJECTILE_LIFE_MS, PLAYER_PROJECTILE_LAUNCH_DELAY_MS, PLAYER_PROJECTILE_HEAD_RATIO, BOSS_HURT_FLASH_MS } from '../config/gameplay';
 import { prefabWidthPx, alignPrefabYToSurfaceTop } from '../content/maps';
 
@@ -193,6 +195,10 @@ const isBossHurt = bossHurtUntilMs > Date.now();
 const isBossDead = bossHP <= 0;
 
 const [bossDespawned, setBossDespawned] = useState(false);
+
+// Heart pickup state
+type HeartPickupData = { x: number; y: number } | null;
+const [heartPickup, setHeartPickup] = useState<HeartPickupData>(null);
 type Box = { left:number; right:number; top:number; bottom:number };
 type PosePayload = { visual:Box; solid:Box; hurt:Box; centerX:number; centerY:number };
 const bossPoseRef = useRef<PosePayload>({
@@ -618,6 +624,9 @@ const bossPoseRef = useRef<PosePayload>({
         bornAt: Date.now(),
         r: 7,
       }]));
+      
+      // Play player fireball sound
+      soundManager.playPlayerFireballSound();
     }, PLAYER_PROJECTILE_LAUNCH_DELAY_MS);
   }, []);
 
@@ -1381,7 +1390,18 @@ const bossPoseRef = useRef<PosePayload>({
                   }}
                   isHurt={isBossHurt}
                   isDead={isBossDead}
-                  onDeathDone={() => setBossDespawned(true)}
+                  onDeathDone={() => {
+                    setBossDespawned(true);
+                    soundManager.playBossDeathSound();
+                    
+                    // Spawn heart on a random platform
+                    if (bossPlatforms.length > 0) {
+                      const randomPlat = bossPlatforms[Math.floor(Math.random() * bossPlatforms.length)];
+                      const heartX = randomPlat.x + prefabWidthPx(levelData.mapName, randomPlat.prefab) / 2;
+                      const heartY = randomPlat.y;
+                      setHeartPickup({ x: heartX, y: heartY });
+                    }
+                  }}
                 />
               );
             })()}
@@ -1467,11 +1487,33 @@ const bossPoseRef = useRef<PosePayload>({
         {mode === 'bossroom' && (
           <BossHUD
             screenW={SCREEN_W}
-            screenH={SCREEN_H}     // ⬅️ improves auto sizing
+            screenH={SCREEN_H}
             yOffset={6}
             hearts={bossHP}
             maxHearts={5}
-            title="EVA"             // ⬅️ ignored; eva.png is used
+          />
+        )}
+
+        {/* Heart Pickup - spawns after boss death */}
+        {mode === 'bossroom' && heartPickup && (
+          <HeartPickup
+            x={heartPickup.x}
+            y={heartPickup.y}
+            worldYToScreenY={worldYToScreenY}
+            playerBox={{
+              left: xRef.current,
+              right: xRef.current + COL_W,
+              top: floorTopY - zRef.current - COL_H,
+              bottom: floorTopY - zRef.current,
+            }}
+            onCollect={() => {
+              setHeartPickup(null); // Remove heart
+              soundManager.playHealthPowerupSound();
+              // Restore to full health
+              if (healthRef.current) {
+                healthRef.current.hp = healthRef.current.maxHp;
+              }
+            }}
           />
         )}
          </Canvas>
