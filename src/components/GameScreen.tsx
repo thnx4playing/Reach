@@ -37,7 +37,9 @@ import DoorSprite, { pointInDoor } from '../features/DoorSprite';
 import BossRoom from '../features/BossRoom';
 import BossDemon from '../features/BossDemon';
 import BossProjectiles, { BossProjectile } from '../features/BossProjectiles';
-import { DOORWAY_SPAWN_Y, DOORWAY_WIDTH, DOORWAY_HEIGHT, DOORWAY_POSITION_OFFSET } from '../config/gameplay';
+import PlayerProjectiles, { PlayerProjectile } from '../features/PlayerProjectiles';
+import BossHUD from '../features/BossHUD';
+import { DOORWAY_SPAWN_Y, DOORWAY_WIDTH, DOORWAY_HEIGHT, DOORWAY_POSITION_OFFSET, PLAYER_PROJECTILE_SPEED, PLAYER_PROJECTILE_LIFE_MS, PLAYER_PROJECTILE_LAUNCH_DELAY_MS, PLAYER_PROJECTILE_HEAD_RATIO, BOSS_HURT_FLASH_MS } from '../config/gameplay';
 import { prefabWidthPx, alignPrefabYToSurfaceTop } from '../content/maps';
 
 // debug flag
@@ -180,6 +182,35 @@ const GameComponent: React.FC<{
   // Ensure the RAF loop sees mode changes
   const modeRef = useRef<'tower'|'bossroom'>('tower');
   useEffect(() => { modeRef.current = mode; }, [mode]);
+
+// ---- Boss state (bossroom only) ----
+const MAX_BOSS_HP = 5;
+const [bossHP, setBossHP] = useState(MAX_BOSS_HP);
+
+// show HURT for a short window after any hit
+const [bossHurtUntilMs, setBossHurtUntilMs] = useState(0);
+const isBossHurt = bossHurtUntilMs > Date.now();
+const isBossDead = bossHP <= 0;
+
+const [bossDespawned, setBossDespawned] = useState(false);
+type Box = { left:number; right:number; top:number; bottom:number };
+type PosePayload = { visual:Box; solid:Box; hurt:Box; centerX:number; centerY:number };
+const bossPoseRef = useRef<PosePayload>({
+  visual: {left:0,right:0,top:0,bottom:0},
+  solid:  {left:0,right:0,top:0,bottom:0},
+  hurt:   {left:0,right:0,top:0,bottom:0},
+  centerX: 0,
+  centerY: 0,
+});
+
+  // ---- Sword attack window ----
+  const isAttackingRef = useRef(false);
+  const attackEndAtRef = useRef(0);
+  const attackHitRegisteredRef = useRef(false);
+  const ATTACK_DURATION_MS = 500; // 6 frames at 12 FPS = 500ms
+
+  // Optional: if you already track facing, wire it here; default face-right.
+  const facingLeftRef = useRef(false);
   
   // ===== Door anchored to existing 3-block grass platform =====
   const DOOR_TARGET_Y_WORLD = -DOORWAY_SPAWN_Y; // world up is negative
@@ -259,6 +290,11 @@ const GameComponent: React.FC<{
     return !isBossroom && !isSuppressed;
   }
 
+  // Helper: rectangles intersection
+  function rectsOverlap(a:{l:number;r:number;t:number;b:number}, b:{l:number;r:number;t:number;b:number}) {
+    return a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+  }
+
   // Enable boss projectiles only after the room is set up
   useEffect(() => {
     if (mode === 'bossroom') {
@@ -270,8 +306,16 @@ const GameComponent: React.FC<{
     }
   }, [mode]);
 
+  // Stop boss shots when dead
+  useEffect(() => {
+    if (isBossDead) setBossShots([]);   // clear any in-flight shots on death
+  }, [isBossDead]);
+
   const [bossShots, setBossShots] = useState<BossProjectile[]>([]);
   const projIdRef = useRef(1);
+
+  const [playerShots, setPlayerShots] = useState<PlayerProjectile[]>([]);
+  const playerProjIdRef = useRef(10000);
 
   const spawnBossProjectile = useCallback((p:{x:number;y:number;vx:number;vy:number;lifeMs:number}) => {
     const id = projIdRef.current++;
@@ -512,6 +556,12 @@ const GameComponent: React.FC<{
   const onPad = useCallback((o: { dirX: -1|0|1; magX: number }) => {
     setDirX(o.dirX);
     dirXRef.current = o.dirX;
+    
+    // Update facing direction for sword attacks
+    // Only update if actually moving (not idle)
+    if (o.dirX !== 0) {
+      facingLeftRef.current = o.dirX === -1;
+    }
 
     const level = Math.abs(o.magX) < 0.02 ? 'idle' : 'run';
     setSpeedLevel(level);
@@ -526,14 +576,50 @@ const GameComponent: React.FC<{
     noteJumpPressed(jumpStateRef.current);
   }, []);
 
-  // Attack callback for boss room
+  // Attack callback
   const requestAttack = useCallback(() => {
-    if (mode === 'bossroom') {
-      setIsAttacking(true);
-      // Reset attack state after animation duration (adjust timing as needed)
-      setTimeout(() => setIsAttacking(false), 500);
-    }
-  }, [mode]);
+    if (modeRef.current !== 'bossroom') return;
+    if (isAttackingRef.current) return;
+
+    // Keep your melee attack window intact
+    isAttackingRef.current = true;
+    attackHitRegisteredRef.current = false;
+    attackEndAtRef.current = performance.now() + ATTACK_DURATION_MS;
+    setIsAttacking(true);
+
+    // schedule projectile ~200ms later; compute SCREEN coords at fire time
+    setTimeout(() => {
+      if (modeRef.current !== 'bossroom') return;
+
+      // SCREEN coordinates at fire time
+      const halfW = COL_W / 2;
+      const centerX_screen = xRef.current + halfW;
+
+      // feet on screen; your engine defines zRef as height above the floor line
+      const feetY_screen   = floorTopY - zRef.current;
+
+      // sprite top on screen; use full sprite height (not the collider)
+      const topY_screen    = feetY_screen - CHAR_H;
+
+      // head line at a ratio from top → down
+      const headY_screen   = topY_screen + (PLAYER_PROJECTILE_HEAD_RATIO * CHAR_H);
+
+      // face-forward nudge
+      const dir = facingLeftRef.current ? -1 : 1;
+      const spawnX = centerX_screen + dir * (halfW * 0.18);
+      const spawnY = headY_screen;
+
+      // store as SCREEN coords
+      setPlayerShots(s => s.concat([{
+        id: playerProjIdRef.current++,
+        x: spawnX, y: spawnY,            // screen-space projectile
+        vx: dir * PLAYER_PROJECTILE_SPEED, vy: 0,
+        lifeMs: PLAYER_PROJECTILE_LIFE_MS,
+        bornAt: Date.now(),
+        r: 7,
+      }]));
+    }, PLAYER_PROJECTILE_LAUNCH_DELAY_MS);
+  }, []);
 
   // Reset timer/score on fresh mount (restart changes key, so this runs again)
   useEffect(() => {
@@ -950,15 +1036,18 @@ const GameComponent: React.FC<{
         // 3) stop any tower projectiles; enable boss projectiles later
         setBossShots([]);
         projIdRef.current = 1;
+        setPlayerShots([]);
         bossProjectilesEnabledRef.current = false;
 
         // 4) spawn fixed boss platforms using the SAME prefab as tower
         const mapW = prefabWidthPx(levelData.mapName, 'platform-grass-3-final');
         setBossPlatforms(createBossPlatforms(floorTopY, mapW));
 
-        // 5) re-center player on the room
+        // 5) re-center player on the room and reset velocity
         xRef.current = Math.round((mapW - CHAR_W) * 0.5);
         zRef.current = 64; // stand a bit above the floor
+        vxRef.current = 0; // stop horizontal movement
+        vzRef.current = 0; // stop vertical movement
       }
     } else {
       // Reset guard when not in tower or door no longer present
@@ -990,6 +1079,92 @@ const GameComponent: React.FC<{
           vzRef.current = 0;
           onGroundRef.current = true;
           break;
+        }
+      }
+    }
+
+    // === BOSS COLLISION (prevents phasing) - OPTIMIZED ===
+    if (modeRef.current === 'bossroom' && frameCount % 2 === 0) { // Only check every 2nd frame
+      const bPose = bossPoseRef.current;
+      const b = bPose?.solid ?? { left:-1e9, right:-1e9, top:-1e9, bottom:-1e9 };
+      // Quick bounds check first
+      if (b.left !== 0 || b.right !== 0 || b.top !== 0 || b.bottom !== 0) {
+        const HALF_W = COL_W / 2;
+        const HALF_H = COL_H / 2;
+        const playerCenterX = xRef.current + HALF_W;
+        const playerFeetY = floorTopY - zRef.current;
+        const playerTopY = playerFeetY - HALF_H * 2;
+
+        const pBox = { l: playerCenterX - HALF_W, r: playerCenterX + HALF_W, t: playerTopY, b: playerFeetY };
+        const bossBox = { l: b.left, r: b.right, t: b.top, b: b.bottom };
+
+        if (rectsOverlap(pBox, bossBox)) {
+          const overlapLeft = Math.abs(pBox.r - bossBox.l);
+          const overlapRight = Math.abs(bossBox.r - pBox.l);
+          const overlapTop = Math.abs(pBox.b - bossBox.t);
+          const overlapBottom = Math.abs(bossBox.b - pBox.t);
+          const minHoriz = Math.min(overlapLeft, overlapRight);
+          const minVert = Math.min(overlapTop, overlapBottom);
+
+          if (minHoriz <= minVert) {
+            // resolve horizontally
+            if (overlapLeft < overlapRight) {
+              xRef.current -= overlapLeft;
+            } else {
+              xRef.current += overlapRight;
+            }
+          } else {
+            // resolve vertically
+            if (overlapTop < overlapBottom) {
+              zRef.current = floorTopY - bossBox.t;
+              vzRef.current = Math.min(0, vzRef.current);
+              onGroundRef.current = true;
+            } else {
+              zRef.current = floorTopY - bossBox.b - COL_H;
+              vzRef.current = Math.max(0, vzRef.current);
+            }
+          }
+        }
+      }
+    }
+
+    // === SWORD ATTACK WINDOW & HIT DETECTION - OPTIMIZED ===
+    if (modeRef.current === 'bossroom' && isAttackingRef.current) {
+      if (performance.now() >= attackEndAtRef.current) {
+        isAttackingRef.current = false;
+        setIsAttacking(false); // Reset the React state as well
+      } else if (!attackHitRegisteredRef.current) {
+        const bHurt = bossPoseRef.current?.hurt ?? { left:0,right:0,top:0,bottom:0 };
+        // Quick bounds check first
+        if (bHurt.left !== 0 || bHurt.right !== 0 || bHurt.top !== 0 || bHurt.bottom !== 0) {
+          const HALF_W = COL_W / 2;
+          const HALF_H = COL_H / 2;
+          const centerX = xRef.current + HALF_W;
+          const feetY = floorTopY - zRef.current;
+          const midY = feetY - HALF_H;
+
+          const reach = HALF_W * 1.2;
+          const thick = HALF_H * 0.6;
+
+          const facingLeft = !!facingLeftRef.current;
+          const sL = facingLeft ? centerX - reach - HALF_W * 0.3 : centerX + HALF_W * 0.3;
+          const sR = facingLeft ? centerX - HALF_W * 0.3 : centerX + reach + HALF_W * 0.3;
+          const sT = midY - thick * 0.5;
+          const sB = midY + thick * 0.5;
+
+          const swordBox = { l: sL, r: sR, t: sT, b: sB };
+          const bossBox = { l: bHurt.left, r: bHurt.right, t: bHurt.top, b: bHurt.bottom };
+
+          if (rectsOverlap(swordBox, bossBox)) {
+            attackHitRegisteredRef.current = true;
+            if (!isBossDead) {
+              setBossHP(hp => {
+                const next = Math.max(0, hp - 1);
+                setBossHurtUntilMs(Date.now() + BOSS_HURT_FLASH_MS);
+                return next;
+              });
+            }
+          }
         }
       }
     }
@@ -1176,7 +1351,7 @@ const GameComponent: React.FC<{
             ))}
 
             {/* Boss demon and projectiles */}
-            {mode === 'bossroom' && (() => {
+            {mode === 'bossroom' && !bossDespawned && (() => {
               // Ensure numeric player world coordinates for boss
               const safePlayerWorldX = Number(xRef.current) + Number(CHAR_W) / 2;
               const safePlayerWorldY = Number(floorTopY) - Number(zRef.current);
@@ -1192,15 +1367,51 @@ const GameComponent: React.FC<{
                   screenH={SCREEN_H}
                   playerX={safePlayerWorldX}
                   playerY={safePlayerWorldY}
+                  onPose={(pose) => { bossPoseRef.current = pose; }}
                   onShoot={({x, y, vx, vy, lifeMs}) => {
                     setBossShots(s => {
                       const newShot = {
                         id: projIdRef.current++,
                         x, y, vx, vy, lifeMs,
                         bornAt: Date.now(),
-                        r: 6 + Math.random() * 6,   // size like the Skia lava balls
+                        r: 4 + Math.random() * 3,   // smaller, more precise collision
                       };
                       return s.concat([newShot]);
+                    });
+                  }}
+                  isHurt={isBossHurt}
+                  isDead={isBossDead}
+                  onDeathDone={() => setBossDespawned(true)}
+                />
+              );
+            })()}
+
+            {/* Player Projectiles - Purple Fireballs */}
+            {mode === 'bossroom' && (() => {
+              const hurt = bossPoseRef.current?.hurt;
+              if (!hurt) return null;
+
+              // Map hurt box to SCREEN space (x is already on-screen in your engine)
+              const hurtScreen = {
+                left:   hurt.left,
+                right:  hurt.right,
+                top:    worldYToScreenY(hurt.top),
+                bottom: worldYToScreenY(hurt.bottom),
+              };
+
+              return (
+                <PlayerProjectiles
+                  projectiles={playerShots}
+                  setProjectiles={setPlayerShots}
+                  screenW={SCREEN_W}
+                  screenH={SCREEN_H}
+                  targetBoxScreen={hurtScreen}                 // ★ same space as projectile
+                  onBossHit={(dmg) => {
+                    if (isBossDead) return;
+                    setBossHP(hp => {
+                      const next = Math.max(0, hp - dmg);
+                      setBossHurtUntilMs(Date.now() + BOSS_HURT_FLASH_MS);
+                      return next;
                     });
                   }}
                 />
@@ -1251,19 +1462,33 @@ const GameComponent: React.FC<{
               }}
             />
           </Group>
+
+        {/* Boss HUD - only in boss room - IMAGE-BASED VERSION */}
+        {mode === 'bossroom' && (
+          <BossHUD
+            screenW={SCREEN_W}
+            screenH={SCREEN_H}     // ⬅️ improves auto sizing
+            yOffset={6}
+            hearts={bossHP}
+            maxHearts={5}
+            title="EVA"             // ⬅️ ignored; eva.png is used
+          />
+        )}
          </Canvas>
       
       
-      {/* Right stack: SCORE + TIME */}
-      <ScoreTimeHUD
-        score={score}
-        heightPx={maxHeightPx}
-        timeMs={timeMs}
-        anchor="right"
-        top={50}
-        onBoxSize={(w) => setRightCardW(w)}
-        onMeasured={(h) => setRightHudH(h)}
-      />
+      {/* Right stack: SCORE + TIME - Hidden in boss room */}
+      {mode !== 'bossroom' && (
+        <ScoreTimeHUD
+          score={score}
+          heightPx={maxHeightPx}
+          timeMs={timeMs}
+          anchor="right"
+          top={50}
+          onBoxSize={(w) => setRightCardW(w)}
+          onMeasured={(h) => setRightHudH(h)}
+        />
+      )}
 
       {/* Float the Skia HP bar directly beneath TIME (no box) */}
       <View
