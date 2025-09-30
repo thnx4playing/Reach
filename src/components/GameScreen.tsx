@@ -1394,6 +1394,15 @@ const bossPoseRef = useRef<PosePayload>({
                     setBossDespawned(true);
                     soundManager.playBossDeathSound();
                     
+                    // Clear boss collision boxes
+                    bossPoseRef.current = {
+                      visual: {left:0,right:0,top:0,bottom:0},
+                      solid:  {left:0,right:0,top:0,bottom:0},
+                      hurt:   {left:0,right:0,top:0,bottom:0},
+                      centerX: 0,
+                      centerY: 0,
+                    };
+                    
                     // Spawn heart on a random platform
                     if (bossPlatforms.length > 0) {
                       const randomPlat = bossPlatforms[Math.floor(Math.random() * bossPlatforms.length)];
@@ -1511,8 +1520,8 @@ const bossPoseRef = useRef<PosePayload>({
               setHeartPickup(null); // Remove heart
               soundManager.playHealthPowerupSound();
               // Restore to full health (heal by current hits to bring hits back to 0)
-              if (hits > 0) {
-                heal(hits);
+              if (sys && sys.state.hits > 0) {
+                sys.heal(sys.state.hits);
               }
             }}
           />
