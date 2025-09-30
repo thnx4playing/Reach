@@ -1489,7 +1489,7 @@ const bossPoseRef = useRef<PosePayload>({
           <BossHUD
             screenW={SCREEN_W}
             screenH={SCREEN_H}
-            yOffset={30}
+            yOffset={60}
             hearts={bossHP}
             maxHearts={5}
           />
