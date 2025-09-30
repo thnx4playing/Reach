@@ -1398,7 +1398,8 @@ const bossPoseRef = useRef<PosePayload>({
                     if (bossPlatforms.length > 0) {
                       const randomPlat = bossPlatforms[Math.floor(Math.random() * bossPlatforms.length)];
                       const heartX = randomPlat.x + prefabWidthPx(levelData.mapName, randomPlat.prefab) / 2;
-                      const heartY = randomPlat.y;
+                      // Raise heart above the platform surface (48px is approximate heart height)
+                      const heartY = randomPlat.y - 48;
                       setHeartPickup({ x: heartX, y: heartY });
                     }
                   }}
@@ -1488,7 +1489,7 @@ const bossPoseRef = useRef<PosePayload>({
           <BossHUD
             screenW={SCREEN_W}
             screenH={SCREEN_H}
-            yOffset={6}
+            yOffset={30}
             hearts={bossHP}
             maxHearts={5}
           />
@@ -1509,9 +1510,9 @@ const bossPoseRef = useRef<PosePayload>({
             onCollect={() => {
               setHeartPickup(null); // Remove heart
               soundManager.playHealthPowerupSound();
-              // Restore to full health
-              if (healthRef.current) {
-                healthRef.current.hp = healthRef.current.maxHp;
+              // Restore to full health (heal by current hits to bring hits back to 0)
+              if (hits > 0) {
+                heal(hits);
               }
             }}
           />

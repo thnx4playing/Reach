@@ -313,7 +313,10 @@ export default function BossDemon(props: Props) {
       if (deathFrameRef.current >= total - 1) {
         if (!deathNotifiedRef.current) {
           deathNotifiedRef.current = true;
-          props.onDeathDone?.();   // tell parent to remove the boss
+          // Hold the last frame for 1 second before despawning
+          setTimeout(() => {
+            props.onDeathDone?.();   // tell parent to remove the boss
+          }, 1000);
         }
         return;                    // stop ticking
       }
