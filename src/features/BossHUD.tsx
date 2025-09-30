@@ -1,5 +1,5 @@
 // src/features/BossHUD.tsx
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Group, Image as SkImage, useImage } from '@shopify/react-native-skia';
 
 type Props = {
@@ -19,13 +19,17 @@ export default React.memo(function BossHUD({
   hearts,
   maxHearts = 5,
 }: Props) {
-  // Load all 6 health states (5 full -> 0 full)
+  // Load EVA title
+  const evaImg = useImage(require('../../assets/misc/eva.png'));
+  
+  // Load all 7 health states (5 full -> empty after death)
   const health1 = useImage(require('../../assets/ui/boss-health-1.png')); // 5 hearts
   const health2 = useImage(require('../../assets/ui/boss-health-2.png')); // 4 hearts
   const health3 = useImage(require('../../assets/ui/boss-health-3.png')); // 3 hearts
   const health4 = useImage(require('../../assets/ui/boss-health-4.png')); // 2 hearts
   const health5 = useImage(require('../../assets/ui/boss-health-5.png')); // 1 heart
   const health6 = useImage(require('../../assets/ui/boss-health-6.png')); // 0 hearts
+  const health7 = useImage(require('../../assets/ui/boss-health-7.png')); // empty bar (after death)
 
   // Pick the right image based on current hearts
   let healthImg = health1;
@@ -34,26 +38,41 @@ export default React.memo(function BossHUD({
   else if (hearts === 2) healthImg = health4;
   else if (hearts === 1) healthImg = health5;
   else if (hearts === 0) healthImg = health6;
+  else if (hearts < 0) healthImg = health7; // Show empty bar after death
 
-  // Wait for image to load
-  if (!healthImg) return null;
+  // Wait for images to load
+  if (!healthImg || !evaImg) return null;
 
-  // Auto-scale to fit screen
-  const naturalW = healthImg.width();
-  const naturalH = healthImg.height();
+  // EVA title sizing (10% larger)
+  const evaNaturalW = evaImg.width();
+  const evaNaturalH = evaImg.height();
+  const evaTargetW = clamp(Math.round(screenW * 0.28 * 1.1), 100, 286); // 10% larger
+  const evaScale = evaTargetW / evaNaturalW;
+  const evaW = Math.round(evaNaturalW * evaScale);
+  const evaH = Math.round(evaNaturalH * evaScale);
+  const evaX = Math.round((screenW - evaW) / 2) + 5; // 5px to the right
+  const evaY = yOffset - 10; // 10px up
+
+  // Health bar sizing
+  const healthNaturalW = healthImg.width();
+  const healthNaturalH = healthImg.height();
   
   // Target width ~40% of screen, with caps
-  const targetW = clamp(Math.round(screenW * 0.4), 120, 320);
-  const scale = targetW / naturalW;
-  const w = Math.round(naturalW * scale);
-  const h = Math.round(naturalH * scale);
+  const healthTargetW = clamp(Math.round(screenW * 0.4), 120, 320);
+  const healthScale = healthTargetW / healthNaturalW;
+  const healthW = Math.round(healthNaturalW * healthScale);
+  const healthH = Math.round(healthNaturalH * healthScale);
   
-  const x = Math.round((screenW - w) / 2);
-  const y = yOffset;
+  const healthX = Math.round((screenW - healthW) / 2);
+  const healthY = evaY + evaH + 10; // 10px gap below EVA title
 
   return (
     <Group>
-      <SkImage image={healthImg} x={x} y={y} width={w} height={h} />
+      {/* EVA Title */}
+      <SkImage image={evaImg} x={evaX} y={evaY} width={evaW} height={evaH} />
+      
+      {/* Health Bar */}
+      <SkImage image={healthImg} x={healthX} y={healthY} width={healthW} height={healthH} />
     </Group>
   );
 }, (a, b) =>

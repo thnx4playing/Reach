@@ -86,7 +86,7 @@ interface GameScreenProps {
 // Inner game component that uses health hooks
 const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // Health system integration
-  const { isDead, bars, takeDamage, hits, sys, reset: resetHealth } = useHealth();
+  const { isDead, bars, takeDamage, hits, sys, heal, reset: resetHealth } = useHealth();
   
   // Audio system integration
   const { playJumpSound, playDamageSound, playDeathSound, playFireDeathSound } = useSound();
