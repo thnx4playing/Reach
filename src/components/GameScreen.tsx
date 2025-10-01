@@ -31,12 +31,14 @@ import { useDamageAnimations } from '../systems/health/useDamageAnimations';
 
 // Audio system imports
 import { useSound } from '../audio/useSound';
+import { soundManager } from '../audio/SoundManager';
 
 // Boss system imports
 import DoorSprite, { pointInDoor } from '../features/DoorSprite';
 import BossRoom from '../features/BossRoom';
 import BossDemon from '../features/BossDemon';
 import BossProjectiles, { BossProjectile } from '../features/BossProjectiles';
+import HeartPickup from '../features/HeartPickup';
 import PlayerProjectiles, { PlayerProjectile } from '../features/PlayerProjectiles';
 import BossHUD from '../features/BossHUD';
 import { DOORWAY_SPAWN_Y, DOORWAY_WIDTH, DOORWAY_HEIGHT, DOORWAY_POSITION_OFFSET, PLAYER_PROJECTILE_SPEED, PLAYER_PROJECTILE_LIFE_MS, PLAYER_PROJECTILE_LAUNCH_DELAY_MS, PLAYER_PROJECTILE_HEAD_RATIO, BOSS_HURT_FLASH_MS } from '../config/gameplay';
@@ -84,7 +86,7 @@ interface GameScreenProps {
 // Inner game component that uses health hooks
 const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
   // Health system integration
-  const { isDead, bars, takeDamage, hits, sys, reset: resetHealth } = useHealth();
+  const { isDead, bars, takeDamage, hits, sys, reset: resetHealth, heal } = useHealth();
   
   // Audio system integration
   const { playJumpSound, playDamageSound, playDeathSound, playFireDeathSound } = useSound();
@@ -125,6 +127,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       playDamageSound={playDamageSound}
       playDeathSound={playDeathSound}
       playFireDeathSound={playFireDeathSound}
+      resetHealth={resetHealth}
     />
   );
 };
@@ -144,6 +147,7 @@ const GameComponent: React.FC<{
   playDamageSound: () => Promise<void>;
   playDeathSound: () => Promise<void>;
   playFireDeathSound: () => Promise<void>;
+  resetHealth: () => void;
 }> = ({ 
   levelData, 
   onRestart, 
@@ -157,8 +161,13 @@ const GameComponent: React.FC<{
   playJumpSound,
   playDamageSound,
   playDeathSound,
-  playFireDeathSound
+  playFireDeathSound,
+  resetHealth
 }) => {
+  
+  // Keep resetHealth in a ref for RAF loop access
+  const resetHealthRef = useRef<() => void>(() => {});
+  useEffect(() => { resetHealthRef.current = resetHealth; }, [resetHealth]);
   
   const [cameraX, setCameraX] = useState(0);
   const [cameraY, setCameraY] = useState(0);
@@ -193,6 +202,9 @@ const isBossHurt = bossHurtUntilMs > Date.now();
 const isBossDead = bossHP <= 0;
 
 const [bossDespawned, setBossDespawned] = useState(false);
+const [heartPickup, setHeartPickup] = useState<{ x:number; y:number; spawnAt:number } | null>(null);
+const heartPickupRef = useRef<typeof heartPickup>(null);
+useEffect(() => { heartPickupRef.current = heartPickup; }, [heartPickup]);
 type Box = { left:number; right:number; top:number; bottom:number };
 type PosePayload = { visual:Box; solid:Box; hurt:Box; centerX:number; centerY:number };
 const bossPoseRef = useRef<PosePayload>({
@@ -1062,6 +1074,35 @@ const bossPoseRef = useRef<PosePayload>({
       hasTeleportedRef.current = false;
     }
 
+    // ───────────────────────────────────────────────────────────────
+    // HEART COLLISION (boss-room only)
+    const hp = heartPickupRef.current;
+    if (modeRef.current === 'bossroom' && hp) {
+      const HX = hp.x;
+      const HY = hp.y;
+      const HW = 32;
+      const HH = 32;
+
+      const L = HX;
+      const R = HX + HW;
+      const T = HY;
+      const B = HY + HH;
+
+      const overlap =
+        box.right  >= L &&
+        box.left   <= R &&
+        box.bottom >= T &&
+        box.top    <= B;
+
+      if (overlap) {
+        // Heal to full (big number clamps to 0 hits), consume, and play sfx
+        resetHealthRef.current(); // instantly restore to 100%
+        setHeartPickup(null);
+        heartPickupRef.current = null;
+        soundManager.playHealthPowerupSound();
+      }
+    }
+
     // === BOSS-ROOM ONE-WAY PLATFORM COLLISION ===
     // Treat the 6–7 fixed slabs like normal one-way tops.
     if (modeRef.current === 'bossroom') {
@@ -1387,6 +1428,31 @@ const bossPoseRef = useRef<PosePayload>({
                   onDeathDone={() => {
                     setBossDespawned(true);
                     soundManager.playBossDeathSound();
+                    // Clear boss collision boxes
+                    bossPoseRef.current = {
+                      visual: {left:0,right:0,top:0,bottom:0},
+                      solid:  {left:0,right:0,top:0,bottom:0},
+                      hurt:   {left:0,right:0,top:0,bottom:0},
+                      centerX: 0,
+                      centerY: 0,
+                    };
+
+                    // Spawn a heart pickup on a random boss platform
+                    try {
+                      if (bossPlatformsRef.current && bossPlatformsRef.current.length > 0) {
+                        const plats = bossPlatformsRef.current;
+                        const pick = plats[Math.floor(Math.random() * plats.length)];
+                        // Center on platform; 30px higher than the current placement above the surface
+                        const HEART_SIZE = 32;
+                        const spawnX = Math.round(pick.x + (pick.w - HEART_SIZE) * 0.5);
+                        const spawnY = Math.round(pick.y - HEART_SIZE - 34); // was -4 => now -34 (30px higher)
+                        const hp = { x: spawnX, y: spawnY, spawnAt: Date.now() };
+                        setHeartPickup(hp);
+                        heartPickupRef.current = hp;
+                      }
+                    } catch (e) {
+                      if (__DEV__) console.warn('Heart spawn failed', e);
+                    }
                   }}
                 />
               );
@@ -1473,11 +1539,23 @@ const bossPoseRef = useRef<PosePayload>({
         {mode === 'bossroom' && (
           <BossHUD
             screenW={SCREEN_W}
-            screenH={SCREEN_H}     // ⬅️ improves auto sizing
-            yOffset={6}
+            screenH={SCREEN_H}
+            yOffset={0}         // EVA position from top - moved up 10px
             hearts={bossHP}
             maxHearts={5}
-            title="EVA"             // ⬅️ ignored; eva.png is used
+            barGapY={-42}       // Health bar gap (negative = overlap/closer) - moved up 20px more
+          />
+        )}
+
+        {/* Heart Pickup after boss death */}
+        {mode === 'bossroom' && heartPickup && (
+          <HeartPickup
+            xWorld={heartPickup.x}
+            yWorld={heartPickup.y}
+            xToScreen={(x) => x}
+            worldYToScreenY={worldYToScreenY}
+            screenW={SCREEN_W}
+            screenH={SCREEN_H}
           />
         )}
          </Canvas>

@@ -8,6 +8,7 @@ type Props = {
   yOffset?: number;
   hearts: number;         // current hearts (0..5)
   maxHearts?: number;
+  barGapY?: number;       // distance from EVA bottom to bar (px)
 };
 
 function clamp(n: number, a: number, b: number) { return Math.max(a, Math.min(b, n)); }
@@ -18,6 +19,7 @@ export default React.memo(function BossHUD({
   yOffset = 6,
   hearts,
   maxHearts = 5,
+  barGapY,
 }: Props) {
   // Load EVA title
   const evaImg = useImage(require('../../assets/misc/eva.png'));
@@ -37,21 +39,20 @@ export default React.memo(function BossHUD({
   else if (hearts === 3) healthImg = health3;
   else if (hearts === 2) healthImg = health4;
   else if (hearts === 1) healthImg = health5;
-  else if (hearts === 0) healthImg = health6;
-  else if (hearts < 0) healthImg = health7; // Show empty bar after death
+  else if (hearts <= 0) healthImg = health7; // Show empty bar when dead (0 or less)
 
   // Wait for images to load
   if (!healthImg || !evaImg) return null;
 
-  // EVA title sizing (10% larger)
+  // EVA title sizing (100% larger than original - another 50%)
   const evaNaturalW = evaImg.width();
   const evaNaturalH = evaImg.height();
-  const evaTargetW = clamp(Math.round(screenW * 0.28 * 1.1), 100, 286); // 10% larger
+  const evaTargetW = clamp(Math.round(screenW * 0.28 * 2.475), 225, 645); // 100% larger (1.65 * 1.5)
   const evaScale = evaTargetW / evaNaturalW;
   const evaW = Math.round(evaNaturalW * evaScale);
   const evaH = Math.round(evaNaturalH * evaScale);
   const evaX = Math.round((screenW - evaW) / 2) + 5; // 5px to the right
-  const evaY = yOffset - 10; // 10px up
+  const evaY = yOffset - 6; // 6px higher than yOffset
 
   // Health bar sizing
   const healthNaturalW = healthImg.width();
@@ -64,7 +65,11 @@ export default React.memo(function BossHUD({
   const healthH = Math.round(healthNaturalH * healthScale);
   
   const healthX = Math.round((screenW - healthW) / 2);
-  const healthY = evaY + evaH + 10; // 10px gap below EVA
+  const gapY = (barGapY ?? -5); // default keeps current look
+  const healthY = Math.round(evaY + evaH + gapY);
+
+  // Debug: log positions
+  console.log('[BossHUD] evaY:', evaY, 'evaH:', evaH, 'healthY:', healthY, 'gapY:', gapY, 'actual gap:', healthY - (evaY + evaH));
 
   return (
     <Group>
@@ -80,5 +85,6 @@ export default React.memo(function BossHUD({
   a.screenH === b.screenH &&
   a.yOffset === b.yOffset &&
   a.hearts === b.hearts &&
-  (a.maxHearts ?? 5) === (b.maxHearts ?? 5)
+  (a.maxHearts ?? 5) === (b.maxHearts ?? 5) &&
+  (a.barGapY ?? -5) === (b.barGapY ?? -5)
 );
