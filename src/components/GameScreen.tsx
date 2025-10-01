@@ -609,6 +609,9 @@ const bossPoseRef = useRef<PosePayload>({
       const spawnX = centerX_screen + dir * (halfW * 0.18);
       const spawnY = headY_screen;
 
+      // Play player fireball sound
+      soundManager.playPlayerFireballSound();
+
       // store as SCREEN coords
       setPlayerShots(s => s.concat([{
         id: playerProjIdRef.current++,
@@ -1381,7 +1384,10 @@ const bossPoseRef = useRef<PosePayload>({
                   }}
                   isHurt={isBossHurt}
                   isDead={isBossDead}
-                  onDeathDone={() => setBossDespawned(true)}
+                  onDeathDone={() => {
+                    setBossDespawned(true);
+                    soundManager.playBossDeathSound();
+                  }}
                 />
               );
             })()}

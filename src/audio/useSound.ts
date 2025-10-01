@@ -18,6 +18,9 @@ export const useSound = () => {
     playDeathSound: () => soundManager.playDeathSound(),
     playFireDeathSound: () => soundManager.playFireDeathSound(),
     playFireballSound: () => soundManager.playFireballSound(),
+    playPlayerFireballSound: () => soundManager.playPlayerFireballSound(),
+    playBossDeathSound: () => soundManager.playBossDeathSound(),
+    playHealthPowerupSound: () => soundManager.playHealthPowerupSound(),
     playSound: (name: string, volume?: number) => soundManager.playSound(name, volume),
   };
 };
