@@ -582,6 +582,17 @@ const bossPoseRef = useRef<PosePayload>({
     noteJumpPressed(jumpStateRef.current);
   }, []);
 
+  // Heart collection callback
+  const handleHeartCollect = useCallback(() => {
+    setHeartPickup(null); // Remove heart
+    soundManager.playHealthPowerupSound();
+    // Restore to full health by healing all current damage
+    const currentHits = sys.state.hits;
+    if (currentHits > 0) {
+      sys.heal(currentHits);
+    }
+  }, [sys]);
+
   // Attack callback
   const requestAttack = useCallback(() => {
     if (modeRef.current !== 'bossroom') return;
@@ -1391,6 +1402,7 @@ const bossPoseRef = useRef<PosePayload>({
                   isHurt={isBossHurt}
                   isDead={isBossDead}
                   onDeathDone={() => {
+                    console.log('[Boss Death] onDeathDone called, bossPlatforms:', bossPlatforms.length);
                     setBossDespawned(true);
                     soundManager.playBossDeathSound();
                     
@@ -1409,7 +1421,10 @@ const bossPoseRef = useRef<PosePayload>({
                       const heartX = randomPlat.x + prefabWidthPx(levelData.mapName, randomPlat.prefab) / 2;
                       // Raise heart above the platform surface (48px is approximate heart height)
                       const heartY = randomPlat.y - 48;
+                      console.log('[Boss Death] Spawning heart at:', { heartX, heartY, platform: randomPlat });
                       setHeartPickup({ x: heartX, y: heartY });
+                    } else {
+                      console.log('[Boss Death] No platforms available for heart spawn!');
                     }
                   }}
                 />
@@ -1516,14 +1531,7 @@ const bossPoseRef = useRef<PosePayload>({
               top: floorTopY - zRef.current - COL_H,
               bottom: floorTopY - zRef.current,
             }}
-            onCollect={() => {
-              setHeartPickup(null); // Remove heart
-              soundManager.playHealthPowerupSound();
-              // Restore to full health (heal by current hits to bring hits back to 0)
-              if (sys && sys.state.hits > 0) {
-                sys.heal(sys.state.hits);
-              }
-            }}
+            onCollect={handleHeartCollect}
           />
         )}
          </Canvas>
