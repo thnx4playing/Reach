@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useReducer } from 'react';
-import { useImage, Rect, Group } from '@shopify/react-native-skia';
+import { useImage, Group } from '@shopify/react-native-skia';
 import SpriteAtlasSprite from '../render/SpriteAtlasSprite';
 import {
   BOSS_PROJECTILE_SPEED,
@@ -197,45 +197,57 @@ export default function BossDemon(props: Props) {
 
       // Report boss AABB for collision detection
       if (props.onPose) {
-        // World-space sprite metrics
-        const cxWorld = props.xWorld + cxBias.current; // sprite center X
-        const cyFeet  = props.yWorld + cyBias.current; // baseline (feet)
-        const W = FW * SCALE;
-        const H = FH * SCALE;
+        // If dying, clear all collision boxes immediately
+        if (dyingRef.current) {
+          const emptyBox: Box = { left: 0, right: 0, top: 0, bottom: 0 };
+          props.onPose({ 
+            visual: emptyBox, 
+            solid: emptyBox, 
+            hurt: emptyBox, 
+            centerX: 0, 
+            centerY: 0 
+          });
+        } else {
+          // World-space sprite metrics
+          const cxWorld = props.xWorld + cxBias.current; // sprite center X
+          const cyFeet  = props.yWorld + cyBias.current; // baseline (feet)
+          const W = FW * SCALE;
+          const H = FH * SCALE;
 
-        // Convert to a center-origin box (y-down world): centerY halfway between top & bottom
-        const cY = cyFeet - H * 0.5;
-        const visual: Box = {
-          left:   cxWorld - W * 0.5,
-          right:  cxWorld + W * 0.5,
-          top:    cY      - H * 0.5,
-          bottom: cY      + H * 0.5,
-        };
+          // Convert to a center-origin box (y-down world): centerY halfway between top & bottom
+          const cY = cyFeet - H * 0.5;
+          const visual: Box = {
+            left:   cxWorld - W * 0.5,
+            right:  cxWorld + W * 0.5,
+            top:    cY      - H * 0.5,
+            bottom: cY      + H * 0.5,
+          };
 
-        // Shrink factors (tune to taste)
-        const SOLID_FX = 0.60; // 60% width
-        const SOLID_FY = 0.70; // 70% height
-        const HURT_FX  = 0.50; // 50% width
-        const HURT_FY  = 0.55; // 55% height
+          // Shrink factors (tune to taste)
+          const SOLID_FX = 0.60; // 60% width
+          const SOLID_FY = 0.70; // 70% height
+          const HURT_FX  = 0.50; // 50% width
+          const HURT_FY  = 0.55; // 55% height
 
-        const solidW = W * SOLID_FX, solidH = H * SOLID_FY;
-        const hurtW  = W * HURT_FX,  hurtH  = H * HURT_FY;
+          const solidW = W * SOLID_FX, solidH = H * SOLID_FY;
+          const hurtW  = W * HURT_FX,  hurtH  = H * HURT_FY;
 
-        const solid: Box = {
-          left:   cxWorld - solidW * 0.5,
-          right:  cxWorld + solidW * 0.5,
-          top:    cY      - solidH * 0.5,
-          bottom: cY      + solidH * 0.5,
-        };
+          const solid: Box = {
+            left:   cxWorld - solidW * 0.5,
+            right:  cxWorld + solidW * 0.5,
+            top:    cY      - solidH * 0.5,
+            bottom: cY      + solidH * 0.5,
+          };
 
-        const hurt: Box = {
-          left:   cxWorld - hurtW * 0.5,
-          right:  cxWorld + hurtW * 0.5,
-          top:    cY      - hurtH * 0.5,
-          bottom: cY      + hurtH * 0.5,
-        };
+          const hurt: Box = {
+            left:   cxWorld - hurtW * 0.5,
+            right:  cxWorld + hurtW * 0.5,
+            top:    cY      - hurtH * 0.5,
+            bottom: cY      + hurtH * 0.5,
+          };
 
-        props.onPose({ visual, solid, hurt, centerX: cxWorld, centerY: cY });
+          props.onPose({ visual, solid, hurt, centerX: cxWorld, centerY: cY });
+        }
       }
 
       raf = requestAnimationFrame(loop);
@@ -253,7 +265,7 @@ export default function BossDemon(props: Props) {
       last = now;
 
 
-      if (aiEnabled && props.onShoot && now >= nextShotAt.current) {
+      if (aiEnabled && !dyingRef.current && props.onShoot && now >= nextShotAt.current) {
         const cxWorld = props.xWorld + cxBias.current;
         const cyWorld = props.yWorld + cyBias.current;
 
@@ -301,22 +313,43 @@ export default function BossDemon(props: Props) {
     const stepMs = 1000 / fps;
     let raf = 0, last = performance.now(), acc = 0;
 
+    // Linger settings: replay last 2 frames ping-pong for ~1.2s
+    const lingerMs = 1200;
+    const lingerStartRef = { v: 0 }; // capture when we reach last frame
+
     const loop = (now: number) => {
       acc += (now - last); last = now;
 
+      // Advance until last frame
       while (acc >= stepMs && deathFrameRef.current < total - 1) {
         deathFrameRef.current++;
         acc -= stepMs;
-        forceRerender();           // show next frame
+        forceRerender(); // show next frame
       }
 
       if (deathFrameRef.current >= total - 1) {
-        if (!deathNotifiedRef.current) {
-          deathNotifiedRef.current = true;
-          props.onDeathDone?.();   // tell parent to remove the boss
+        // We've reached the final frame; start linger if not started
+        if (lingerStartRef.v === 0) {
+          lingerStartRef.v = now;
         }
-        return;                    // stop ticking
+
+        const since = now - lingerStartRef.v;
+        const fA = total - 2, fB = total - 1;
+        if (since < lingerMs) {
+          // ping-pong last two frames at ~8 fps during linger
+          const pingPongFps = 8;
+          const pingStep = Math.floor((since / (1000 / pingPongFps)) % 2);
+          deathFrameRef.current = pingStep ? fA : fB;
+          forceRerender();
+        } else {
+          if (!deathNotifiedRef.current) {
+            deathNotifiedRef.current = true;
+            props.onDeathDone?.();   // tell parent to remove the boss
+          }
+          return; // stop
+        }
       }
+
       raf = requestAnimationFrame(loop);
     };
 
@@ -358,37 +391,6 @@ export default function BossDemon(props: Props) {
   const baseY      = props.worldYToScreenY(props.yWorld + cyBias.current);
   const flipX      = props.playerX < (props.xWorld + cxBias.current);
 
-  // Calculate hitbox positions for debug visualization
-  const cxWorld = props.xWorld + cxBias.current;
-  const cyFeet = props.yWorld + cyBias.current;
-  const W = FW * SCALE;
-  const H = FH * SCALE;
-  const cY = cyFeet - H * 0.5;
-
-  // Hitbox dimensions (same as in RAF loop)
-  const SOLID_FX = 0.60; // 60% width
-  const SOLID_FY = 0.70; // 70% height
-  const HURT_FX = 0.50;  // 50% width
-  const HURT_FY = 0.55;  // 55% height
-
-  const solidW = W * SOLID_FX, solidH = H * SOLID_FY;
-  const hurtW = W * HURT_FX, hurtH = H * HURT_FY;
-
-  // Convert to screen coordinates
-  const visualLeft = props.xToScreen(cxWorld - W * 0.5);
-  const visualTop = props.worldYToScreenY(cY - H * 0.5);
-  const visualWidth = W;
-  const visualHeight = H;
-
-  const solidLeft = props.xToScreen(cxWorld - solidW * 0.5);
-  const solidTop = props.worldYToScreenY(cY - solidH * 0.5);
-  const solidWidth = solidW;
-  const solidHeight = solidH;
-
-  const hurtLeft = props.xToScreen(cxWorld - hurtW * 0.5);
-  const hurtTop = props.worldYToScreenY(cY - hurtH * 0.5);
-  const hurtWidth = hurtW;
-  const hurtHeight = hurtH;
 
   return (
     <Group>
@@ -400,40 +402,6 @@ export default function BossDemon(props: Props) {
         baselineY={baseY}
         scale={SCALE}
         flipX={flipX}
-      />
-      
-      {/* Debug Hitboxes */}
-      {/* Visual (full sprite) - Green outline */}
-      <Rect
-        x={visualLeft}
-        y={visualTop}
-        width={visualWidth}
-        height={visualHeight}
-        color="rgba(0, 255, 0, 0.3)"
-        style="stroke"
-        strokeWidth={2}
-      />
-      
-      {/* Solid (collision) - Blue outline */}
-      <Rect
-        x={solidLeft}
-        y={solidTop}
-        width={solidWidth}
-        height={solidHeight}
-        color="rgba(0, 0, 255, 0.5)"
-        style="stroke"
-        strokeWidth={2}
-      />
-      
-      {/* Hurt (damage) - Red outline */}
-      <Rect
-        x={hurtLeft}
-        y={hurtTop}
-        width={hurtWidth}
-        height={hurtHeight}
-        color="rgba(255, 0, 0, 0.7)"
-        style="stroke"
-        strokeWidth={2}
       />
     </Group>
   );

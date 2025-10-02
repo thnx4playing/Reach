@@ -193,7 +193,7 @@ const GameComponent: React.FC<{
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
 // ---- Boss state (bossroom only) ----
-const MAX_BOSS_HP = 5;
+const MAX_BOSS_HP = 6;
 const [bossHP, setBossHP] = useState(MAX_BOSS_HP);
 
 // show HURT for a short window after any hit
@@ -1078,28 +1078,34 @@ const bossPoseRef = useRef<PosePayload>({
     // HEART COLLISION (boss-room only)
     const hp = heartPickupRef.current;
     if (modeRef.current === 'bossroom' && hp) {
-      const HX = hp.x;
-      const HY = hp.y;
-      const HW = 32;
-      const HH = 32;
+      // gate pickup until fade completes
+      const canPickup = !('activatesAt' in hp) || (Date.now() >= (hp as any).activatesAt);
+      if (!canPickup) {
+        // skip collision until spawn effect finishes
+      } else {
+        const HX = hp.x;
+        const HY = hp.y;
+        const HW = 32;
+        const HH = 32;
 
-      const L = HX;
-      const R = HX + HW;
-      const T = HY;
-      const B = HY + HH;
+        const L = HX;
+        const R = HX + HW;
+        const T = HY;
+        const B = HY + HH;
 
-      const overlap =
-        box.right  >= L &&
-        box.left   <= R &&
-        box.bottom >= T &&
-        box.top    <= B;
+        const overlap =
+          box.right  >= L &&
+          box.left   <= R &&
+          box.bottom >= T &&
+          box.top    <= B;
 
-      if (overlap) {
-        // Heal to full (big number clamps to 0 hits), consume, and play sfx
-        resetHealthRef.current(); // instantly restore to 100%
-        setHeartPickup(null);
-        heartPickupRef.current = null;
-        soundManager.playHealthPowerupSound();
+        if (overlap) {
+          // Full heal, consume, and play sfx
+          resetHealthRef.current(); // (or heal(999) if you prefer)
+          setHeartPickup(null);
+          heartPickupRef.current = null;
+          soundManager.playHealthPowerupSound();
+        }
       }
     }
 
@@ -1426,8 +1432,8 @@ const bossPoseRef = useRef<PosePayload>({
                   isHurt={isBossHurt}
                   isDead={isBossDead}
                   onDeathDone={() => {
+                    console.log('[DEBUG] Boss death animation finished, spawning heart pickup...');
                     setBossDespawned(true);
-                    soundManager.playBossDeathSound();
                     // Clear boss collision boxes
                     bossPoseRef.current = {
                       visual: {left:0,right:0,top:0,bottom:0},
@@ -1437,22 +1443,24 @@ const bossPoseRef = useRef<PosePayload>({
                       centerY: 0,
                     };
 
-                    // Spawn a heart pickup on a random boss platform
-                    try {
-                      if (bossPlatformsRef.current && bossPlatformsRef.current.length > 0) {
-                        const plats = bossPlatformsRef.current;
-                        const pick = plats[Math.floor(Math.random() * plats.length)];
-                        // Center on platform; 30px higher than the current placement above the surface
+                    // Spawn a heart pickup in the center of the boss room, 25px above the floor
+                    setTimeout(() => {
+                      try {
                         const HEART_SIZE = 32;
-                        const spawnX = Math.round(pick.x + (pick.w - HEART_SIZE) * 0.5);
-                        const spawnY = Math.round(pick.y - HEART_SIZE - 34); // was -4 => now -34 (30px higher)
-                        const hp = { x: spawnX, y: spawnY, spawnAt: Date.now() };
+                        const spawnX = Math.round(SCREEN_W * 0.5 - HEART_SIZE * 0.5); // Center of screen
+                        const spawnY = Math.round(floorTopY - 70); // 70px above the floor (raised by 20px more)
+                        console.log('[DEBUG] Floor position:', floorTopY, 'Screen height:', SCREEN_H, 'Heart spawn Y:', spawnY);
+                        const now = Date.now(); // Use real time for consistent gating
+                        const fadeMs = 850;  // fade-in/spawn effect duration
+                        // Set spawnAt to current time so fade-in starts immediately
+                        const hp = { x: spawnX, y: spawnY, spawnAt: now, activatesAt: now + fadeMs };
+                        console.log('[DEBUG] Heart pickup spawned at:', { x: spawnX, y: spawnY, now, activatesAt: now + fadeMs });
                         setHeartPickup(hp);
                         heartPickupRef.current = hp;
+                      } catch (e) {
+                        if (__DEV__) console.warn('Heart spawn failed', e);
                       }
-                    } catch (e) {
-                      if (__DEV__) console.warn('Heart spawn failed', e);
-                    }
+                    }, 2000); // 2s delay before heart appears
                   }}
                 />
               );
@@ -1483,6 +1491,14 @@ const bossPoseRef = useRef<PosePayload>({
                     setBossHP(hp => {
                       const next = Math.max(0, hp - dmg);
                       setBossHurtUntilMs(Date.now() + BOSS_HURT_FLASH_MS);
+                      
+                      // Play boss death sound when HP reaches 0 (before death animation starts)
+                      console.log('[DEBUG] Boss hit - current HP:', hp, 'damage:', dmg, 'next HP:', next);
+                      if (next === 0 && hp > 0) {
+                        console.log('[DEBUG] Boss HP reached 0, playing death sound and starting death animation');
+                        soundManager.playBossDeathSound();
+                      }
+                      
                       return next;
                     });
                   }}
@@ -1542,13 +1558,27 @@ const bossPoseRef = useRef<PosePayload>({
             screenH={SCREEN_H}
             yOffset={0}         // EVA position from top - moved up 10px
             hearts={bossHP}
-            maxHearts={5}
+            maxHearts={6}   // was 5
             barGapY={-42}       // Health bar gap (negative = overlap/closer) - moved up 20px more
           />
         )}
 
-        {/* Heart Pickup after boss death */}
-        {mode === 'bossroom' && heartPickup && (
+        {/* Heart moved to overlay canvas above world layers */}
+         </Canvas>
+
+      {/* Heart Pickup overlay (above ground/lava) */}
+      {mode === 'bossroom' && heartPickup && (
+        <Canvas
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: SCREEN_W,
+            height: SCREEN_H,
+            zIndex: 9990,        // under your HUD (which uses ~9998), above ground/lava
+          }}
+          pointerEvents="none"
+        >
           <HeartPickup
             xWorld={heartPickup.x}
             yWorld={heartPickup.y}
@@ -1556,10 +1586,10 @@ const bossPoseRef = useRef<PosePayload>({
             worldYToScreenY={worldYToScreenY}
             screenW={SCREEN_W}
             screenH={SCREEN_H}
+            spawnAtMs={heartPickup.spawnAt}
           />
-        )}
-         </Canvas>
-      
+        </Canvas>
+      )}
       
       {/* Right stack: SCORE + TIME - Hidden in boss room */}
       {mode !== 'bossroom' && (
@@ -1672,6 +1702,7 @@ const bossPoseRef = useRef<PosePayload>({
             maxConcurrent={2}           // allow up to 2 at once
             spawnMinMs={10000}          // 10–20 seconds between waves
             spawnMaxMs={20000}
+            initialDelayMs={5000}       // 5 second delay before first fireball
             peakTargetScreenY={96}      // keep apex near top
             damagePerHit={1}
             speedScale={0.66}          // ≈ 1/3 slower; try 0.6–0.75 range

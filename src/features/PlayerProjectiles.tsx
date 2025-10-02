@@ -1,6 +1,7 @@
 // src/features/PlayerProjectiles.tsx
 import React, { useEffect, useRef, useReducer } from 'react';
 import { Group, Circle } from '@shopify/react-native-skia';
+import { soundManager } from '../audio/SoundManager';
 
 export type PlayerProjectile = {
   id: number;
@@ -96,6 +97,7 @@ export default function PlayerProjectiles(props: Props) {
 
         if (hit) {
           setTimeout(() => props.onBossHit(1), 0);
+          soundManager.playBossDamageSound(); // Play boss damage sound when hit
           toCull.push(id);
           return;
         }

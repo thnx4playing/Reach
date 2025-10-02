@@ -18,28 +18,29 @@ export default React.memo(function BossHUD({
   screenH = 800,
   yOffset = 6,
   hearts,
-  maxHearts = 5,
+  maxHearts = 6,
   barGapY,
 }: Props) {
   // Load EVA title
   const evaImg = useImage(require('../../assets/misc/eva.png'));
   
-  // Load all 7 health states (5 full -> empty after death)
-  const health1 = useImage(require('../../assets/ui/boss-health-1.png')); // 5 hearts
-  const health2 = useImage(require('../../assets/ui/boss-health-2.png')); // 4 hearts
-  const health3 = useImage(require('../../assets/ui/boss-health-3.png')); // 3 hearts
-  const health4 = useImage(require('../../assets/ui/boss-health-4.png')); // 2 hearts
-  const health5 = useImage(require('../../assets/ui/boss-health-5.png')); // 1 heart
-  const health6 = useImage(require('../../assets/ui/boss-health-6.png')); // 0 hearts
-  const health7 = useImage(require('../../assets/ui/boss-health-7.png')); // empty bar (after death)
+  // Load all 7 health states (6 full -> empty after death)
+  const health1 = useImage(require('../../assets/ui/boss-health-1.png')); // 6 hearts (full health)
+  const health2 = useImage(require('../../assets/ui/boss-health-2.png')); // 5 hearts (1 hit)
+  const health3 = useImage(require('../../assets/ui/boss-health-3.png')); // 4 hearts (2 hits)
+  const health4 = useImage(require('../../assets/ui/boss-health-4.png')); // 3 hearts (3 hits)
+  const health5 = useImage(require('../../assets/ui/boss-health-5.png')); // 2 hearts (4 hits)
+  const health6 = useImage(require('../../assets/ui/boss-health-6.png')); // 1 heart (5 hits)
+  const health7 = useImage(require('../../assets/ui/boss-health-7.png')); // empty bar (death - 0 hearts)
 
   // Pick the right image based on current hearts
   let healthImg = health1;
-  if (hearts === 4) healthImg = health2;
-  else if (hearts === 3) healthImg = health3;
-  else if (hearts === 2) healthImg = health4;
-  else if (hearts === 1) healthImg = health5;
-  else if (hearts <= 0) healthImg = health7; // Show empty bar when dead (0 or less)
+  if (hearts === 5) healthImg = health2;      // 5 hearts (1 hit)
+  else if (hearts === 4) healthImg = health3; // 4 hearts (2 hits)
+  else if (hearts === 3) healthImg = health4; // 3 hearts (3 hits)
+  else if (hearts === 2) healthImg = health5; // 2 hearts (4 hits)
+  else if (hearts === 1) healthImg = health6; // 1 heart (5 hits)
+  else if (hearts <= 0) healthImg = health7;  // Show empty bar when dead (0 or less)
 
   // Wait for images to load
   if (!healthImg || !evaImg) return null;
@@ -85,6 +86,6 @@ export default React.memo(function BossHUD({
   a.screenH === b.screenH &&
   a.yOffset === b.yOffset &&
   a.hearts === b.hearts &&
-  (a.maxHearts ?? 5) === (b.maxHearts ?? 5) &&
+  (a.maxHearts ?? 6) === (b.maxHearts ?? 6) &&
   (a.barGapY ?? -5) === (b.barGapY ?? -5)
 );

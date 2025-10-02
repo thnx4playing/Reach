@@ -35,6 +35,7 @@ export class SoundManager {
       await this.loadSound('fireball', require('../../assets/sounds/fireball.wav'));
       await this.loadSound('fireball-player', require('../../assets/sounds/fireball-player.wav'));
       await this.loadSound('boss-death', require('../../assets/sounds/boss-death.wav'));
+      await this.loadSound('boss-damage', require('../../assets/sounds/boss-damage.wav'));
       await this.loadSound('health-powerup', require('../../assets/sounds/health-powerup.wav'));
 
       this.isInitialized = true;
@@ -107,6 +108,10 @@ export class SoundManager {
 
   public async playBossDeathSound(): Promise<void> {
     await this.playSound('boss-death', 0.9); // Boss death sound
+  }
+
+  public async playBossDamageSound(): Promise<void> {
+    await this.playSound('boss-damage', 0.8); // Boss damage sound when hit by player fireball
   }
 
   public async playHealthPowerupSound(): Promise<void> {

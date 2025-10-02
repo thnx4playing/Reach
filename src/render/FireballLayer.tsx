@@ -53,6 +53,7 @@ type Props = {
   gravity?: number;            // px/s^2
   peakTargetScreenY?: number;  // aim apex toward this screen Y (from top)
   damagePerHit?: number;
+  initialDelayMs?: number;     // delay before first fireball spawn
 
   // New: motion & smoothing
   speedScale?: number;         // <1 slows (0.66 ≈ 1/3 slower)
@@ -76,15 +77,23 @@ export default function FireballLayer({
   gravity = 1350,
   peakTargetScreenY = 96,
   damagePerHit = 1,
+  initialDelayMs = 5000,  // 5 second delay by default
 
   speedScale = 0.66,     // ~⅓ slower motion by default
   smoothAlpha = 0.25,    // light EMA for visual smoothness
 }: Props) {
   const poolRef = useRef<Fireball[]>([]);
-  const nextSpawnAtMsRef = useRef<number>(0);
+  const nextSpawnAtMsRef = useRef<number | null>(null);
   const idRef = useRef(1);
 
   const nowMs = clockMs ?? timeMs ?? 0;
+  
+  // Initialize first spawn only when the animation clock is valid (> 0)
+  if (nextSpawnAtMsRef.current === null) {
+    if (nowMs > 0) {
+      nextSpawnAtMsRef.current = nowMs + initialDelayMs; // 5s after first real clock
+    }
+  }
   const xToScreen = worldXToScreenX ?? ((x: number) => x);
 
   // Utilities
@@ -127,9 +136,13 @@ export default function FireballLayer({
   const activeCount = poolRef.current.length;
 
   // Spawn a wave (random 1 or 2), respecting maxConcurrent
-  if (nowMs >= nextSpawnAtMsRef.current && activeCount < maxConcurrent) {
+  if (
+    nextSpawnAtMsRef.current !== null &&
+    nowMs >= nextSpawnAtMsRef.current &&
+    poolRef.current.length < maxConcurrent
+  ) {
     const desired = Math.random() < 0.45 ? 2 : 1;
-    const capacity = Math.max(0, maxConcurrent - activeCount);
+    const capacity = Math.max(0, maxConcurrent - poolRef.current.length);
     const toSpawn = Math.min(desired, capacity);
     const y0World = lavaYWorld - 8;
 
