@@ -22,8 +22,8 @@ export default function BossRoom({
   const y = worldYToScreenY(floorYWorld);
   return (
     <Group>
-      {/* full floor */}
-      <Rect x={0} y={y} width={screenW} height={24} color="#3a3a3a" />
+      {/* Floor visual handled by HellBackground; keep this only if it's for collisions and not visible */}
+      {/* <Rect x={0} y={y} width={screenW} height={24} color="#2b0d0d" /> */}
       {/* fixed platforms are rendered by existing PlatformRenderer via props */}
     </Group>
   );

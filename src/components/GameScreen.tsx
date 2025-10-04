@@ -12,6 +12,7 @@ import { PlatformRenderer } from './PlatformRenderer';
 import HazardBand from '../render/HazardBand';
 import GroundBand from '../render/GroundBand';
 import FireballLayer from '../render/FireballLayer';
+import HellBackground from '../render/HellBackground';
 import type { LevelData } from '../content/levels';
 import { MAPS, getPrefab, getTileSize } from '../content/maps';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
@@ -1334,44 +1335,45 @@ const bossPoseRef = useRef<PosePayload>({
         style={styles.canvas}
         pointerEvents="box-none"
       >
-          <Rect x={0} y={0} width={SCREEN_W} height={SCREEN_H} color="#87CEEB" />
-          
-{useMemo(() => {
-            const cloudData = [
-              { baseX: SCREEN_W * 0.2, y: SCREEN_H * 0.15, size: 35, speed: 0.8 },
-              { baseX: SCREEN_W * 0.5, y: SCREEN_H * 0.25, size: 40, speed: 1.2 },
-              { baseX: SCREEN_W * 0.8, y: SCREEN_H * 0.2, size: 30, speed: 0.6 },
-              { baseX: SCREEN_W * 0.35, y: SCREEN_H * 0.4, size: 25, speed: 1.0 },
-            ];
-            
-            const animTime = Math.floor(elapsedSec * 15) / 15;
-            
-            return cloudData.map((cloud, i) => {
-              const drift = Math.sin(animTime * 0.1 * cloud.speed + i) * 8;
-              const x = cloud.baseX + drift;
-              
+          {/* BACKGROUND */}
+          {useMemo(() => {
+            if (mode === 'tower') {
               return (
-                <Group key={i}>
-                  <Rect 
-                    x={x - cloud.size * 0.5} 
-                    y={cloud.y} 
-                    width={cloud.size} 
-                    height={cloud.size * 0.6} 
-                    color="white" 
-                    opacity={0.8}
-                  />
-                  <Rect 
-                    x={x - cloud.size * 0.3} 
-                    y={cloud.y - cloud.size * 0.2} 
-                    width={cloud.size * 0.6} 
-                    height={cloud.size * 0.6} 
-                    color="white" 
-                    opacity={0.9}
-                  />
+                <Group>
+                  <Rect x={0} y={0} width={SCREEN_W} height={SCREEN_H} color="#87CEEB" />
+                  {(() => {
+                    const cloudData = [
+                      { baseX: SCREEN_W * 0.2, y: SCREEN_H * 0.15, size: 35, speed: 0.8 },
+                      { baseX: SCREEN_W * 0.5, y: SCREEN_H * 0.25, size: 40, speed: 1.2 },
+                      { baseX: SCREEN_W * 0.8, y: SCREEN_H * 0.2, size: 30, speed: 0.6 },
+                      { baseX: SCREEN_W * 0.35, y: SCREEN_H * 0.4, size: 25, speed: 1.0 },
+                    ];
+                    const animTime = Math.floor(elapsedSec * 15) / 15;
+                    return cloudData.map((cloud, i) => {
+                      const drift = Math.sin(animTime * 0.1 * cloud.speed + i) * 8;
+                      const x = cloud.baseX + drift;
+                      return (
+                        <Group key={i}>
+                          <Rect x={x - cloud.size * 0.5} y={cloud.y} width={cloud.size} height={cloud.size * 0.6} color="white" opacity={0.8} />
+                          <Rect x={x - cloud.size * 0.3} y={cloud.y - cloud.size * 0.2} width={cloud.size * 0.6} height={cloud.size * 0.6} color="white" opacity={0.9} />
+                        </Group>
+                      );
+                    });
+                  })()}
                 </Group>
               );
-            });
-          }, [Math.floor(elapsedSec * 4)])}
+            } else {
+              return (
+                <HellBackground
+                  width={SCREEN_W}
+                  height={SCREEN_H}
+                  timeMs={hazardAnimationTime}
+                  floorY={worldYToScreenY(floorTopY)}
+                  floorLiftPx={22}   // raise visual floor ~22px so feet meet floor
+                />
+              );
+            }
+          }, [mode, SCREEN_W, SCREEN_H, elapsedSec, hazardAnimationTime, floorTopY, worldYToScreenY])}
           
           <Group transform={[{ translateY: -cameraY }]}>
             {/* PERFORMANCE: Use memoized platform renderer - only in tower mode */}
@@ -1622,8 +1624,8 @@ const bossPoseRef = useRef<PosePayload>({
       </View>
       
       
-      {/* Ground Band - Dirt with grass top - both tower and boss room modes */}
-      {(() => {
+      {/* Ground Band - Dirt with grass top - tower mode only */}
+      {mode === 'tower' && (() => {
         // Use the same world->screen conversion as HazardBand for consistency
         const groundScreenY = worldYToScreenY(floorTopY);
         // Adjust upward to align grass lip exactly under character's feet
