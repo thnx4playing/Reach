@@ -103,7 +103,7 @@ export class SoundManager {
   }
 
   public async playPlayerFireballSound(): Promise<void> {
-    await this.playSound('fireball-player', 0.7); // Player fireball sound
+    await this.playSound('fireball-player', 0.49); // Player fireball sound (reduced by 30%)
   }
 
   public async playBossDeathSound(): Promise<void> {
@@ -111,7 +111,7 @@ export class SoundManager {
   }
 
   public async playBossDamageSound(): Promise<void> {
-    await this.playSound('boss-damage', 0.8); // Boss damage sound when hit by player fireball
+    await this.playSound('boss-damage', 0.2); // Boss damage sound when hit by player fireball (reduced by 75%)
   }
 
   public async playHealthPowerupSound(): Promise<void> {
