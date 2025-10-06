@@ -1,6 +1,6 @@
 // src/render/HellBackground.tsx
 import React, { useMemo } from 'react';
-import { Group, Rect, Path, Circle, Skia } from '@shopify/react-native-skia';
+import { Group, Rect, Path, Circle, Skia, Image, useImage } from '@shopify/react-native-skia';
 
 type Props = {
   width: number;
@@ -39,8 +39,11 @@ export default function HellBackground({
 }: Props) {
   const t = (timeMs % 100000) / 1000; // seconds
 
+  // Load brick floor image
+  const brickFloorImage = useImage(require('../../assets/maps/dark/brick-floor.png'));
+
   // Single lighter background color
-  const backgroundColor = '#2a1f2a'; // Lighter purple-gray tone
+  const backgroundColor = '#3a2f3a'; // Even lighter purple-gray tone
 
   // Stalactites removed - no longer needed
 
@@ -49,36 +52,8 @@ export default function HellBackground({
   const visFloorY = Math.max(0, baseFloorY - floorLiftPx);
   const floorBandH = Math.max(0, height - visFloorY);
 
-  // Stones + cracks just in the top ~56px of floor
-  const floorDetail = useMemo(() => {
-    const rng = makeRand(4242);
-    const stones: { x: number; y: number; w: number; h: number; a: number }[] = [];
-    const cracks: { x1: number; y1: number; x2: number; y2: number; a: number }[] = [];
-    const topBandH = Math.min(56, floorBandH);
-
-    // Stones
-    const count = Math.max(24, Math.floor(width / 28));
-    for (let i = 0; i < count; i++) {
-      const w = 10 + rng() * 22; // 10..32
-      const h = 6 + rng() * 12;  // 6..18
-      const x = rng() * width;
-      const y = visFloorY + 6 + rng() * Math.max(1, topBandH - 10);
-      stones.push({ x, y, w, h, a: 0.65 + rng() * 0.25 });
-    }
-
-    // Cracks (small random segments)
-    const crackCount = Math.floor(count * 0.45);
-    for (let i = 0; i < crackCount; i++) {
-      const len = 6 + rng() * 20; // 6..26
-      const x1 = rng() * width;
-      const y1 = visFloorY + 8 + rng() * Math.max(1, topBandH - 14);
-      const x2 = x1 + (rng() - 0.5) * len;
-      const y2 = y1 + (rng() - 0.2) * (len * 0.4);
-      cracks.push({ x1, y1, x2, y2, a: 0.18 + rng() * 0.12 });
-    }
-
-    return { stones, cracks, topBandH };
-  }, [width, visFloorY, floorBandH]);
+  // Floor detail for lava glow positioning
+  const topBandH = Math.min(56, floorBandH);
 
   // Floating embers (background mood)
   const embers = useMemo(() => {
@@ -117,29 +92,33 @@ export default function HellBackground({
 
       {/* Lanterns removed */}
 
-      {/* Floor band (base) */}
-      <Rect x={0} y={visFloorY} width={width} height={floorBandH} color="#1b0707" opacity={1} />
-      {/* Top bevel/lip */}
-      <Rect x={0} y={visFloorY - 2} width={width} height={4} color="#3b1111" opacity={0.9} />
-      {/* Rim shadow */}
-      <Rect x={0} y={visFloorY + 2} width={width} height={4} color="#0a0404" opacity={0.35} />
+      {/* Tiled Brick Floor Image */}
+      {brickFloorImage && (
+        <>
+          {/* Tile the brick floor image across the width */}
+          {Array.from({ length: Math.ceil(width / (brickFloorImage.width() || 64)) }, (_, i) => (
+            <Image
+              key={`brick-floor-${i}`}
+              image={brickFloorImage}
+              x={i * (brickFloorImage.width() || 64)}
+              y={visFloorY}
+              width={brickFloorImage.width() || 64}
+              height={floorBandH}
+              fit="fill"
+            />
+          ))}
+          
+          {/* Top bevel/lip */}
+          <Rect x={0} y={visFloorY - 2} width={width} height={4} color="#3b1111" opacity={0.9} />
+          
+          {/* Rim shadow */}
+          <Rect x={0} y={visFloorY + 2} width={width} height={4} color="#0a0404" opacity={0.35} />
 
-      {/* Stones */}
-      {floorDetail.stones.map((s, i) => (
-        <Rect key={i} x={s.x} y={s.y} width={s.w} height={s.h} color="#2b0d0d" opacity={s.a} />
-      ))}
-
-      {/* Cracks */}
-      {floorDetail.cracks.map((c, i) => {
-        const path = Skia.Path.Make();
-        path.moveTo(c.x1, c.y1);
-        path.lineTo(c.x2, c.y2);
-        return <Path key={i} path={path} color="#120406" style="stroke" strokeWidth={1} opacity={c.a} />;
-      })}
-
-      {/* Subtle lava glow creeping up from below */}
-      <Rect x={0} y={visFloorY + floorDetail.topBandH - 4} width={width} height={Math.max(0, floorBandH - floorDetail.topBandH + 4)} color="#ff3000" opacity={0.08} />
-      <Rect x={0} y={visFloorY + floorDetail.topBandH + 6} width={width} height={Math.max(0, floorBandH - floorDetail.topBandH - 6)} color="#ffa000" opacity={0.05} />
+          {/* Subtle lava glow creeping up from below */}
+          <Rect x={0} y={visFloorY + topBandH - 4} width={width} height={Math.max(0, floorBandH - topBandH + 4)} color="#ff3000" opacity={0.08} />
+          <Rect x={0} y={visFloorY + topBandH + 6} width={width} height={Math.max(0, floorBandH - topBandH - 6)} color="#ffa000" opacity={0.05} />
+        </>
+      )}
     </Group>
   );
 }

@@ -28,7 +28,9 @@ export default function App() {
 
   const handlePlay = () => {
     if (selectedMap) {
-      setCurrentLevel(LEVELS[selectedMap as keyof typeof LEVELS]);
+      const level = LEVELS[selectedMap as keyof typeof LEVELS];
+      console.log('[App] Loading level:', { selectedMap, level });
+      setCurrentLevel(level);
       setCurrentScreen('game');
     }
   };

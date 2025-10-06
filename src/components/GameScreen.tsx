@@ -13,8 +13,9 @@ import HazardBand from '../render/HazardBand';
 import GroundBand from '../render/GroundBand';
 import FireballLayer from '../render/FireballLayer';
 import HellBackground from '../render/HellBackground';
+import TiledFloor from '../scene/boss/TiledFloor';
 import type { LevelData } from '../content/levels';
-import { MAPS, getPrefab, getTileSize } from '../content/maps';
+import { MAPS, getPrefab, getTileSize, MapName } from '../content/maps';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
 import { EnhancedPlatformManager } from '../systems/platform/PlatformManager';
 import { checkPlatformCollision } from '../physics/PlatformCollision';
@@ -258,39 +259,65 @@ const bossPoseRef = useRef<PosePayload>({
   useEffect(() => { bossPlatformsRef.current = bossPlatforms; }, [bossPlatforms]);
 
   function createBossPlatforms(floorTopY: number, mapW: number): BossPlat[] {
-    // Use the actual prefab width for collision accuracy
-    const W = prefabWidthPx(levelData.mapName, 'platform-grass-3-final'); // 96px (3 tiles × 16px × 2 scale)
+    // Use dark tileset prefabs
+    const darkMap = 'dark' as MapName;
+    
+    // Platform widths for dark tileset
+    const platform3W = prefabWidthPx(darkMap, 'platform-dark-3-final', 2); // 96px (3 tiles)
+    const platform1W = prefabWidthPx(darkMap, 'platform-dark-1-final', 2); // 32px (1 tile)
+    const platform2W = prefabWidthPx(darkMap, 'platform-dark-2-left-final', 2); // 64px (2 tiles)
     const H = 24;
 
-    // Arrange platforms: 2 left, 3 middle, 2 right at different heights
     const screenCenter = SCREEN_W * 0.5;
-    const margin = 120; // margin from screen edges
-    const leftZone = screenCenter - 150;   // left side
-    const rightZone = screenCenter + 150;  // right side
-    const middleZone = screenCenter;       // center
+    const margin = 40;
     
-    // X positions: 2 left, 3 middle, 2 right (all within screen bounds)
-    const xs = [
-      leftZone - 60,    // left 1
-      leftZone + 20,    // left 2
-      middleZone - 80,  // middle 1
-      middleZone,       // middle 2
-      middleZone + 80,  // middle 3
-      rightZone - 20,   // right 1
-      rightZone + 60,   // right 2
+    const platforms: BossPlat[] = [
+      // Three platform-dark-3-final (3-block platforms) - spread out
+      {
+        id: 'boss-plf-0',
+        x: screenCenter - 180,
+        y: floorTopY - 195, // adjusted for floor position change
+        w: platform3W,
+        h: H,
+        prefab: 'platform-dark-3-final',
+      },
+      {
+        id: 'boss-plf-1',
+        x: screenCenter + 80,
+        y: floorTopY - 315, // adjusted for floor position change
+        w: platform3W,
+        h: H,
+        prefab: 'platform-dark-3-final',
+      },
+      {
+        id: 'boss-plf-2',
+        x: screenCenter - 50,
+        y: floorTopY - 470, // adjusted for floor position change (top middle platform)
+        w: platform3W,
+        h: H,
+        prefab: 'platform-dark-3-final',
+      },
+      
+      // platform-dark-2-left-final (flush left)
+      {
+        id: 'boss-plf-3',
+        x: 0,
+        y: floorTopY - 355, // adjusted for floor position change
+        w: platform2W,
+        h: H,
+        prefab: 'platform-dark-2-left-final',
+      },
+      
+      // platform-dark-2-right-final (flush right, raised by 40px)
+      {
+        id: 'boss-plf-4',
+        x: SCREEN_W - platform2W,
+        y: floorTopY - 415, // adjusted for floor position change
+        w: platform2W,
+        h: H,
+        prefab: 'platform-dark-2-right-final',
+      },
     ];
-    
-    // Y positions: all at different heights, staggered
-    const ys = [120, 280, 200, 360, 480, 160, 400];
-
-    const platforms = ys.map((dy, i) => ({
-      id: `boss-plf-${i}`,
-      x: xs[i],
-      y: floorTopY - dy,
-      w: W,
-      h: H,
-      prefab: BOSS_PREFAB,
-    }));
     
     return platforms;
   }
@@ -413,7 +440,7 @@ const bossPoseRef = useRef<PosePayload>({
     const rows = (pf?.cells?.length ?? pf?.rects?.length ?? 2);
 
     const floorHeight = rows * tile * SCALE;
-    const result = Math.round(SCREEN_H - floorHeight);
+    const result = Math.round(SCREEN_H - floorHeight - 5); // moved floor up by 5px (reduced from 10px)
     
     return result;
   }, [levelData.mapName]);
@@ -482,7 +509,33 @@ const bossPoseRef = useRef<PosePayload>({
     // Now publish to state once so the first frame has content
     updatePlatforms(mgr.getAllPlatforms());
     
-  }, [levelData.mapName, floorTopY]); // FIXED: Remove updatePlatforms dependency to prevent infinite loop
+    // Check if this level should start in boss room mode
+    console.log('[GameScreen] Level data:', { 
+      mapName: levelData.mapName, 
+      startInBossRoom: levelData.startInBossRoom,
+      floorTopY 
+    });
+    
+    if (levelData.startInBossRoom) {
+      console.log('[GameScreen] Starting in boss room mode');
+      setMode('bossroom');
+      setCameraY(0); // Fix camera for boss room
+      
+      // Set up boss platforms
+      const mapW = prefabWidthPx(levelData.mapName, 'platform-grass-3-final');
+      setBossPlatforms(createBossPlatforms(floorTopY, mapW));
+      
+      // Reset player position for boss room
+      xRef.current = Math.round((mapW - CHAR_W) * 0.5);
+      zRef.current = 7; // Compensate for raised floor
+      vxRef.current = 0;
+      vzRef.current = 0;
+    } else {
+      console.log('[GameScreen] Starting in tower mode');
+      setMode('tower'); // Ensure we start in tower mode for regular levels
+    }
+    
+  }, [levelData.mapName, floorTopY, levelData.startInBossRoom]); // Added startInBossRoom dependency
 
 
   // PERFORMANCE: O(cells) instead of O(N) platform queries
@@ -869,18 +922,18 @@ const bossPoseRef = useRef<PosePayload>({
     // Add boss room collision slabs
     const bossCollision = mode === 'bossroom'
       ? [
-          // Boss room floor
+          // Boss room floor - RAISED BY 7PX
           {
             id: 'boss-floor',
             x: -SCREEN_W,
-            y: floorTopY,
+            y: floorTopY - 7, // CHANGED: Raised by 7px
             w: SCREEN_W * 3,
-            h: 32, // Standard floor height
+            h: 32,
             type: 'platform' as const,
             collision: {
               left: -SCREEN_W,
               right: SCREEN_W * 2,
-              topY: floorTopY,
+              topY: floorTopY - 7, // CHANGED: Raised by 7px
               solid: true,
               width: SCREEN_W * 3,
               height: 32
@@ -1061,7 +1114,7 @@ const bossPoseRef = useRef<PosePayload>({
 
         // 5) re-center player on the room and reset velocity
         xRef.current = Math.round((mapW - CHAR_W) * 0.5);
-        zRef.current = 64; // stand a bit above the floor
+        zRef.current = 7; // CHANGED: Lowered from 0 to 7 (compensates for raised floor)
         vxRef.current = 0; // stop horizontal movement
         vzRef.current = 0; // stop vertical movement
       }
@@ -1364,12 +1417,14 @@ const bossPoseRef = useRef<PosePayload>({
               );
             } else {
               return (
-                <HellBackground
-                  width={SCREEN_W}
-                  height={SCREEN_H}
+                <TiledFloor
+                  left={0}
+                  right={SCREEN_W}
+                  topY={floorTopY - 7}
+                  cameraY={0}
+                  tileHeight={32}
+                  prefer128={true}
                   timeMs={hazardAnimationTime}
-                  floorY={worldYToScreenY(floorTopY)}
-                  floorLiftPx={22}   // raise visual floor ~22px so feet meet floor
                 />
               );
             }
@@ -1397,10 +1452,42 @@ const bossPoseRef = useRef<PosePayload>({
               />
             )}
             
-            {/* Boss room platforms - render using same prefab as tower */}
+            {/* Boss room platforms - render using dark tileset */}
             {mode === 'bossroom' && bossPlatforms.map(p => (
-              <PrefabNode key={p.id} map="grassy" name={p.prefab} x={p.x} y={p.y} />
+              <PrefabNode key={p.id} map="dark" name={p.prefab} x={p.x} y={p.y} />
             ))}
+
+            {/* Boss room decorations - lights and vases */}
+            {mode === 'bossroom' && (() => {
+              const decorations: Array<{ prefab: string; x: number; y: number; zIndex?: number }> = [];
+              
+              
+              // Add vases on floor and platforms (reduced spawn rate by 50%)
+              bossPlatforms.forEach((platform, idx) => {
+                if (idx % 4 === 0) { // Changed from % 2 to % 4 (50% reduction)
+                  // Place vase on every fourth platform (static positioning)
+                  const vaseType = 'vase-1-final'; // Fixed type instead of random
+                  const vaseY = platform.y - 32; // Static Y position (platform top - 32px)
+                  decorations.push({
+                    prefab: vaseType,
+                    x: platform.x + platform.w / 2 - 16, // Center vase on platform
+                    y: vaseY,
+                    zIndex: 10
+                  });
+                }
+              });
+              
+              
+              return decorations.map((deco, idx) => (
+                <PrefabNode 
+                  key={`deco-${idx}`}
+                  map="dark"
+                  name={deco.prefab}
+                  x={deco.x}
+                  y={deco.y}
+                />
+              ));
+            })()}
 
             {/* Boss demon and projectiles */}
             {mode === 'bossroom' && !bossDespawned && (() => {

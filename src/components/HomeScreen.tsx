@@ -19,9 +19,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onMapSelect, onPlay }) =
     { name: 'dungeon', displayName: 'Dungeon', color: '#8B4513' },
     { name: 'frozen', displayName: 'Frozen', color: '#B0E0E6' },
     { name: 'grassy', displayName: 'Grassy', color: '#90EE90' },
+    { name: 'bossroom', displayName: 'Boss Room', color: '#8B0000' },
   ];
 
   const handleMapSelect = (map: MapName) => {
+    console.log('[HomeScreen] Map selected:', map);
     setSelectedMap(map);
     onMapSelect(map);
     setDropdownVisible(false);
@@ -37,10 +39,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onMapSelect, onPlay }) =
     onPlay();
   };
   
-  // Set initial map selection on mount
-  React.useEffect(() => {
-    onMapSelect('grassy');
-  }, [onMapSelect]);
+  // Set initial map selection on mount - removed to allow user selection to work
+  // React.useEffect(() => {
+  //   onMapSelect('grassy');
+  // }, [onMapSelect]);
 
   return (
     <View style={styles.container}>

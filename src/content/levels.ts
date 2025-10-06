@@ -15,6 +15,7 @@ export type LevelData = {
   decorations: Platform[];
   characterSpawn: { x: number; y: number };
   floorTopY: number;
+  startInBossRoom?: boolean; // Special flag for boss room levels
 };
 
 function buildLevel(mapName: MapName, w: number, h: number): LevelData {
@@ -79,10 +80,27 @@ function getMapDecorations(mapName: MapName, width: number, height: number, floo
   }
 }
 
+// Special boss room level that starts directly in boss room mode
+function buildBossRoomLevel(): LevelData {
+  const FLOOR_SCALE = 2;
+  const staticFloor = makeStaticFloor('bossroom', width, height, FLOOR_SCALE);
+  const floorTopY = Math.round(height - prefabHeightPx('bossroom', 'floor', 2));
+  
+  return {
+    mapName: 'bossroom', // Use bossroom map type
+    platforms: staticFloor,
+    decorations: [], // Boss room has its own decorations
+    characterSpawn: { x: width * 0.5, y: height - 100 },
+    floorTopY,
+    startInBossRoom: true, // This flag tells GameScreen to start in boss room mode
+  };
+}
+
 export const LEVELS: Record<MapName, LevelData> = {
   dark: buildLevel('dark', width, height),
   desert: buildLevel('desert', width, height),
   dungeon: buildLevel('dungeon', width, height),
   frozen: buildLevel('frozen', width, height),
   grassy: buildLevel('grassy', width, height),
+  bossroom: buildBossRoomLevel(), // Special boss room level
 };

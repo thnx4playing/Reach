@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useImage } from "@shopify/react-native-skia";
 import { grassyPrefabImages } from "../assets/grassyPrefabs";
+import { darkPrefabImages } from "../assets/darkPrefabs";
 import type { MapName } from "../content/maps";
 
 // MapName -> list of prefab names to warm
 const PREFAB_LISTS: Record<MapName, string[]> = {
   grassy: Object.keys(grassyPrefabImages),
-  dark:   [], desert: [], dungeon: [], frozen: [], // fill later if you switch those maps too
+  dark: Object.keys(darkPrefabImages),
+  desert: [], dungeon: [], frozen: [], // fill later if you switch those maps too
 };
 
 type Preloaded = Map<string, any>; // key = `${map}:${name}`, value = SkImage
@@ -15,7 +17,11 @@ export const usePreloadedImage = (map: MapName, prefab: string) =>
   useContext(Ctx).get(`${map}:${prefab}`) ?? null;
 
 function ImageLoader({ map, prefab, onReady }: { map: MapName; prefab: string; onReady: (k: string, img: any)=>void }) {
-  const src = map === "grassy" ? grassyPrefabImages[prefab] : undefined;
+  const src = map === "grassy" 
+    ? grassyPrefabImages[prefab] 
+    : map === "dark"
+    ? darkPrefabImages[prefab]
+    : undefined;
   const img = useImage(src);
   useEffect(() => { if (img) onReady(`${map}:${prefab}`, img); }, [img, map, prefab, onReady]);
   return null;

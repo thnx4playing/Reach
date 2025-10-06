@@ -96,7 +96,32 @@ const grassyCatalog: PrefabCatalog = {
     "boot-final": { cells: [[null, null, null, null]] },
   }
 };
-const darkCatalog   = darkPrefs       as PrefabCatalog;
+const darkCatalog: PrefabCatalog = {
+  meta: {
+    map: "dark",
+    tileset_image: "dark-tileset-final.png",
+    tileSize: 16,
+    margin: 0,
+    spacing: 0,
+    columns: 30,
+    rows: 20
+  },
+  frames: (darkPrefs as any).frames || {},
+  prefabs: {
+    // Platform prefabs with proper solid cells for collision detection
+    "platform-dark-3-final": { cells: [["cell-2-1", "cell-3-1", "cell-4-1"]] },
+    "platform-dark-1-final": { cells: [["cell-3-3"]] },
+    "platform-dark-2-left-final": { cells: [["cell-9-2", "cell-10-2"]] },
+    "platform-dark-2-right-final": { cells: [["cell-9-4", "cell-10-4"]] },
+    
+    // Decoration prefabs (no collision needed)
+    "light-final": { cells: [[null, null], [null, null]] }, // 2x2 light sprite
+    "vase-1-final": { cells: [[null]] }, // 1x1 vase
+    "vase-2-final": { cells: [[null]] }, // 1x1 vase
+    "banner-1-final": { cells: [[null], [null]] }, // 1x2 banner
+    "banner-2-final": { cells: [[null], [null]] }, // 1x2 banner
+  }
+};
 const desertCatalog = desertPrefs     as PrefabCatalog;
 const dungeonCatalog= dungeonPrefs    as PrefabCatalog;
 const frozenCatalog = frozenPrefs     as PrefabCatalog;
@@ -107,6 +132,7 @@ export const MAPS = {
   dungeon: { image: dungeonImage, prefabs: dungeonCatalog, frames: (dungeonCatalog as any).frames || {} },
   frozen:  { image: frozenImage,  prefabs: frozenCatalog,  frames: (frozenCatalog as any).frames || {} },
   grassy:  { image: undefined,  prefabs: grassyCatalog,  frames: {} },
+  bossroom: { image: darkImage, prefabs: darkCatalog, frames: (darkCatalog as any).frames || {} }, // Uses dark tileset
 } as const;
 
 export type MapName = keyof typeof MAPS;

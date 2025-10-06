@@ -3,6 +3,7 @@ import { Image as SkImageComponent, useImage, Group } from "@shopify/react-nativ
 import { MAPS, MapName } from "../content/maps";
 import { usePreloadedImage } from "./ImagePreloaderContext";
 import { grassyPrefabImages } from "../assets/grassyPrefabs";
+import { darkPrefabImages } from "../assets/darkPrefabs";
 
 type Props = { map: MapName; name: string; x?: number; y?: number; scale?: number; opacity?: number };
 
@@ -16,7 +17,13 @@ export function PrefabNode({ map, name, x = 0, y = 0, scale = 2, opacity = 1.0 }
 
   // Always call hooks unconditionally
   const pre = usePreloadedImage(map, name);
-  const lazy = useImage(map === "grassy" ? grassyPrefabImages[name] : undefined);
+  const lazy = useImage(
+    map === "grassy" 
+      ? grassyPrefabImages[name]
+      : map === "dark"
+      ? darkPrefabImages[name]
+      : undefined
+  );
   const finalImg = pre || lazy;
   if (!finalImg) return null;
 
