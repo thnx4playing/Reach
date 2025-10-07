@@ -107,8 +107,8 @@ function calcDoorIceWorldXY(anchor: { x: number; y: number; w: number }) {
   const x = Math.round(anchor.x + (anchor.w - DOOR_ICE_WIDTH) * 0.5) + nudgeX;
 
   // place above platform top by the scaled sprite height + fixed offset
-  // Increase offset by another 25px to move door up (total 50px from original)
-  const adjustedOffsetY = offsetY + 50;
+  // Adjusted for unified floor system - move door down by 25px
+  const adjustedOffsetY = offsetY + 25;
   const y = Math.round(anchor.y - DOOR_ICE_HEIGHT * scale - adjustedOffsetY);
 
   return { x, y };
