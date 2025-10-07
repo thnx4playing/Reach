@@ -19,13 +19,15 @@ export type LevelData = {
 };
 
 function buildLevel(mapName: MapName, w: number, h: number): LevelData {
-  const FLOOR_SCALE = 2;
-  const staticFloor = makeStaticFloor(mapName, w, h, FLOOR_SCALE);
+  // Core maps (grassy, frozen, etc.) use Skia-generated floors, not prefab floors
+  // Only boss room uses prefab floors
+  const staticFloor: Platform[] = []; // Empty for core maps - Skia handles floor rendering
   
-  // Calculate floorTopY for all maps
-  const floorPrefabName = mapName === 'grassy' ? 'floor-final' : 
-                         mapName === 'frozen' ? 'floor-final' : 'floor';
-  const floorTopY = Math.round(h - prefabHeightPx(mapName, floorPrefabName, 2));
+  // For core maps, use a fixed floor height that matches Skia rendering
+  // This should match the calculation in src/engine/floor.ts
+  const SKIA_FLOOR_HEIGHT = 32;
+  const SKIA_VISUAL_OFFSET = 52; // GroundBand adjusts upward by 30px, plus adjustment for grass lip and fine-tuning
+  const floorTopY = Math.round(h - SKIA_FLOOR_HEIGHT - 5 + SKIA_VISUAL_OFFSET);
   
   // Get map-specific decorations (ground-level only)
   const decorations = getMapDecorations(mapName, w, h, floorTopY);
@@ -93,8 +95,8 @@ function getMapDecorations(mapName: MapName, width: number, height: number, floo
 // Special boss room level that starts directly in boss room mode
 function buildBossRoomLevel(): LevelData {
   const FLOOR_SCALE = 2;
-  const staticFloor = makeStaticFloor('bossroom', width, height, FLOOR_SCALE);
-  const floorTopY = Math.round(height - prefabHeightPx('bossroom', 'floor', 2));
+  const staticFloor = makeStaticFloor('bossroom', width, height, FLOOR_SCALE, 'floor-final');
+  const floorTopY = Math.round(height - prefabHeightPx('bossroom', 'floor-final', 2));
   
   return {
     mapName: 'bossroom', // Use bossroom map type

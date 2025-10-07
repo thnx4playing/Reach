@@ -80,7 +80,12 @@ export class SoundManager {
       await sound.setVolumeAsync(volume);
       await sound.playAsync();
     } catch (error) {
-      console.error(`[SoundManager] Failed to play sound ${name}:`, error);
+      // Log error but don't crash - this prevents the "seeking interrupted" crash
+      if (error instanceof Error && error.message.includes('Seeking interrupted')) {
+        console.warn(`[SoundManager] Sound ${name} was interrupted during playback - this is normal during map transitions`);
+      } else {
+        console.error(`[SoundManager] Failed to play sound ${name}:`, error);
+      }
     }
   }
 

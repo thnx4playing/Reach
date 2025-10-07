@@ -18,6 +18,9 @@ import TiledFloor from '../scene/boss/TiledFloor';
 import type { LevelData } from '../content/levels';
 import { LEVELS } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, MapName } from '../content/maps';
+import { getProfile, MapName as ProfileMapName } from '../config/mapProfiles';
+import { floorTopYFor } from '../engine/floor';
+import { enterMap } from '../engine/enterMap';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
 import { EnhancedPlatformManager } from '../systems/platform/PlatformManager';
 import { checkPlatformCollision } from '../physics/PlatformCollision';
@@ -93,12 +96,20 @@ const DEFAULT_FOOT_OFFSET = 0;
 // Door-ice helper function
 const DOOR_ICE_SCALE = 1.5; // must match DoorIceSprite
 
+// Door-ice helper uses boss profile constants
 function calcDoorIceWorldXY(anchor: { x: number; y: number; w: number }) {
-  // Center horizontally on the platform; match your visual nudge of -15px
-  const x = Math.round(anchor.x + (anchor.w - DOOR_ICE_WIDTH) * 0.5) - 15;
+  const boss = getProfile('bossroom'); // constants live in boss profile
+  const scale = boss.door?.scale ?? 1.5;
+  const nudgeX = boss.door?.nudgeX ?? -15;
+  const offsetY = boss.door?.offsetYAboveTop ?? 32;
 
-  // Position door-ice back up above the platform
-  const y = Math.round(anchor.y - DOOR_ICE_HEIGHT * DOOR_ICE_SCALE - 32);
+  // center horizontally, plus a small styling nudge
+  const x = Math.round(anchor.x + (anchor.w - DOOR_ICE_WIDTH) * 0.5) + nudgeX;
+
+  // place above platform top by the scaled sprite height + fixed offset
+  // Increase offset by another 25px to move door up (total 50px from original)
+  const adjustedOffsetY = offsetY + 50;
+  const y = Math.round(anchor.y - DOOR_ICE_HEIGHT * scale - adjustedOffsetY);
 
   return { x, y };
 }
@@ -111,6 +122,9 @@ interface GameScreenProps {
 
 // Inner game component that uses health hooks
 const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack, onLevelChange }) => {
+  // Get map profile for consistent behavior
+  const profile = getProfile(levelData.mapName as ProfileMapName);
+  
   // Health system integration
   const { isDead, bars, takeDamage, hits, sys, reset: resetHealth, heal } = useHealth();
   
@@ -510,23 +524,8 @@ const bossPoseRef = useRef<PosePayload>({
   // Optional: disable input when dead
   const inputEnabled = !isDead;
 
-  // Floor calculation
-  const floorTopY = useMemo(() => {
-    const meta = (MAPS as any)[levelData.mapName]?.prefabs?.meta;
-    const tile = meta?.tileSize ?? 16;
-
-    const floorPrefabName =
-      (levelData.mapName === 'grassy' || levelData.mapName === 'frozen' || levelData.mapName === 'bossroom')
-        ? 'floor-final'
-        : 'floor';
-    const pf = (MAPS as any)[levelData.mapName]?.prefabs?.prefabs?.[floorPrefabName];
-    const rows = (pf?.cells?.length ?? pf?.rects?.length ?? 2);
-
-    const floorHeight = rows * tile * SCALE;
-    const result = Math.round(SCREEN_H - floorHeight - 5); // moved floor up by 5px (reduced from 10px)
-    
-    return result;
-  }, [levelData.mapName]);
+  // Floor calculation (unified)
+  const floorTopY = useMemo(() => floorTopYFor(levelData.mapName as ProfileMapName), [levelData.mapName]);
 
   // Character dims - MOVED HERE to avoid hoisting issues
   const mapDef = MAPS[levelData.mapName];
@@ -613,18 +612,17 @@ const bossPoseRef = useRef<PosePayload>({
     
     if (levelData.startInBossRoom) {
       console.log('[GameScreen] Starting in boss room mode');
-      setMode('bossroom');
-      setCameraY(0); // Fix camera for boss room
-      
-      // Set up boss platforms
-      const mapW = prefabWidthPx(levelData.mapName, THREE_BLOCK_PREFAB);
-      setBossPlatforms(createBossPlatforms(floorTopY, mapW));
-      
-      // Reset player position for boss room
-      xRef.current = Math.round((mapW - CHAR_W) * 0.5);
-      zRef.current = 7; // Compensate for raised floor
-      vxRef.current = 0;
-      vzRef.current = 0;
+      enterMap("bossroom", {
+        setMode, setCameraY,
+        setPlatforms: setBossPlatforms,
+        buildPlatforms: createBossPlatforms,
+        setDoorAnchor, setDoorIceAnchor,
+        xRef, zRef, vxRef, vzRef, onGroundRef,
+        clampFramesRef: clampToGroundFramesRef,
+        mapWidthFor: (m) => prefabWidthPx(m, THREE_BLOCK_PREFAB),
+        modeForMap: (m) => (m === "bossroom" ? "bossroom" : "tower"),
+        platformManager: platformManager.current
+      });
     } else {
       console.log('[GameScreen] Starting in tower mode');
       setMode('tower'); // Ensure we start in tower mode for regular levels
@@ -833,12 +831,13 @@ const bossPoseRef = useRef<PosePayload>({
         groundedFramesRef.current = 0;
       }
 
-      // If we just teleported to bossroom, clamp to its floor on the very next frame
-      // (prevents any airborne carryover from tower mode)
-      if (postTeleportClampRef.current && modeRef.current === 'bossroom') {
-        zRef.current  = 0;   // feet on floor
-        vzRef.current = 0;   // no vertical velocity
-        postTeleportClampRef.current = false;
+      // Ground clamp for map entry (unified system)
+      if (clampToGroundFramesRef.current > 0) {
+        zRef.current = 0;
+        vzRef.current = 0;
+        onGroundRef.current = true;
+        groundedFramesRef.current = Math.max(groundedFramesRef.current, 1);
+        clampToGroundFramesRef.current -= 1;
       }
       
       // PERFORMANCE: Simplified timing - just use basic delta time
@@ -1209,33 +1208,24 @@ const bossPoseRef = useRef<PosePayload>({
         // 1) briefly suppress hazards so this frame can't kill us
         hazardSuppressUntilMsRef.current = Date.now() + 1000;
 
-        // 2) enter boss room
-        setMode('bossroom');
-        setCameraY(0); // fix the room to screen; also ensures GroundBand is visible
-        // Hard clamp vertical now, and again next frame (after room swap is realized)
-        zRef.current  = 0;
-        vzRef.current = 0;
-        onGroundRef.current = true;
-        
-        // Hold to ground for a couple frames to ensure we use the new map's floorTopY
-        clampToGroundFramesRef.current = 2;
-        postTeleportClampRef.current = true;
+        // 2) enter boss room using unified system
+        enterMap("bossroom", {
+          setMode, setCameraY,
+          setPlatforms: setBossPlatforms,
+          buildPlatforms: createBossPlatforms,
+          setDoorAnchor, setDoorIceAnchor,
+          xRef, zRef, vxRef, vzRef, onGroundRef,
+          clampFramesRef: clampToGroundFramesRef,
+          mapWidthFor: (m) => prefabWidthPx(m, THREE_BLOCK_PREFAB),
+          modeForMap: (m) => (m === "bossroom" ? "bossroom" : "tower"),
+          platformManager: platformManager.current
+        });
 
         // 3) stop any tower projectiles; enable boss projectiles later
         setBossShots([]);
         projIdRef.current = 1;
         setPlayerShots([]);
         bossProjectilesEnabledRef.current = false;
-
-        // 4) spawn fixed boss platforms using the SAME prefab as tower
-        const mapW = prefabWidthPx(levelData.mapName, THREE_BLOCK_PREFAB);
-        setBossPlatforms(createBossPlatforms(floorTopY, mapW));
-
-        // 5) re-center player on the room and reset velocity
-        xRef.current = Math.round((mapW - CHAR_W) * 0.5);
-        zRef.current = 7; // CHANGED: Lowered from 0 to 7 (compensates for raised floor)
-        vxRef.current = 0; // stop horizontal movement
-        vzRef.current = 0; // stop vertical movement
       }
     } else {
       // Reset guard when not in tower or door no longer present
@@ -1272,26 +1262,29 @@ const bossPoseRef = useRef<PosePayload>({
         // 1) briefly suppress hazards so this frame can't kill us
         hazardSuppressUntilMsRef.current = Date.now() + 1000;
 
-        // 2) switch to frozen map using the same pattern as grassy door
+        // 2) Clear all state before switching maps (same as direct start)
+        setAllPlatforms([]);
+        updatePlatforms([]);
+        setBossShots([]);
+        setPlayerShots([]);
+        bossProjectilesEnabledRef.current = false;
+        projIdRef.current = 1;
+
+        // 3) switch to frozen map using unified system
         const frozenLevel = LEVELS.frozen;
         onLevelChange(frozenLevel);
         
-        // 3) stop boss projectiles and reset projectile system
-        setBossShots([]);
-        projIdRef.current = 1;
-        setPlayerShots([]);
-        bossProjectilesEnabledRef.current = false;
-
-        // 4) re-center player on the frozen map and reset velocity
-        xRef.current = frozenLevel.characterSpawn.x;
-        zRef.current = 0; // Start on the floor (Z=0 is floor level)
-        vxRef.current = 0;
-        vzRef.current = 0;
-        onGroundRef.current = true;
-        
-        // 5) reset camera and mode - position camera to show player on floor
-        setCameraY(frozenLevel.floorTopY - SCREEN_H * 0.5); // Center camera on floor
-        setMode('tower');
+        enterMap("frozen", {
+          setMode, setCameraY,
+          setPlatforms: setAllPlatforms,
+          buildPlatforms: () => [], // frozen uses procedural generation
+          setDoorAnchor, setDoorIceAnchor,
+          xRef, zRef, vxRef, vzRef, onGroundRef,
+          clampFramesRef: clampToGroundFramesRef,
+          mapWidthFor: (m) => prefabWidthPx(m, THREE_BLOCK_PREFAB),
+          modeForMap: (m) => (m === "bossroom" ? "bossroom" : "tower"),
+          platformManager: platformManager.current
+        });
         
         console.log('[DEBUG] Door-ice teleport triggered!');
         
@@ -1729,7 +1722,7 @@ const bossPoseRef = useRef<PosePayload>({
                         const HEART_SIZE = 32;
                         const spawnX = Math.round(SCREEN_W * 0.5 - HEART_SIZE * 0.5); // Center of screen
                         // Keep heart at original position
-                        const spawnY = Math.round(floorTopY - 127);
+                        const spawnY = Math.round(floorTopY - 177); // Move up another 25px (total 50px from original)
                         const now = Date.now(); // Use real time for consistent gating
                         const fadeMs = 850;  // fade-in/spawn effect duration
                         // Set spawnAt to current time so fade-in starts immediately
