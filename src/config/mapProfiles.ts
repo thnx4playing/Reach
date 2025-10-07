@@ -1,33 +1,37 @@
 // src/config/mapProfiles.ts
 export type MapName = "grassy" | "frozen" | "desert" | "dungeon" | "bossroom";
 
-export type MapProfileId = "core" | "boss";
+export type MapProfileId = "unified";
 export interface MapProfile {
   id: MapProfileId;
-  floorPrefab: "floor-final" | "floor"; // prefab to measure floor height (boss room only)
-  spawnZ: number;                       // 0 = stand on floor
-  clampFrames: number;                  // frames to hard-clamp to floor on entry
-  door?: {                              // optional boss-room door constants
+  floorPrefab: "floor-final" | "floor";
+  spawnZ: number;
+  clampFrames: number;
+  door?: {
     scale: number;
-    nudgeX: number;         // px
-    offsetYAboveTop: number;// px
+    nudgeX: number;
+    offsetYAboveTop: number;
   };
 }
 
 export const MAP_PROFILE_BY_MAP: Record<MapName, MapProfileId> = {
-  grassy: "core",
-  frozen: "core",
-  desert: "core",
-  dungeon: "core",
-  bossroom: "boss",
+  grassy: "unified",
+  frozen: "unified",
+  desert: "unified",
+  dungeon: "unified",
+  bossroom: "unified",
 };
 
 export const MAP_PROFILES: Record<MapProfileId, MapProfile> = {
-  core:  { id: "core",  floorPrefab: "floor-final", spawnZ: 0, clampFrames: 2 },
-  boss:  { id: "boss",  floorPrefab: "floor-final", spawnZ: 0, clampFrames: 2,
-           door: { scale: 1.5, nudgeX: -15, offsetYAboveTop: 32 } },
+  unified: { 
+    id: "unified",  
+    floorPrefab: "floor-final", 
+    spawnZ: 0, 
+    clampFrames: 2,
+    door: { scale: 1.5, nudgeX: -15, offsetYAboveTop: 32 }
+  },
 };
 
 export function getProfile(mapName: MapName): MapProfile {
-  return MAP_PROFILES[ MAP_PROFILE_BY_MAP[mapName] ?? "core" ];
+  return MAP_PROFILES["unified"];
 }

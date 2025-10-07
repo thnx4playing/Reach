@@ -1041,18 +1041,18 @@ const bossPoseRef = useRef<PosePayload>({
     // Add boss room collision slabs
     const bossCollision = mode === 'bossroom'
       ? [
-          // Boss room floor - RAISED BY 7PX
+          // Boss room floor - UNIFIED HEIGHT
           {
             id: 'boss-floor',
             x: -SCREEN_W,
-            y: floorTopY - 7, // CHANGED: Raised by 7px
+            y: floorTopY, // CHANGED: Use unified floorTopY
             w: SCREEN_W * 3,
             h: 32,
             type: 'platform' as const,
             collision: {
               left: -SCREEN_W,
               right: SCREEN_W * 2,
-              topY: floorTopY - 7, // CHANGED: Raised by 7px
+              topY: floorTopY, // CHANGED: Use unified floorTopY
               solid: true,
               width: SCREEN_W * 3,
               height: 32
