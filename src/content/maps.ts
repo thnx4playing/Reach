@@ -37,7 +37,8 @@ const dungeonImage  = require("../../assets/maps/dungeon/dungeon-tileset-final.p
 import frozenPrefs  from "../../assets/maps/frozen/frozen_prefabs.json";
 const frozenImage   = require("../../assets/maps/frozen/frozen-tileset-final.png") as number;
 
-// Grassy map now uses individual sprites, no tilesheet needed
+// Grassy and Frozen maps now use individual sprites, no tilesheet needed
+import { frozenPrefabImages } from "../assets/frozenPrefabs";
 
 // ---- Registry ----
 export type MapDef = {
@@ -54,6 +55,16 @@ const GRASSY_PLATFORM_COLS: Record<string, number> = {
   "platform-wood-2-left-final": 2,
   "platform-wood-2-right-final": 2,
   "platform-wood-3-final": 3,
+  "floor-final": 1,
+};
+
+// Helper map for frozen platform column counts
+const FROZEN_PLATFORM_COLS: Record<string, number> = {
+  "platform-frozen-1-final": 1,
+  "platform-frozen-3-final": 3,
+  "platform-frozen-wood-1-final": 1,
+  "platform-frozen-2-left-final": 2,
+  "platform-frozen-2-right-final": 2,
   "floor-final": 1,
 };
 
@@ -96,6 +107,33 @@ const grassyCatalog: PrefabCatalog = {
     "boot-final": { cells: [[null, null, null, null]] },
   }
 };
+
+// Create frozen catalog for prefab definitions (no image needed)
+const frozenCatalog: PrefabCatalog = {
+  meta: {
+    map: "frozen",
+    tileset_image: "individual_sprites",
+    tileSize: 16,
+  },
+  frames: {}, // No frames needed for individual sprites
+  prefabs: {
+    // Platform prefabs with proper solid cells for collision detection
+    "floor-final": { cells: [["cell-0-0"]] },
+    "platform-frozen-1-final": { cells: [["cell-0-0"]] },
+    "platform-frozen-3-final": { cells: [["cell-0-0", "cell-1-0", "cell-2-0"]] },
+    "platform-frozen-wood-1-final": { cells: [["cell-0-0"]] },
+    "platform-frozen-2-left-final": { cells: [["cell-0-0", "cell-1-0"]] },
+    "platform-frozen-2-right-final": { cells: [["cell-0-0", "cell-1-0"]] },
+    // Decoration prefabs (no collision needed)
+    "tree-large-frozen-final": { cells: [[null, null, null, null], [null, null, null, null]] },
+    "tree-medium-frozen-final": { cells: [[null, null, null, null], [null, null, null, null]] },
+    "tree-small-frozen-final": { cells: [[null, null, null, null]] },
+    "ice-large-final": { cells: [[null, null, null, null]] },
+    "ice-medium-final": { cells: [[null, null, null, null]] },
+    "ice-small-final": { cells: [[null, null, null, null]] },
+  }
+};
+
 const darkCatalog: PrefabCatalog = {
   meta: {
     map: "dark",
@@ -124,14 +162,14 @@ const darkCatalog: PrefabCatalog = {
 };
 const desertCatalog = desertPrefs     as PrefabCatalog;
 const dungeonCatalog= dungeonPrefs    as PrefabCatalog;
-const frozenCatalog = frozenPrefs     as PrefabCatalog;
+// frozenCatalog is defined above with individual sprites
 
 export const MAPS = {
   dark:    { image: darkImage,    prefabs: darkCatalog,    frames: (darkCatalog as any).frames || {} },
   desert:  { image: desertImage,  prefabs: desertCatalog,  frames: (desertCatalog as any).frames || {} },
   dungeon: { image: dungeonImage, prefabs: dungeonCatalog, frames: (dungeonCatalog as any).frames || {} },
-  frozen:  { image: frozenImage,  prefabs: frozenCatalog,  frames: (frozenCatalog as any).frames || {} },
-  grassy:  { image: undefined,  prefabs: grassyCatalog,  frames: {} },
+  frozen:  { image: undefined,    prefabs: frozenCatalog,  frames: {} }, // Uses individual sprites like grassy
+  grassy:  { image: undefined,    prefabs: grassyCatalog,  frames: {} },
   bossroom: { image: darkImage, prefabs: darkCatalog, frames: (darkCatalog as any).frames || {} }, // Uses dark tileset
 } as const;
 
@@ -156,9 +194,11 @@ export function prefabWidthPx(map: MapName, prefabName: string, scale = 2): numb
   if (!p) return tile;
   if (p.cells) {
     const cols = Math.max(0, ...p.cells.map(row => row.length));
-    // Fallback for grassy map if cols is 0 (all null cells)
-    if (map === "grassy" && cols === 0) {
-      const fallbackCols = GRASSY_PLATFORM_COLS[prefabName] ?? 1;
+    // Fallback for grassy and frozen maps if cols is 0 (all null cells)
+    if ((map === "grassy" || map === "frozen") && cols === 0) {
+      const fallbackCols = map === "grassy" 
+        ? (GRASSY_PLATFORM_COLS[prefabName] ?? 1)
+        : (FROZEN_PLATFORM_COLS[prefabName] ?? 1);
       return fallbackCols * tile;
     }
     return Math.max(1, cols) * tile;
@@ -192,6 +232,7 @@ export function prefabHeightPx(map: MapName, prefabName: string, scale = 2): num
 }
 
 // Visual foot inset per prefab (px at scale=1)
+
 export const PREFAB_FOOT_INSET: Record<string, number> = {
   // Platforms (no inset needed - they ARE the surface)
   'floor-final': 0,
@@ -214,6 +255,14 @@ export const PREFAB_FOOT_INSET: Record<string, number> = {
   'grass-4-final': 12,
   'grass-5-final': 12,
   'grass-6-final': 12,
+  
+  // Frozen decorations
+  'tree-large-frozen-final': 2,
+  'tree-medium-frozen-final': 2,
+  'tree-small-frozen-final': 2,
+  'ice-large-final': 0,
+  'ice-medium-final': 2,  // (= ~4px down at scale 2)
+  'ice-small-final': 3,   // (= ~6px down at scale 2)
   
   // Door (needs to sit on platform surface)
   'door': 0, // No foot inset needed - door should sit flush
@@ -251,9 +300,14 @@ export function prefabTopSolidSegmentsPx(
     if (rows[r].some(Boolean)) { topRowIdx = r; break; }
   }
   if (topRowIdx < 0) {
-    // Fallback for grassy map if no truthy cells found
+    // Fallback for grassy and frozen maps if no truthy cells found
     if (map === "grassy") {
       const cols = GRASSY_PLATFORM_COLS[prefabName] ?? 1;
+      return [{ x: 0, y: 0, w: cols * tile, h: tile }];
+    }
+    if (map === "frozen") {
+      // Use same logic as grassy map for frozen platforms
+      const cols = FROZEN_PLATFORM_COLS[prefabName] ?? 1;
       return [{ x: 0, y: 0, w: cols * tile, h: tile }];
     }
     return segs;
@@ -288,9 +342,11 @@ export function prefabPlatformSlabsPx(map: MapName, prefabName: string, scale = 
       }
     }
   }
-  // Fallback for grassy map if no slabs found (empty rows array)
-  if (slabs.length === 0 && map === "grassy") {
-    const cols = GRASSY_PLATFORM_COLS[prefabName] ?? 1;
+  // Fallback for grassy and frozen maps if no slabs found (empty rows array)
+  if (slabs.length === 0 && (map === "grassy" || map === "frozen")) {
+    const cols = map === "grassy" 
+      ? (GRASSY_PLATFORM_COLS[prefabName] ?? 1)
+      : (FROZEN_PLATFORM_COLS[prefabName] ?? 1);
     const fallbackSlabs = Array.from({ length: cols }, (_, c) => ({ 
       x: c * tile, 
       yTop: 0, 

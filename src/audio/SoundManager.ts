@@ -75,8 +75,10 @@ export class SoundManager {
     }
 
     try {
+      // Stop the sound first to avoid "seeking interrupted" errors
+      await sound.stopAsync();
       await sound.setVolumeAsync(volume);
-      await sound.replayAsync();
+      await sound.playAsync();
     } catch (error) {
       console.error(`[SoundManager] Failed to play sound ${name}:`, error);
     }

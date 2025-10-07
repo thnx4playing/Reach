@@ -1,6 +1,7 @@
 // src/scene/boss/TiledFloor.tsx
 import React, { useMemo } from "react";
 import { Group, Image, useImage, Rect, Circle } from "@shopify/react-native-skia";
+import BossLavaLayer from "../../render/BossLavaLayer";
 
 type Props = {
   left: number;         // room left (world px)
@@ -41,7 +42,7 @@ export default function TiledFloor({
     return arr;
   }, [left, width, tileW]);
 
-  // Floating embers (from HellBackground)
+  // Floating embers (distributed across whole screen)
   const embers = useMemo(() => {
     const rng = (seed0 = 42) => {
       let seed = seed0 >>> 0;
@@ -53,16 +54,18 @@ export default function TiledFloor({
     const rand = rng(42);
     const count = Math.max(22, Math.floor(width * 0.05));
     const arr = [];
+    // Use screen height for full vertical distribution
+    const screenHeight = 844; // SCREEN_H constant
     for (let i = 0; i < count; i++) {
       arr.push({
         x: left + rand() * width,
-        y: topY - 100 + rand() * 200, // Start above floor, float upward
+        y: rand() * screenHeight, // Distribute across entire screen height
         s: 2 + rand() * 4, // size
         ph: rand() * Math.PI * 2, // phase
       });
     }
     return arr;
-  }, [left, width, topY]);
+  }, [left, width]);
 
   if (!img) return null;
 
@@ -72,6 +75,14 @@ export default function TiledFloor({
 
   return (
     <Group transform={[{ translateY: -cameraY }]}>
+      {/* Animated lava layer under the floor */}
+      <BossLavaLayer
+        width={width}
+        height={tileHeight}
+        y={y + tileHeight}
+        timeMs={timeMs}
+      />
+      
       {/* Floor tiles */}
       {xs.map((x, i) => (
         <Image
@@ -85,34 +96,16 @@ export default function TiledFloor({
         />
       ))}
       
-      {/* Lava effect under the floor */}
-      <Rect 
-        x={left} 
-        y={y + tileHeight} 
-        width={width} 
-        height={tileHeight} // Same height as floor tiles
-        color="#ff3000" 
-        opacity={0.6}
-      />
-      <Rect 
-        x={left} 
-        y={y + tileHeight} 
-        width={width} 
-        height={tileHeight * 0.5} // Half height for brighter top
-        color="#ffa000" 
-        opacity={0.8}
-      />
-      
       {/* Floating embers */}
       {embers.map((e, i) => {
-        const emberY = (e.y - (t * (6 + e.s)) + e.ph * 10) % (topY + 300);
+        const emberY = (e.y - (t * (6 + e.s)) + e.ph * 10) % 844; // Use screen height for wrapping
         const emberX = e.x + Math.sin(t * 0.8 + e.ph) * 8;
         const alpha = 0.18 + 0.45 * (0.5 + 0.5 * Math.sin(t * 2 + e.ph));
         return (
           <Rect 
             key={`ember-${i}`} 
             x={emberX} 
-            y={emberY < topY - 100 ? emberY + 400 : emberY} 
+            y={emberY < 0 ? emberY + 844 : emberY} // Wrap around screen height
             width={e.s} 
             height={e.s} 
             color="#ffcc66" 

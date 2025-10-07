@@ -1,6 +1,6 @@
 import { Dimensions } from 'react-native';
 import type { MapName } from './maps';
-import { prefabHeightPx, getTileSize } from './maps';
+import { prefabHeightPx, getTileSize, alignPrefabYToSurfaceTop } from './maps';
 import { makeStaticFloor } from './floor';
 
 // Re-export MapName for use in other files
@@ -23,7 +23,8 @@ function buildLevel(mapName: MapName, w: number, h: number): LevelData {
   const staticFloor = makeStaticFloor(mapName, w, h, FLOOR_SCALE);
   
   // Calculate floorTopY for all maps
-  const floorPrefabName = mapName === 'grassy' ? 'floor-final' : 'floor';
+  const floorPrefabName = mapName === 'grassy' ? 'floor-final' : 
+                         mapName === 'frozen' ? 'floor-final' : 'floor';
   const floorTopY = Math.round(h - prefabHeightPx(mapName, floorPrefabName, 2));
   
   // Get map-specific decorations (ground-level only)
@@ -70,9 +71,18 @@ function getMapDecorations(mapName: MapName, width: number, height: number, floo
       ];
     
     case 'frozen':
+      // Ground-level decorations (trees + ice). PlatformManager will add more on platforms.
       return [
-        { prefab: 'vase', x: 200, y: floorTopY - 32, scale: 2 },
-        { prefab: 'vase-tall', x: 300, y: floorTopY - 48, scale: 2 },
+        // Trees
+        { prefab: 'tree-large-frozen-final',  x:  80, y: alignPrefabYToSurfaceTop('frozen', 'tree-large-frozen-final',  floorTopY, 2),  scale: 2 },
+        { prefab: 'tree-medium-frozen-final', x: 280, y: alignPrefabYToSurfaceTop('frozen', 'tree-medium-frozen-final', floorTopY, 2),  scale: 2 },
+        { prefab: 'tree-small-frozen-final',  x: 420, y: alignPrefabYToSurfaceTop('frozen', 'tree-small-frozen-final',  floorTopY, 2),  scale: 2 },
+
+        // Ice
+        { prefab: 'ice-small-final',  x:  50, y: alignPrefabYToSurfaceTop('frozen', 'ice-small-final',  floorTopY, 2), scale: 2 },
+        { prefab: 'ice-medium-final', x: 150, y: alignPrefabYToSurfaceTop('frozen', 'ice-medium-final', floorTopY, 2), scale: 2 },
+        { prefab: 'ice-large-final',  x: 250, y: alignPrefabYToSurfaceTop('frozen', 'ice-large-final',  floorTopY, 2), scale: 2 },
+        { prefab: 'ice-small-final',  x: 360, y: alignPrefabYToSurfaceTop('frozen', 'ice-small-final',  floorTopY, 2), scale: 2 },
       ];
     
     default:

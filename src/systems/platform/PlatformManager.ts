@@ -15,10 +15,14 @@ const PHYSICS = { gravity: 1500, jumpVel: 780, maxRunSpeed: 220, margin: 0.08 };
 // Prefabs
 const PREF_LEFT  = 'platform-wood-2-left-final'  as const;
 const PREF_RIGHT = 'platform-wood-2-right-final' as const;
+const FROZEN_PREF_LEFT  = 'platform-frozen-2-left-final'  as const;
+const FROZEN_PREF_RIGHT = 'platform-frozen-2-right-final' as const;
 
 // Pools
 const GRASS_PREFABS = ['platform-grass-1-final', 'platform-grass-3-final'] as const;
 const WOOD_PREFABS  = ['platform-wood-1-final', 'platform-wood-3-final', 'platform-wood-2-left-final', 'platform-wood-2-right-final'] as const;
+const FROZEN_PREFABS = ['platform-frozen-1-final', 'platform-frozen-3-final'] as const;
+const FROZEN_WOOD_PREFABS = ['platform-frozen-wood-1-final', 'platform-frozen-2-left-final', 'platform-frozen-2-right-final'] as const;
 
 // Weights / tuning
 const AHEAD_SCREENS = 2.5;
@@ -41,6 +45,16 @@ const DECORATION_CONFIG = {
   grass: {
     types: ['grass-1-final', 'grass-2-final', 'grass-3-final', 'grass-4-final', 'grass-5-final', 'grass-6-final'],
     probability: 0.8, // 80% chance per available tile
+    maxPerTile: 1,
+  },
+  // Frozen map decorations
+  frozen_trees: {
+    types: ['tree-large-frozen-final', 'tree-medium-frozen-final', 'tree-small-frozen-final'],
+    probability: 0.4, // 40% chance for frozen trees on frozen-3 platforms
+  },
+  ice: {
+    types: ['ice-large-final', 'ice-medium-final', 'ice-small-final'],
+    probability: 0.8, // 80% chance per available tile (replacing grass)
     maxPerTile: 1,
   }
 };
@@ -111,6 +125,13 @@ class SpatialIndex {
     }
   }
   
+  // Reset method to clear all platforms when switching maps
+  resetPlatforms() {
+    this.grid.clear();
+    this.totalPlatforms = 0;
+    this.highestPlayerY = 0;
+  }
+
   // FIX: Add proper cleanup method
   private cleanupOldCells() {
     const keysToRemove: string[] = [];
@@ -171,6 +192,12 @@ class SpatialIndex {
     
     return platforms;
   }
+
+  reset() {
+    this.grid.clear();
+    this.totalPlatforms = 0;
+    this.highestPlayerY = 0;
+  }
   
   // FIX: Override clear to reset counter
   clear() {
@@ -211,11 +238,27 @@ function sampleTargetX(rng: RNG) {
   return f * SCREEN_W;
 }
 
-function weightedPrefab(rng: RNG) {
-  if (rng() < GRASS_WEIGHT) {
-    return GRASS_PREFABS[Math.floor(rng() * GRASS_PREFABS.length)];
+function weightedPrefab(rng: RNG, mapName: MapName) {
+  if (mapName === 'frozen') {
+    if (rng() < GRASS_WEIGHT) {
+      return FROZEN_PREFABS[Math.floor(rng() * FROZEN_PREFABS.length)];
+    }
+    return FROZEN_WOOD_PREFABS[Math.floor(rng() * FROZEN_WOOD_PREFABS.length)];
+  } else {
+    // Default grassy map logic
+    if (rng() < GRASS_WEIGHT) {
+      return GRASS_PREFABS[Math.floor(rng() * GRASS_PREFABS.length)];
+    }
+    return WOOD_PREFABS[Math.floor(rng() * WOOD_PREFABS.length)];
   }
-  return WOOD_PREFABS[Math.floor(rng() * WOOD_PREFABS.length)];
+}
+
+function getLeftPrefab(mapName: MapName) {
+  return mapName === 'frozen' ? FROZEN_PREF_LEFT : PREF_LEFT;
+}
+
+function getRightPrefab(mapName: MapName) {
+  return mapName === 'frozen' ? FROZEN_PREF_RIGHT : PREF_RIGHT;
 }
 
 function bounds(map: MapName, p: PlatformDef, scale: number) {
@@ -348,7 +391,8 @@ export class EnhancedPlatformManager {
     const H  = maxVerticalReach();
     const dy = 0.34 * H;
 
-    const prefab   = 'platform-grass-3-final'; // same as before
+    // Use correct prefab based on map type
+    const prefab   = this.map === 'frozen' ? 'platform-frozen-3-final' : 'platform-grass-3-final';
     const w        = prefabWidthPx(this.map, prefab, this.scale);
     const xCenter  = SCREEN_W * 0.5;
     const yTop     = Math.round(floorTopY - dy);
@@ -375,10 +419,15 @@ export class EnhancedPlatformManager {
   private generateDecorationsFor(platform: PlatformDef): void {
     if (!platform.collision?.solid) return;
     
+    // Map-specific platform checks
     const isGrass3 = platform.prefab === 'platform-grass-3-final';
     const isGrass1 = platform.prefab === 'platform-grass-1-final';
+    const isFrozen3 = platform.prefab === 'platform-frozen-3-final';
+    const isFrozen1 = platform.prefab === 'platform-frozen-1-final';
     
-    if (!isGrass3 && !isGrass1) return;
+    // Only generate decorations for appropriate platforms
+    if (this.map === 'grassy' && !isGrass3 && !isGrass1) return;
+    if (this.map === 'frozen' && !isFrozen3 && !isFrozen1) return;
     
     // Get platform collision segments to determine available tiles
     const segments = prefabTopSolidSegmentsPx(this.map, platform.prefab, this.scale);
@@ -392,9 +441,10 @@ export class EnhancedPlatformManager {
     // Track which tiles are occupied to prevent overlaps
     const occupiedTiles = new Set<number>();
     
-    // Add trees (only on grass-3 platforms)
-    if (isGrass3 && DECORATION_CONFIG.trees) {
-      const treeConfig = DECORATION_CONFIG.trees;
+    // Add trees (on 3-tile platforms)
+    const isThreeTile = isGrass3 || isFrozen3;
+    const treeConfig = this.map === 'frozen' ? DECORATION_CONFIG.frozen_trees : DECORATION_CONFIG.trees;
+    if (isThreeTile && treeConfig) {
       if (this.rng() < treeConfig.probability) {
         const availableTiles = Array.from({length: numTiles}, (_, i) => i)
           .filter(tileIndex => !occupiedTiles.has(tileIndex));
@@ -424,37 +474,37 @@ export class EnhancedPlatformManager {
       }
     }
     
-    // Add mushrooms
-    if (DECORATION_CONFIG.mushrooms) {
-      const mushroomConfig = DECORATION_CONFIG.mushrooms;
-      if (this.rng() < mushroomConfig.probability) {
+    // Add mushrooms (grassy) or ice (frozen)
+    const decorationConfig = this.map === 'frozen' ? DECORATION_CONFIG.ice : DECORATION_CONFIG.mushrooms;
+    if (decorationConfig) {
+      if (this.rng() < decorationConfig.probability) {
         const availableTiles = Array.from({length: numTiles}, (_, i) => i)
           .filter(tileIndex => !occupiedTiles.has(tileIndex));
         
         if (availableTiles.length > 0) {
           const tileIndex = availableTiles[Math.floor(this.rng() * availableTiles.length)];
-          const mushroomType = mushroomConfig.types[Math.floor(this.rng() * mushroomConfig.types.length)];
+          const decorationType = decorationConfig.types[Math.floor(this.rng() * decorationConfig.types.length)];
           
-          const mushroomWorldX = platform.x + segment.x + (tileIndex * tileSize);
-          const mushroomWorldY = alignPrefabYToSurfaceTop(this.map, mushroomType, surfaceWorldY, this.scale);
+          const decorationWorldX = platform.x + segment.x + (tileIndex * tileSize);
+          const decorationWorldY = alignPrefabYToSurfaceTop(this.map, decorationType, surfaceWorldY, this.scale);
           
-          const mushroom: PlatformDef = {
+          const decoration: PlatformDef = {
             id: this.generateUniqueId(), // Fixed: Unique decoration IDs
             type: 'decoration',
-            prefab: mushroomType,
-            x: Math.round(mushroomWorldX),
-            y: Math.round(mushroomWorldY),
+            prefab: decorationType,
+            x: Math.round(decorationWorldX),
+            y: Math.round(decorationWorldY),
             scale: this.scale,
           };
-          this.platforms.push(mushroom);
-          this.spatialIndex.addPlatform(mushroom);
+          this.platforms.push(decoration);
+          this.spatialIndex.addPlatform(decoration);
           occupiedTiles.add(tileIndex);
         }
       }
     }
     
-    // Add grass tufts
-    if (DECORATION_CONFIG.grass) {
+    // Add grass tufts (only for grassy map)
+    if (this.map === 'grassy' && DECORATION_CONFIG.grass) {
       const grassConfig = DECORATION_CONFIG.grass;
       const maxGrass = isGrass3 ? 3 : isGrass1 ? 1 : 0;
       
@@ -519,11 +569,11 @@ export class EnhancedPlatformManager {
   }
 
   private placeRelative(prefab: string, fromX: number, fromY: number, dx: number, dy: number) {
-    if (prefab === PREF_LEFT) {
+    if (prefab === getLeftPrefab(this.map)) {
       const w = prefabWidthPx(this.map, prefab, this.scale);
       return this.placeAbsolute(prefab, 0, fromY - dy);
     }
-    if (prefab === PREF_RIGHT) {
+    if (prefab === getRightPrefab(this.map)) {
       const w = prefabWidthPx(this.map, prefab, this.scale);
       return this.placeAbsolute(prefab, SCREEN_W - w, fromY - dy);
     }
@@ -534,8 +584,8 @@ export class EnhancedPlatformManager {
   }
 
   private tryEdgePair(fromX: number, fromY: number, dyBase: number): boolean {
-    const leftW = prefabWidthPx(this.map, PREF_LEFT, this.scale);
-    const rightW = prefabWidthPx(this.map, PREF_RIGHT, this.scale);
+    const leftW = prefabWidthPx(this.map, getLeftPrefab(this.map), this.scale);
+    const rightW = prefabWidthPx(this.map, getRightPrefab(this.map), this.scale);
     const leftC = leftW / 2;
     const rightC = SCREEN_W - rightW / 2; 
     const H = maxVerticalReach(); 
@@ -548,11 +598,11 @@ export class EnhancedPlatformManager {
       if (!reachable(dx, dy1)) continue;
       
       if (which === 'left') { 
-        this.placeAbsolute(PREF_LEFT, 0, fromY - dy1); 
-        this.placeAbsolute(PREF_RIGHT, SCREEN_W - rightW, (fromY - dy1) - VERT_PAIR_GAP); 
+        this.placeAbsolute(getLeftPrefab(this.map), 0, fromY - dy1); 
+        this.placeAbsolute(getRightPrefab(this.map), SCREEN_W - rightW, (fromY - dy1) - VERT_PAIR_GAP); 
       } else { 
-        this.placeAbsolute(PREF_RIGHT, SCREEN_W - rightW, fromY - dy1); 
-        this.placeAbsolute(PREF_LEFT, 0, (fromY - dy1) - VERT_PAIR_GAP); 
+        this.placeAbsolute(getRightPrefab(this.map), SCREEN_W - rightW, fromY - dy1); 
+        this.placeAbsolute(getLeftPrefab(this.map), 0, (fromY - dy1) - VERT_PAIR_GAP); 
       }
       return true;
     }
@@ -600,16 +650,16 @@ export class EnhancedPlatformManager {
       
       if (this.rng() < PAIR_CHANCE) {
         if (this.tryEdgePair(from.xCenter, from.yTop, dy)) { 
-          const rightW = prefabWidthPx(this.map, PREF_RIGHT, this.scale); 
+          const rightW = prefabWidthPx(this.map, getRightPrefab(this.map), this.scale); 
           from = {xCenter: SCREEN_W - rightW / 2, yTop: Math.min(...this.platforms.slice(-2).map(p => p.y))}; 
           generated++;
           continue; 
         }
       }
       
-      const prefab = weightedPrefab(this.rng);
-      const targetX = (prefab === PREF_LEFT) ? (prefabWidthPx(this.map, PREF_LEFT, this.scale) / 2)
-                    : (prefab === PREF_RIGHT) ? (SCREEN_W - prefabWidthPx(this.map, PREF_RIGHT, this.scale) / 2)
+      const prefab = weightedPrefab(this.rng, this.map);
+      const targetX = (prefab === getLeftPrefab(this.map)) ? (prefabWidthPx(this.map, getLeftPrefab(this.map), this.scale) / 2)
+                    : (prefab === getRightPrefab(this.map)) ? (SCREEN_W - prefabWidthPx(this.map, getRightPrefab(this.map), this.scale) / 2)
                     : sampleTargetX(this.rng);
       const dx = targetX - from.xCenter;
       
@@ -617,7 +667,9 @@ export class EnhancedPlatformManager {
         from = this.placeRelative(prefab, from.xCenter, from.yTop, dx, dy); 
         generated++;
       } else { 
-        from = this.placeRelative('platform-grass-1-final', from.xCenter, from.yTop, 0, 0.35 * maxVerticalReach()); 
+        // Use correct prefab based on map type
+        const fallbackPrefab = this.map === 'frozen' ? 'platform-frozen-1-final' : 'platform-grass-1-final';
+        from = this.placeRelative(fallbackPrefab, from.xCenter, from.yTop, 0, 0.35 * maxVerticalReach()); 
         generated++;
       }
     }
@@ -643,7 +695,7 @@ export class EnhancedPlatformManager {
       
       if (this.rng() < PAIR_CHANCE) {
         if (this.tryEdgePair(from.xCenter, from.yTop, dy)) { 
-          const rightW = prefabWidthPx(this.map, PREF_RIGHT, this.scale); 
+          const rightW = prefabWidthPx(this.map, getRightPrefab(this.map), this.scale); 
           from = {xCenter: SCREEN_W - rightW / 2, yTop: Math.min(...this.platforms.slice(-2).map(p => p.y))}; 
           attempts = 0; 
           changed = true; 
@@ -651,9 +703,9 @@ export class EnhancedPlatformManager {
         }
       }
       
-      const prefab = weightedPrefab(this.rng);
-      const targetX = (prefab === PREF_LEFT) ? (prefabWidthPx(this.map, PREF_LEFT, this.scale) / 2)
-                    : (prefab === PREF_RIGHT) ? (SCREEN_W - prefabWidthPx(this.map, PREF_RIGHT, this.scale) / 2)
+      const prefab = weightedPrefab(this.rng, this.map);
+      const targetX = (prefab === getLeftPrefab(this.map)) ? (prefabWidthPx(this.map, getLeftPrefab(this.map), this.scale) / 2)
+                    : (prefab === getRightPrefab(this.map)) ? (SCREEN_W - prefabWidthPx(this.map, getRightPrefab(this.map), this.scale) / 2)
                     : sampleTargetX(this.rng);
       const dx = targetX - from.xCenter;
       
@@ -664,7 +716,9 @@ export class EnhancedPlatformManager {
       } else { 
         attempts += 1; 
         if (attempts >= MAX_ATTEMPTS) { 
-          from = this.placeRelative('platform-grass-1-final', from.xCenter, from.yTop, 0, 0.35 * maxVerticalReach()); 
+          // Use correct prefab based on map type
+          const fallbackPrefab = this.map === 'frozen' ? 'platform-frozen-1-final' : 'platform-grass-1-final';
+          from = this.placeRelative(fallbackPrefab, from.xCenter, from.yTop, 0, 0.35 * maxVerticalReach()); 
           attempts = 0; 
           changed = true; 
         } 
@@ -692,6 +746,11 @@ export class EnhancedPlatformManager {
   getPlatformsNear(x: number, y: number, radius: number): PlatformDef[] {
     // Use spatial index for fast lookups
     return this.spatialIndex.getPlatformsNear(x, y, radius);
+  }
+
+  // Reset method to clear all platforms when switching maps
+  resetPlatforms() {
+    this.spatialIndex.reset();
   }
 
   getPlatformsNearPlayer(x: number, y: number, r: number, solidsOnly = true) {

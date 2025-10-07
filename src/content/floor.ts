@@ -27,6 +27,8 @@ export function makeStaticFloor(
   if (!prefabName) {
     if (mapName === 'grassy') {
       prefabName = 'floor-final';
+    } else if (mapName === 'frozen') {
+      prefabName = 'floor-final';
     } else {
       prefabName = 'floor';
     }

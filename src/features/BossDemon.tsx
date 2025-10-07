@@ -223,11 +223,13 @@ export default function BossDemon(props: Props) {
             bottom: cY      + H * 0.5,
           };
 
-          // Shrink factors (tune to taste)
-          const SOLID_FX = 0.60; // 60% width
-          const SOLID_FY = 0.70; // 70% height
-          const HURT_FX  = 0.50; // 50% width
-          const HURT_FY  = 0.55; // 55% height
+          // Shrink factors (tighter so the box doesn't extend past the body)
+          // Solid box: used for blocking the player
+          const SOLID_FX = 0.42; // was 0.48 — narrower so it doesn't stick out horizontally
+          const SOLID_FY = 0.52; // was 0.58 — shorter so it doesn't extend above/below the sprite
+          // Hurt box: keep slightly smaller than solid to feel fair when striking
+          const HURT_FX  = 0.46; // was 0.50
+          const HURT_FY  = 0.50; // was 0.55
 
           const solidW = W * SOLID_FX, solidH = H * SOLID_FY;
           const hurtW  = W * HURT_FX,  hurtH  = H * HURT_FY;
@@ -389,7 +391,7 @@ export default function BossDemon(props: Props) {
 
   const leftScreen = props.xToScreen(props.xWorld + cxBias.current) - (FW * SCALE) / 2;
   const baseY      = props.worldYToScreenY(props.yWorld + cyBias.current);
-  const flipX      = props.playerX < (props.xWorld + cxBias.current);
+  const flipX      = props.playerX > (props.xWorld + cxBias.current);
 
 
   return (

@@ -11,10 +11,12 @@ import { PrefabNode } from '../render/PrefabNode';
 import { PlatformRenderer } from './PlatformRenderer';
 import HazardBand from '../render/HazardBand';
 import GroundBand from '../render/GroundBand';
+import FrozenBand from '../render/FrozenBand';
 import FireballLayer from '../render/FireballLayer';
 import HellBackground from '../render/HellBackground';
 import TiledFloor from '../scene/boss/TiledFloor';
 import type { LevelData } from '../content/levels';
+import { LEVELS } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, MapName } from '../content/maps';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
 import { EnhancedPlatformManager } from '../systems/platform/PlatformManager';
@@ -27,6 +29,7 @@ import { dbg } from '../utils/dbg';
 import { useHealth } from '../systems/health/HealthContext';
 import ScoreTimeHUD from '../ui/ScoreTimeHUD';
 import SkiaHealthBar from '../ui/SkiaHealthBar';
+import BossVerticalHealthBar from '../ui/BossVerticalHealthBar';
 import { DeathModal } from '../ui/DeathModal';
 import { useDamageAnimations } from '../systems/health/useDamageAnimations';
 
@@ -36,14 +39,21 @@ import { useSound } from '../audio/useSound';
 import { soundManager } from '../audio/SoundManager';
 
 // Boss system imports
-import DoorSprite, { pointInDoor } from '../features/DoorSprite';
+import DoorSprite, { pointInDoorTightFeet } from '../features/DoorSprite';
+import DoorIceSprite, { pointInDoorIceTightFeet } from '../features/DoorIceSprite';
 import BossRoom from '../features/BossRoom';
 import BossDemon from '../features/BossDemon';
 import BossProjectiles, { BossProjectile } from '../features/BossProjectiles';
 import HeartPickup from '../features/HeartPickup';
 import PlayerProjectiles, { PlayerProjectile } from '../features/PlayerProjectiles';
 import BossHUD from '../features/BossHUD';
-import { DOORWAY_SPAWN_Y, DOORWAY_WIDTH, DOORWAY_HEIGHT, DOORWAY_POSITION_OFFSET, PLAYER_PROJECTILE_SPEED, PLAYER_PROJECTILE_LIFE_MS, PLAYER_PROJECTILE_LAUNCH_DELAY_MS, PLAYER_PROJECTILE_HEAD_RATIO, BOSS_HURT_FLASH_MS } from '../config/gameplay';
+import {
+  DOORWAY_SPAWN_Y, DOORWAY_WIDTH, DOORWAY_HEIGHT, DOORWAY_POSITION_OFFSET,
+  DOOR_ICE_WIDTH, DOOR_ICE_HEIGHT, DOOR_ICE_POSITION_OFFSET,
+  DOOR_TRIGGER_INNER_X_RATIO, DOOR_TRIGGER_BOTTOM_Y_RATIO, DOOR_TRIGGER_PAD,
+  DOOR_TRIGGER_REQUIRE_GROUNDED_FRAMES,
+  PLAYER_PROJECTILE_SPEED, PLAYER_PROJECTILE_LIFE_MS, PLAYER_PROJECTILE_LAUNCH_DELAY_MS, PLAYER_PROJECTILE_HEAD_RATIO, BOSS_HURT_FLASH_MS
+} from '../config/gameplay';
 import { prefabWidthPx, alignPrefabYToSurfaceTop } from '../content/maps';
 
 // debug flag
@@ -78,20 +88,35 @@ const JUMP_VELOCITY = JUMP_VEL;
 const ACCEL = 1200;  // INCREASED: Faster acceleration
 const DECEL = 800;   // INCREASED: Faster deceleration  
 const PAD_SIZE = 140;
-const FOOT_OFFSET = 0;
+const DEFAULT_FOOT_OFFSET = 0;
+
+// Door-ice helper function
+const DOOR_ICE_SCALE = 1.5; // must match DoorIceSprite
+
+function calcDoorIceWorldXY(anchor: { x: number; y: number; w: number }) {
+  // Center horizontally on the platform; match your visual nudge of -15px
+  const x = Math.round(anchor.x + (anchor.w - DOOR_ICE_WIDTH) * 0.5) - 15;
+
+  // Position door-ice back up above the platform
+  const y = Math.round(anchor.y - DOOR_ICE_HEIGHT * DOOR_ICE_SCALE - 32);
+
+  return { x, y };
+}
 
 interface GameScreenProps {
   levelData: LevelData;
   onBack: () => void;
+  onLevelChange: (levelData: LevelData) => void;
 }
 
 // Inner game component that uses health hooks
-const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
+const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack, onLevelChange }) => {
   // Health system integration
   const { isDead, bars, takeDamage, hits, sys, reset: resetHealth, heal } = useHealth();
   
   // Audio system integration
   const { playJumpSound, playDamageSound, playDeathSound, playFireDeathSound } = useSound();
+  
   const maxHits = sys.state.maxHits;
   const { isHurt } = useDamageAnimations();
 
@@ -119,6 +144,7 @@ const InnerGameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
       levelData={levelData}
       onRestart={handleRestart}
       onMainMenu={handleMainMenu}
+      onLevelChange={onLevelChange}
       isDead={isDead}
       bars={bars}
       takeDamage={takeDamage}
@@ -139,6 +165,7 @@ const GameComponent: React.FC<{
   levelData: LevelData;
   onRestart: () => void;
   onMainMenu: () => void;
+  onLevelChange: (levelData: LevelData) => void;
   isDead: boolean;
   bars: number;
   takeDamage: (n?: number) => boolean;
@@ -154,22 +181,24 @@ const GameComponent: React.FC<{
   levelData, 
   onRestart, 
   onMainMenu, 
+  onLevelChange,
   isDead, 
   bars, 
   takeDamage, 
   hits, 
   maxHits, 
-  isHurt,
-  playJumpSound,
-  playDamageSound,
-  playDeathSound,
-  playFireDeathSound,
-  resetHealth
+  isHurt, 
+  playJumpSound, 
+  playDamageSound, 
+  playDeathSound, 
+  playFireDeathSound, 
+  resetHealth 
 }) => {
   
   // Keep resetHealth in a ref for RAF loop access
   const resetHealthRef = useRef<() => void>(() => {});
   useEffect(() => { resetHealthRef.current = resetHealth; }, [resetHealth]);
+  
   
   const [cameraX, setCameraX] = useState(0);
   const [cameraY, setCameraY] = useState(0);
@@ -239,15 +268,28 @@ const bossPoseRef = useRef<PosePayload>({
   const doorAnchorRef = useRef(doorAnchor);
   doorAnchorRef.current = doorAnchor;
   
+  // ===== Door-Ice anchored to top platform in boss room =====
+  const [doorIceAnchor, setDoorIceAnchor] = useState<null | { id: string; x: number; y: number; w: number }>(null);
+  const doorIceAnchorRef = useRef(doorIceAnchor);
+  doorIceAnchorRef.current = doorIceAnchor;
+  
+  // Calculate door-ice position from anchor using helper function
+  const doorIceWorld = doorIceAnchor ? calcDoorIceWorldXY(doorIceAnchor) : { x: 0, y: 0 };
+  const doorIceWorldX = doorIceWorld.x;
+  const doorIceWorldY = doorIceWorld.y;
+  
   // === Boss-room helpers & guards ===
   const hazardSuppressUntilMsRef = useRef(0); // blocks lava/fall deaths briefly
   const hasTeleportedRef = useRef(false);     // prevents multi-trigger on door overlap
+  const hasTeleportedDoorIceRef = useRef(false); // prevents multi-trigger on door-ice overlap
+  const groundedFramesRef = useRef(0);        // tracks consecutive grounded frames for door trigger
+  const postTeleportClampRef = useRef(false); // flag to hard-clamp to boss floor next frame
 
   // toggle for rendering/moving player bullets and enemy projectiles
   const bossProjectilesEnabledRef = useRef(false);
 
   // Prefab id your normal map uses for a 3-block platform
-  const BOSS_PREFAB = 'platform-grass-3-final';
+  const BOSS_PREFAB = levelData.mapName === 'frozen' ? 'platform-frozen-3-final' : 'platform-grass-3-final';
 
   // Build 6–7 fixed platforms using the SAME prefab as tower.
   // We keep them centered and staggered above the floor.
@@ -256,7 +298,9 @@ const bossPoseRef = useRef<PosePayload>({
   
   // Keep a ref to boss platforms for collision
   const bossPlatformsRef = useRef<BossPlat[]>([]);
-  useEffect(() => { bossPlatformsRef.current = bossPlatforms; }, [bossPlatforms]);
+  useEffect(() => { 
+    bossPlatformsRef.current = bossPlatforms; 
+  }, [bossPlatforms]);
 
   function createBossPlatforms(floorTopY: number, mapW: number): BossPlat[] {
     // Use dark tileset prefabs
@@ -275,16 +319,16 @@ const bossPoseRef = useRef<PosePayload>({
       // Three platform-dark-3-final (3-block platforms) - spread out
       {
         id: 'boss-plf-0',
-        x: screenCenter - 180,
-        y: floorTopY - 195, // adjusted for floor position change
+        x: screenCenter - 165, // moved right by 15px (was -180, now -165)
+        y: floorTopY - 180, // moved down by 15px (was -195, now -180)
         w: platform3W,
         h: H,
         prefab: 'platform-dark-3-final',
       },
       {
         id: 'boss-plf-1',
-        x: screenCenter + 80,
-        y: floorTopY - 315, // adjusted for floor position change
+        x: screenCenter + 60, // moved left by 20px (was +80, now +60)
+        y: floorTopY - 295, // moved down by 20px (was -315, now -295)
         w: platform3W,
         h: H,
         prefab: 'platform-dark-3-final',
@@ -292,7 +336,7 @@ const bossPoseRef = useRef<PosePayload>({
       {
         id: 'boss-plf-2',
         x: screenCenter - 50,
-        y: floorTopY - 470, // adjusted for floor position change (top middle platform)
+        y: floorTopY - 495, // moved up by 25px (was 470, now 495)
         w: platform3W,
         h: H,
         prefab: 'platform-dark-3-final',
@@ -308,11 +352,11 @@ const bossPoseRef = useRef<PosePayload>({
         prefab: 'platform-dark-2-left-final',
       },
       
-      // platform-dark-2-right-final (flush right, raised by 40px)
+      // platform-dark-2-right-final (flush right, raised by 70px)
       {
         id: 'boss-plf-4',
         x: SCREEN_W - platform2W,
-        y: floorTopY - 415, // adjusted for floor position change
+        y: floorTopY - 445, // raised by additional 30px (was 415, now 445)
         w: platform2W,
         h: H,
         prefab: 'platform-dark-2-right-final',
@@ -362,8 +406,8 @@ const bossPoseRef = useRef<PosePayload>({
     setBossShots(prev => [...prev, { id, bornAt: Date.now(), ...p }]);
   }, []);
 
-  // Prefab id for the 3-block grass platform (adjust if your id differs)
-  const THREE_BLOCK_PREFAB = 'platform-grass-3-final';
+  // Prefab id for the 3-block platform (adjust if your id differs)
+  const THREE_BLOCK_PREFAB = levelData.mapName === 'frozen' ? 'platform-frozen-3-final' : 'platform-grass-3-final';
 
   function findNearestThreeBlockAbove(mgr: any, targetY: number) {
     if (!mgr) return null;
@@ -388,6 +432,41 @@ const bossPoseRef = useRef<PosePayload>({
     return { id: closest.id, x: closest.x, y: closest.y, w };
   }
 
+  // Find the top platform in boss room for door-ice spawning
+  function findTopBossPlatform() {
+    const currentPlatforms = bossPlatformsRef.current || bossPlatforms;
+    if (!currentPlatforms || currentPlatforms.length === 0) return null;
+    
+    // Find the platform with the highest Y position (remember: up is negative)
+    return currentPlatforms.reduce((top, current) => {
+      return current.y < top.y ? current : top; // smaller Y = higher up
+    });
+  }
+
+  // Spawn door-ice on the top platform in boss room
+  function spawnDoorIceOnTopPlatform() {
+    // Use the ref instead of state since it should have the current value
+    const currentPlatforms = bossPlatformsRef.current || bossPlatforms;
+    
+    if (currentPlatforms.length === 0) {
+      return;
+    }
+    
+    const topPlatform = currentPlatforms.reduce((top, current) => {
+      return current.y < top.y ? current : top; // smaller Y = higher up
+    });
+    
+    if (topPlatform) {
+      const anchor = {
+        id: topPlatform.id,
+        x: topPlatform.x,
+        y: topPlatform.y,
+        w: topPlatform.w
+      };
+      setDoorIceAnchor(anchor);
+    }
+  }
+
 
   // State variables
   const [x, setX] = useState(SCREEN_W * 0.5);
@@ -407,6 +486,7 @@ const bossPoseRef = useRef<PosePayload>({
   const vzRef = useRef(0);
   const dirXRef = useRef(0);
   const speedRef = useRef<'idle'|'run'>('idle');
+  const clampToGroundFramesRef = useRef(0);
   const onGroundRef = useRef(true);
   const didWrapRef = useRef(false);
   const feetYRef = useRef(levelData?.floorTopY ?? 0);
@@ -435,7 +515,10 @@ const bossPoseRef = useRef<PosePayload>({
     const meta = (MAPS as any)[levelData.mapName]?.prefabs?.meta;
     const tile = meta?.tileSize ?? 16;
 
-    const floorPrefabName = levelData.mapName === 'grassy' ? 'floor-final' : 'floor';
+    const floorPrefabName =
+      (levelData.mapName === 'grassy' || levelData.mapName === 'frozen' || levelData.mapName === 'bossroom')
+        ? 'floor-final'
+        : 'floor';
     const pf = (MAPS as any)[levelData.mapName]?.prefabs?.prefabs?.[floorPrefabName];
     const rows = (pf?.cells?.length ?? pf?.rects?.length ?? 2);
 
@@ -444,6 +527,14 @@ const bossPoseRef = useRef<PosePayload>({
     
     return result;
   }, [levelData.mapName]);
+
+  // Character dims - MOVED HERE to avoid hoisting issues
+  const mapDef = MAPS[levelData.mapName];
+  const TILE = getTileSize(levelData.mapName) * SCALE;
+  const COL_W = Math.round(0.58 * 48 * SCALE);
+  const COL_H = Math.round(0.88 * 48 * SCALE) - 15;
+  const CHAR_W = 48 * SCALE;
+  const CHAR_H = 48 * SCALE;
 
   // Calculate player's world Y position
   const playerWorldY = floorTopY - zRef.current;
@@ -499,6 +590,10 @@ const bossPoseRef = useRef<PosePayload>({
   useEffect(() => {
     const mgr = new EnhancedPlatformManager(levelData.mapName as any, floorTopY, 2);
     platformManager.current = mgr;
+    
+    // Clear any existing platforms to prevent duplicate keys
+    setAllPlatforms([]);
+    updatePlatforms([]);
 
     const bootCamY = 0; // Initial camera Y
     const bootPlayerY = 0; // Initial player Y
@@ -522,7 +617,7 @@ const bossPoseRef = useRef<PosePayload>({
       setCameraY(0); // Fix camera for boss room
       
       // Set up boss platforms
-      const mapW = prefabWidthPx(levelData.mapName, 'platform-grass-3-final');
+      const mapW = prefabWidthPx(levelData.mapName, THREE_BLOCK_PREFAB);
       setBossPlatforms(createBossPlatforms(floorTopY, mapW));
       
       // Reset player position for boss room
@@ -562,8 +657,13 @@ const bossPoseRef = useRef<PosePayload>({
     }));
   }, [bossPlatforms]);
 
-  // Find and anchor the door to a 3-block platform
+  // Find and anchor the door to a 3-block platform (only on grassy map)
   useEffect(() => {
+    if (levelData.mapName !== 'grassy') {
+      setDoorAnchor(null); // Clear door anchor on non-grassy maps
+      return;
+    }
+
     if (doorAnchor) {
       return; // already found
     }
@@ -577,7 +677,7 @@ const bossPoseRef = useRef<PosePayload>({
     if (a) {
       setDoorAnchor(a);
     }
-  }, [visiblePlatforms, DOOR_TARGET_Y_WORLD]);
+  }, [visiblePlatforms, DOOR_TARGET_Y_WORLD, levelData.mapName]);
 
 
   // Add this after platformManager initialization to validate the setup:
@@ -591,14 +691,7 @@ const bossPoseRef = useRef<PosePayload>({
   
 
 
-  const mapDef = MAPS[levelData.mapName];
-
-  // Character dims
-  const TILE = getTileSize(levelData.mapName) * SCALE;
-  const COL_W = Math.round(0.58 * 48 * SCALE);
-  const COL_H = Math.round(0.88 * 48 * SCALE) - 15;
-  const CHAR_W = 48 * SCALE;
-  const CHAR_H = 48 * SCALE;
+  // Character dims moved to earlier in the file to avoid hoisting issues
 
   // Head span used ONLY for ceiling tests
   const HEAD_W = Math.max(6, Math.floor(COL_W * 0.35));
@@ -733,6 +826,20 @@ const bossPoseRef = useRef<PosePayload>({
       frameCount++;
       frameCountRef.current = frameCount;
       
+      // Track consecutive grounded frames (simple hysteresis for the door trigger)
+      if (onGroundRef.current) {
+        groundedFramesRef.current = Math.min(groundedFramesRef.current + 1, 60);
+      } else {
+        groundedFramesRef.current = 0;
+      }
+
+      // If we just teleported to bossroom, clamp to its floor on the very next frame
+      // (prevents any airborne carryover from tower mode)
+      if (postTeleportClampRef.current && modeRef.current === 'bossroom') {
+        zRef.current  = 0;   // feet on floor
+        vzRef.current = 0;   // no vertical velocity
+        postTeleportClampRef.current = false;
+      }
       
       // PERFORMANCE: Simplified timing - just use basic delta time
       const dt = Math.min(0.0166, (t - last) / 1000); // Cap at 60 FPS
@@ -872,6 +979,15 @@ const bossPoseRef = useRef<PosePayload>({
       vzRef.current -= GRAVITY * dt;
       zRef.current += vzRef.current * dt;
 
+      // Ground clamp for post-warp positioning
+      if (clampToGroundFramesRef.current > 0) {
+        zRef.current = 0;           // stand on floor
+        vzRef.current = 0;          // no residual vertical velocity
+        onGroundRef.current = true; // firmly grounded
+        groundedFramesRef.current = Math.max(groundedFramesRef.current, 1);
+        clampToGroundFramesRef.current -= 1;
+      }
+
       // Calculate current Y position after physics update
       const currFeetY = floorTopY - zRef.current;
       const prevTopY = prevFeetY - COL_H;
@@ -913,11 +1029,15 @@ const bossPoseRef = useRef<PosePayload>({
         const playerWorldY = floorTopY - zRef.current; // Current feet position
         
         // Get platforms that could be relevant (wider search)
-        const nearbyPlatforms = platformManager.current?.getPlatformsNearPlayer(
-          playerWorldX,
-          playerWorldY,
-          200 // Increased search radius
-        ) || [];
+        // IMPORTANT: In bossroom we MUST ignore tower platforms to prevent "invisible" landings.
+        const isBoss = modeRef.current === 'bossroom';
+        const nearbyPlatforms = isBoss
+          ? []
+          : (platformManager.current?.getPlatformsNearPlayer(
+              playerWorldX,
+              playerWorldY,
+              200 // Increased search radius
+            ) || []);
         
     // Add boss room collision slabs
     const bossCollision = mode === 'bossroom'
@@ -963,10 +1083,9 @@ const bossPoseRef = useRef<PosePayload>({
         ]
       : [];
 
-        const platformsForCollision = [
-          ...nearbyPlatforms,   // your normal generated platforms
-          ...bossCollision,     // add boss room slabs only in bossroom
-        ];
+        const platformsForCollision = isBoss
+          ? bossCollision      // boss room: only fixed slabs we define below
+          : nearbyPlatforms;   // tower: only procedurally generated platforms
         
         
         // Check each platform
@@ -1063,36 +1182,28 @@ const bossPoseRef = useRef<PosePayload>({
         onGroundRef.current = false;
       }
 
-    // ===== Door teleport AABB (world space) =====
-    if (mode === 'tower' && doorAnchorRef.current) {
-      // Use your existing player AABB if available; otherwise compute one
-      const box = currentPlayerBox ?? getPlayerBox({
-        xRefIsLeftEdge: true,
-        x: xRef.current,
-        z: zRef.current,
-        floorTopY,
-        charW: CHAR_W,
-        colW: COL_W,
-        colH: COL_H,
-      });
-
+    // ===== Door teleport (tight feet-in-door check) - only on grassy map =====
+    if (mode === 'tower' && levelData.mapName === 'grassy' && doorAnchorRef.current) {
       // Calculate door position from current anchor (same as used for rendering)
       const currentDoorWorldX = Math.round(doorAnchorRef.current.x + (doorAnchorRef.current.w - DOORWAY_WIDTH) * 0.5);
       const currentDoorWorldY = Math.round(doorAnchorRef.current.y - DOORWAY_HEIGHT + DOORWAY_POSITION_OFFSET);
+      // Player center X and feet Y in world space
+      const playerCenterX = xRef.current + CHAR_W * 0.5;
+      const playerFeetY   = floorTopY - zRef.current;
 
-      const PAD = 6; // a little forgiveness feels better
-      const L = currentDoorWorldX - PAD;
-      const R = currentDoorWorldX + DOORWAY_WIDTH + PAD;
-      const T = currentDoorWorldY - PAD;
-      const B = currentDoorWorldY + DOORWAY_HEIGHT + PAD;
+      const inside = pointInDoorTightFeet(
+        playerCenterX,
+        playerFeetY,
+        currentDoorWorldX,
+        currentDoorWorldY,
+        DOOR_TRIGGER_INNER_X_RATIO,
+        DOOR_TRIGGER_BOTTOM_Y_RATIO,
+        DOOR_TRIGGER_PAD
+      );
 
-      const overlap =
-        box.right  >= L &&
-        box.left   <= R &&
-        box.bottom >= T &&
-        box.top    <= B;
-
-      if (overlap && !hasTeleportedRef.current) {
+      // Require the player to be truly standing at the door for a few frames
+      const groundedOK = groundedFramesRef.current >= DOOR_TRIGGER_REQUIRE_GROUNDED_FRAMES;
+      if (inside && groundedOK && !hasTeleportedRef.current) {
         hasTeleportedRef.current = true;
 
         // 1) briefly suppress hazards so this frame can't kill us
@@ -1101,6 +1212,14 @@ const bossPoseRef = useRef<PosePayload>({
         // 2) enter boss room
         setMode('bossroom');
         setCameraY(0); // fix the room to screen; also ensures GroundBand is visible
+        // Hard clamp vertical now, and again next frame (after room swap is realized)
+        zRef.current  = 0;
+        vzRef.current = 0;
+        onGroundRef.current = true;
+        
+        // Hold to ground for a couple frames to ensure we use the new map's floorTopY
+        clampToGroundFramesRef.current = 2;
+        postTeleportClampRef.current = true;
 
         // 3) stop any tower projectiles; enable boss projectiles later
         setBossShots([]);
@@ -1109,7 +1228,7 @@ const bossPoseRef = useRef<PosePayload>({
         bossProjectilesEnabledRef.current = false;
 
         // 4) spawn fixed boss platforms using the SAME prefab as tower
-        const mapW = prefabWidthPx(levelData.mapName, 'platform-grass-3-final');
+        const mapW = prefabWidthPx(levelData.mapName, THREE_BLOCK_PREFAB);
         setBossPlatforms(createBossPlatforms(floorTopY, mapW));
 
         // 5) re-center player on the room and reset velocity
@@ -1122,43 +1241,103 @@ const bossPoseRef = useRef<PosePayload>({
       // Reset guard when not in tower or door no longer present
       hasTeleportedRef.current = false;
     }
+
+    // ===== Door-Ice teleport (boss room to frozen map) =====
+    if (modeRef.current === 'bossroom' && doorIceAnchorRef.current) {
+      const { x: diX, y: diY } = calcDoorIceWorldXY(doorIceAnchorRef.current);
+
+      // Player center X and FEET Y in WORLD space
+      const playerCenterX = xRef.current + CHAR_W * 0.5;
+      const playerFeetY   = floorTopY - zRef.current;
+
+      // Tight feet-in-door check, matching DoorIceSprite scale/geometry
+      const inside = pointInDoorIceTightFeet(
+        playerCenterX,
+        playerFeetY,
+        diX,
+        diY,
+        DOOR_TRIGGER_INNER_X_RATIO,
+        DOOR_TRIGGER_BOTTOM_Y_RATIO,
+        DOOR_TRIGGER_PAD
+      );
+
+      // Require a few grounded frames so you can't "catch" the door mid-jump
+      const groundedOK = groundedFramesRef.current >= DOOR_TRIGGER_REQUIRE_GROUNDED_FRAMES;
+
+      // Debug door-ice teleport (removed verbose logging to reduce spam)
+
+      if (inside && groundedOK && !hasTeleportedDoorIceRef.current) {
+        hasTeleportedDoorIceRef.current = true;
+
+        // 1) briefly suppress hazards so this frame can't kill us
+        hazardSuppressUntilMsRef.current = Date.now() + 1000;
+
+        // 2) switch to frozen map using the same pattern as grassy door
+        const frozenLevel = LEVELS.frozen;
+        onLevelChange(frozenLevel);
+        
+        // 3) stop boss projectiles and reset projectile system
+        setBossShots([]);
+        projIdRef.current = 1;
+        setPlayerShots([]);
+        bossProjectilesEnabledRef.current = false;
+
+        // 4) re-center player on the frozen map and reset velocity
+        xRef.current = frozenLevel.characterSpawn.x;
+        zRef.current = 0; // Start on the floor (Z=0 is floor level)
+        vxRef.current = 0;
+        vzRef.current = 0;
+        onGroundRef.current = true;
+        
+        // 5) reset camera and mode - position camera to show player on floor
+        setCameraY(frozenLevel.floorTopY - SCREEN_H * 0.5); // Center camera on floor
+        setMode('tower');
+        
+        console.log('[DEBUG] Door-ice teleport triggered!');
+        
+      }
+    } else {
+      // Reset the guard if we leave bossroom or door disappears
+      hasTeleportedDoorIceRef.current = false;
+    }
     
-    // TEMPORARY: Reset teleport guard every 5 seconds for testing
+    // TEMPORARY: Reset teleport guards every 5 seconds for testing
     if (frameCount % 300 === 0) { // 5 seconds at 60fps
       hasTeleportedRef.current = false;
+      hasTeleportedDoorIceRef.current = false;
     }
 
     // ───────────────────────────────────────────────────────────────
     // HEART COLLISION (boss-room only)
     const hp = heartPickupRef.current;
     if (modeRef.current === 'bossroom' && hp) {
-      // gate pickup until fade completes
-      const canPickup = !('activatesAt' in hp) || (Date.now() >= (hp as any).activatesAt);
-      if (!canPickup) {
-        // skip collision until spawn effect finishes
-      } else {
-        const HX = hp.x;
-        const HY = hp.y;
-        const HW = 32;
-        const HH = 32;
+      // Wait until the spawn fade finishes (if present)
+      const ready = !('activatesAt' in hp) || Date.now() >= (hp as any).activatesAt;
+      if (ready) {
+        // Heart "virtual" center for pickup detection (at floor level)
+        const heartCX = hp.x + 16;  // Keep horizontal center
+        const heartCY = floorTopY;  // Position pickup zone at floor level
 
-        const L = HX;
-        const R = HX + HW;
-        const T = HY;
-        const B = HY + HH;
+        // Player feet point + horizontal center in WORLD space
+        // `box` is our cached player AABB in WORLD coords (built earlier via getPlayerBox)
+        const px = (box.left + box.right) * 0.5; // player center X
+        const py = box.bottom;                   // player feet Y
 
-        const overlap =
-          box.right  >= L &&
-          box.left   <= R &&
-          box.bottom >= T &&
-          box.top    <= B;
+        // Feet-based circular pickup — forgiving and feels great
+        const dx = px - heartCX;
+        const dy = py - heartCY;
+        const r = 20; // pickup radius; adjust 18–22 as you like
+        const inside = (dx * dx + dy * dy) <= (r * r);
 
-        if (overlap) {
-          // Full heal, consume, and play sfx
-          resetHealthRef.current(); // (or heal(999) if you prefer)
+
+        if (inside) {
+          resetHealthRef.current();   // full heal (or call a heal() of your choice)
           setHeartPickup(null);
           heartPickupRef.current = null;
           soundManager.playHealthPowerupSound();
+
+          // Spawn door-ice on the top platform right after pickup
+          spawnDoorIceOnTopPlatform();
         }
       }
     }
@@ -1440,8 +1619,8 @@ const bossPoseRef = useRef<PosePayload>({
               />
             )}
             
-            {/* Doorway rendering - only in tower mode */}
-            {mode === 'tower' && doorAnchor && (
+            {/* Doorway rendering - only in tower mode and only on grassy map */}
+            {mode === 'tower' && levelData.mapName === 'grassy' && doorAnchor && (
               <DoorSprite
                 doorWorldX={doorWorldX}
                 doorWorldY={doorWorldY}
@@ -1452,10 +1631,22 @@ const bossPoseRef = useRef<PosePayload>({
               />
             )}
             
-            {/* Boss room platforms - render using dark tileset */}
-            {mode === 'bossroom' && bossPlatforms.map(p => (
-              <PrefabNode key={p.id} map="dark" name={p.prefab} x={p.x} y={p.y} />
-            ))}
+            {/* Door-Ice rendering - only in boss room mode after heart pickup */}
+            {mode === 'bossroom' && doorIceAnchor && (
+              <DoorIceSprite
+                doorWorldX={doorIceWorldX}
+                doorWorldY={doorIceWorldY}
+                xToScreen={(x) => x}
+                worldYToScreenY={worldYToScreenY}
+                screenW={SCREEN_W}
+                screenH={SCREEN_H}
+              />
+            )}
+            
+      {/* Boss room platforms - render using dark tileset */}
+      {mode === 'bossroom' && bossPlatforms.map(p => (
+        <PrefabNode key={p.id} map="dark" name={p.prefab} x={p.x} y={p.y} scale={2} />
+      ))}
 
             {/* Boss room decorations - lights and vases */}
             {mode === 'bossroom' && (() => {
@@ -1498,7 +1689,7 @@ const bossPoseRef = useRef<PosePayload>({
               
               return (
                 <BossDemon
-                  xWorld={prefabWidthPx(levelData.mapName, 'platform-grass-3-final')*0.5}
+                  xWorld={prefabWidthPx(levelData.mapName, THREE_BLOCK_PREFAB)*0.5}
                   yWorld={floorTopY - 420}
                   worldYToScreenY={worldYToScreenY}
                   xToScreen={(x) => x}
@@ -1537,13 +1728,12 @@ const bossPoseRef = useRef<PosePayload>({
                       try {
                         const HEART_SIZE = 32;
                         const spawnX = Math.round(SCREEN_W * 0.5 - HEART_SIZE * 0.5); // Center of screen
-                        const spawnY = Math.round(floorTopY - 70); // 70px above the floor (raised by 20px more)
-                        console.log('[DEBUG] Floor position:', floorTopY, 'Screen height:', SCREEN_H, 'Heart spawn Y:', spawnY);
+                        // Keep heart at original position
+                        const spawnY = Math.round(floorTopY - 127);
                         const now = Date.now(); // Use real time for consistent gating
                         const fadeMs = 850;  // fade-in/spawn effect duration
                         // Set spawnAt to current time so fade-in starts immediately
                         const hp = { x: spawnX, y: spawnY, spawnAt: now, activatesAt: now + fadeMs };
-                        console.log('[DEBUG] Heart pickup spawned at:', { x: spawnX, y: spawnY, now, activatesAt: now + fadeMs });
                         setHeartPickup(hp);
                         heartPickupRef.current = hp;
                       } catch (e) {
@@ -1626,7 +1816,7 @@ const bossPoseRef = useRef<PosePayload>({
               posX={xRef.current}
               lift={z}
               scale={SCALE}
-              footOffset={FOOT_OFFSET}
+              footOffset={DEFAULT_FOOT_OFFSET}
               isHurt={isHurt}
               isDead={isDead}
               isBossRoom={mode === 'bossroom'}
@@ -1679,6 +1869,7 @@ const bossPoseRef = useRef<PosePayload>({
           />
         </Canvas>
       )}
+
       
       {/* Right stack: SCORE + TIME - Hidden in boss room */}
       {mode !== 'bossroom' && (
@@ -1693,22 +1884,42 @@ const bossPoseRef = useRef<PosePayload>({
         />
       )}
 
-      {/* Float the Skia HP bar directly beneath TIME (no box) */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          right: 12,
-          top: 50 + rightHudH + 8,   // 8px gap below the TIME card
-          zIndex: 9998,
-        }}
-      >
-        <SkiaHealthBar
-          width={Math.max(120, rightCardW)}
-          height={20}
-          health={((maxHits - hits) / maxHits) * 100}
-        />
-      </View>
+      {/* Health Bar - Vertical in boss room, horizontal in tower mode */}
+      {mode === 'bossroom' ? (
+        // Vertical health bar in top right corner for boss room
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: 37, // moved down by 25px (was 12, now 37)
+            zIndex: 9998,
+          }}
+        >
+          <BossVerticalHealthBar
+            width={30}
+            height={100}
+            health={((maxHits - hits) / maxHits) * 100}
+          />
+        </View>
+      ) : (
+        // Horizontal health bar below TIME card for tower mode
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: 50 + rightHudH + 8,   // 8px gap below the TIME card
+            zIndex: 9998,
+          }}
+        >
+          <SkiaHealthBar
+            width={Math.max(120, rightCardW)}
+            height={20}
+            health={((maxHits - hits) / maxHits) * 100}
+          />
+        </View>
+      )}
       
       
       {/* Ground Band - Dirt with grass top - tower mode only */}
@@ -1719,15 +1930,28 @@ const bossPoseRef = useRef<PosePayload>({
         const adjustedGroundY = groundScreenY - 30; // Move up 30px to align better
         const groundH = Math.max(0, SCREEN_H - adjustedGroundY);
         
-        return (
-          <GroundBand
-            width={SCREEN_W}
-            height={groundH}
-            y={adjustedGroundY}
-            opacity={1}
-            timeMs={hazardAnimationTime}
-          />
-        );
+        // Use FrozenBand for frozen map, GroundBand for other maps
+        if (levelData.mapName === 'frozen') {
+          return (
+            <FrozenBand
+              width={SCREEN_W}
+              height={groundH}
+              y={adjustedGroundY}
+              opacity={1}
+              timeMs={hazardAnimationTime}
+            />
+          );
+        } else {
+          return (
+            <GroundBand
+              width={SCREEN_W}
+              height={groundH}
+              y={adjustedGroundY}
+              opacity={1}
+              timeMs={hazardAnimationTime}
+            />
+          );
+        }
       })()}
       
         {/* Hazard Band - Improved lava rendering */}
@@ -1834,12 +2058,13 @@ const bossPoseRef = useRef<PosePayload>({
 };
 
 // Main GameScreen component
-export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack }) => {
+export const GameScreen: React.FC<GameScreenProps> = ({ levelData, onBack, onLevelChange }) => {
   return (
     <ImagePreloaderProvider maps={[levelData.mapName]}>
       <InnerGameScreen 
         levelData={levelData} 
         onBack={onBack}
+        onLevelChange={onLevelChange}
       />
     </ImagePreloaderProvider>
   );

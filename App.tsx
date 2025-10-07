@@ -40,6 +40,10 @@ export default function App() {
     setCurrentLevel(null);
   };
 
+  const handleLevelChange = (newLevel: LevelData) => {
+    setCurrentLevel(newLevel);
+  };
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
@@ -60,6 +64,7 @@ export default function App() {
               <GameScreen
                 levelData={currentLevel}
                 onBack={handleBack}
+                onLevelChange={handleLevelChange}
               />
             </>
           )}

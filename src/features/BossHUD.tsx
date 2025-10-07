@@ -48,26 +48,26 @@ export default React.memo(function BossHUD({
   // EVA title sizing (reduced by 50%, then increased by 10%)
   const evaNaturalW = evaImg.width();
   const evaNaturalH = evaImg.height();
-  const evaTargetW = clamp(Math.round(screenW * 0.28 * 1.36125), 123, 354); // Reduced by 50%, then +10% (1.2375 * 1.1)
+  const evaTargetW = clamp(Math.round(screenW * 0.28 * 1.36125 * 1.15), 141, 407); // Reduced by 50%, then +10%, then +15% (1.36125 * 1.15)
   const evaScale = evaTargetW / evaNaturalW;
   const evaW = Math.round(evaNaturalW * evaScale);
   const evaH = Math.round(evaNaturalH * evaScale);
   const evaX = Math.round((screenW - evaW) / 2) + 5; // 5px to the right
-  const evaY = yOffset + 20; // 20px down from yOffset to avoid being cut off
+  const evaY = yOffset + 5; // 5px down from yOffset (moved up by 15px from 20px)
 
   // Health bar sizing (reduced by 50%, then increased by 20%)
   const healthNaturalW = healthImg.width();
   const healthNaturalH = healthImg.height();
   
-  // Target width ~24% of screen, with caps (reduced from 40%, then +20%)
-  const healthTargetW = clamp(Math.round(screenW * 0.24), 72, 192);
+  // Target width ~27.6% of screen, with caps (reduced from 40%, then +20%, then +15%)
+  const healthTargetW = clamp(Math.round(screenW * 0.24 * 1.15), 83, 221);
   const healthScale = healthTargetW / healthNaturalW;
   const healthW = Math.round(healthNaturalW * healthScale);
   const healthH = Math.round(healthNaturalH * healthScale);
   
   const healthX = Math.round((screenW - healthW) / 2);
   const gapY = (barGapY ?? -5); // default keeps current look
-  const healthY = Math.round(evaY + evaH + gapY + 25); // moved down by 25px
+  const healthY = Math.round(evaY + evaH + gapY + 10); // moved up by 15px (was +25, now +10)
 
   // Debug: log positions
   console.log('[BossHUD] evaY:', evaY, 'evaH:', evaH, 'healthY:', healthY, 'gapY:', gapY, 'actual gap:', healthY - (evaY + evaH));

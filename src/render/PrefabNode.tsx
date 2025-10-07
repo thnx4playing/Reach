@@ -4,24 +4,37 @@ import { MAPS, MapName } from "../content/maps";
 import { usePreloadedImage } from "./ImagePreloaderContext";
 import { grassyPrefabImages } from "../assets/grassyPrefabs";
 import { darkPrefabImages } from "../assets/darkPrefabs";
+import { frozenPrefabImages } from "../assets/frozenPrefabs";
 
 type Props = { map: MapName; name: string; x?: number; y?: number; scale?: number; opacity?: number };
 
 export function PrefabNode({ map, name, x = 0, y = 0, scale = 2, opacity = 1.0 }: Props) {
-  const def = MAPS[map];
+  // Normalize map for assets (bossroom uses dark tiles)
+  const logicalMap = (map === "bossroom" ? "dark" : map) as MapName;
+  const def = MAPS[logicalMap];
   const pf = def.prefabs?.prefabs?.[name];
-  if (!pf) { 
-    if (__DEV__) console.warn(`[PrefabNode] missing "${name}" in "${map}"`); 
-    return null; 
+  if (!pf) {
+    // Don't bail—fall back to image dimensions so we still render
+    if (__DEV__) {
+      const warned = ((PrefabNode as any)._warnedPrefabs ?? new Set()) as Set<string>;
+      const key = `${logicalMap}:${name}`;
+      if (!warned.has(key)) {
+        console.warn(`[PrefabNode] missing "${name}" in "${logicalMap}" — drawing by image size.`);
+        warned.add(key);
+        (PrefabNode as any)._warnedPrefabs = warned;
+      }
+    }
   }
 
   // Always call hooks unconditionally
-  const pre = usePreloadedImage(map, name);
+  const pre = usePreloadedImage(logicalMap, name);
   const lazy = useImage(
-    map === "grassy" 
+    logicalMap === "grassy"
       ? grassyPrefabImages[name]
-      : map === "dark"
+      : logicalMap === "dark"
       ? darkPrefabImages[name]
+      : logicalMap === "frozen"
+      ? frozenPrefabImages[name]
       : undefined
   );
   const finalImg = pre || lazy;
