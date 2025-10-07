@@ -107,8 +107,8 @@ function calcDoorIceWorldXY(anchor: { x: number; y: number; w: number }) {
   const x = Math.round(anchor.x + (anchor.w - DOOR_ICE_WIDTH) * 0.5) + nudgeX;
 
   // place above platform top by the scaled sprite height + fixed offset
-  // Adjusted for unified floor system - move door down by 75px total
-  const adjustedOffsetY = offsetY - 25;
+  // Adjusted for unified floor system - move door down by 85px total
+  const adjustedOffsetY = offsetY - 35;
   const y = Math.round(anchor.y - DOOR_ICE_HEIGHT * scale - adjustedOffsetY);
 
   return { x, y };
@@ -1721,8 +1721,8 @@ const bossPoseRef = useRef<PosePayload>({
                       try {
                         const HEART_SIZE = 32;
                         const spawnX = Math.round(SCREEN_W * 0.5 - HEART_SIZE * 0.5); // Center of screen
-                        // Keep heart at original position
-                        const spawnY = Math.round(floorTopY - 177); // Move up another 25px (total 50px from original)
+                        // Lower heart by 15px
+                        const spawnY = Math.round(floorTopY - 162); // Lower heart by 15px
                         const now = Date.now(); // Use real time for consistent gating
                         const fadeMs = 850;  // fade-in/spawn effect duration
                         // Set spawnAt to current time so fade-in starts immediately
