@@ -1,51 +1,51 @@
 // src/config/gameplay.ts
-// Test at ~150 px above the start (later you can bump if you want)
-export const DOORWAY_SPAWN_Y = 150; // px up from start (world up is negative)
+// This file now re-exports from the centralized physics config
+// Kept for backward compatibility with existing imports
 
-// Size to draw the door sprite (scaled render size)
-export const DOORWAY_WIDTH  = 64;   // px
-export const DOORWAY_HEIGHT = 96;   // px
+import { DOOR_CONFIG, BOSS_PHYSICS } from './physics';
 
-// ── Door trigger tuning (how "inside" the player must be) ────────────────────
-// Horizontal: only the middle % of the door counts as "enterable"
-export const DOOR_TRIGGER_INNER_X_RATIO   = 0.55; // 55% of door width (centered)
-// Vertical: only the lower portion of the door counts (feet walking in)
-export const DOOR_TRIGGER_BOTTOM_Y_RATIO  = 0.45; // bottom 55% of door height
-// Tiny forgiveness so it doesn't feel pixel-perfect
-export const DOOR_TRIGGER_PAD             = 2;    // px
+// ============================================================================
+// DOOR CONFIGURATION (re-exported for backward compatibility)
+// ============================================================================
 
-// How many consecutive frames the player must be grounded before door activates
-export const DOOR_TRIGGER_REQUIRE_GROUNDED_FRAMES = 3;
+// Tower door (grassy → boss)
+export const DOORWAY_SPAWN_Y = DOOR_CONFIG.TOWER_DOOR.SPAWN_Y;
+export const DOORWAY_WIDTH = DOOR_CONFIG.TOWER_DOOR.WIDTH;
+export const DOORWAY_HEIGHT = DOOR_CONFIG.TOWER_DOOR.HEIGHT;
+export const DOORWAY_POSITION_OFFSET = DOOR_CONFIG.TOWER_DOOR.POSITION_OFFSET;
+export const DOOR_TRIGGER_INNER_X_RATIO = DOOR_CONFIG.TOWER_DOOR.TRIGGER_INNER_X_RATIO;
+export const DOOR_TRIGGER_BOTTOM_Y_RATIO = DOOR_CONFIG.TOWER_DOOR.TRIGGER_BOTTOM_Y_RATIO;
+export const DOOR_TRIGGER_PAD = DOOR_CONFIG.TOWER_DOOR.TRIGGER_PAD;
+export const DOOR_TRIGGER_REQUIRE_GROUNDED_FRAMES = DOOR_CONFIG.TOWER_DOOR.REQUIRE_GROUNDED_FRAMES;
 
-// Door positioning offset - fine-tuned to sit flush on platform surface
-// This value positions the door so its bottom sits on the platform top
-export const DOORWAY_POSITION_OFFSET = 17; // px (positive = lower door, negative = raise door)
+// Boss door (boss → frozen)
+export const DOOR_ICE_WIDTH = DOOR_CONFIG.BOSS_DOOR.WIDTH;
+export const DOOR_ICE_HEIGHT = DOOR_CONFIG.BOSS_DOOR.HEIGHT;
+export const DOOR_ICE_POSITION_OFFSET = DOOR_CONFIG.BOSS_DOOR.POSITION_OFFSET;
 
-// ── Door-Ice configuration (boss room to frozen map) ────────────────────────
-export const DOOR_ICE_WIDTH  = 64;   // px (same as regular door)
-export const DOOR_ICE_HEIGHT = 96;   // px (same as regular door)
-export const DOOR_ICE_POSITION_OFFSET = -35; // px (negative to place door ON TOP of platform)
+// ============================================================================
+// BOSS ROOM CONFIGURATION (re-exported for backward compatibility)
+// ============================================================================
 
-// Optional future knobs (kept for completeness)
 export const BOSSROOM_PLATFORM_COUNT = 7;
-export const BOSS_FIRE_COOLDOWN_MIN = 5000;
-export const BOSS_FIRE_COOLDOWN_MAX = 10000;
-export const BOSS_PROJECTILE_SPEED  = 320;
-export const BOSS_DAMAGE_PER_HIT    = 1;
+export const BOSS_FIRE_COOLDOWN_MIN = BOSS_PHYSICS.BOSS_FIRE_COOLDOWN_MIN_MS;
+export const BOSS_FIRE_COOLDOWN_MAX = BOSS_PHYSICS.BOSS_FIRE_COOLDOWN_MAX_MS;
+export const BOSS_PROJECTILE_SPEED = BOSS_PHYSICS.BOSS_PROJECTILE_SPEED;
+export const BOSS_DAMAGE_PER_HIT = BOSS_PHYSICS.BOSS_DAMAGE_PER_HIT;
 
-// Player projectile tuning (boss room only)
-export const PLAYER_PROJECTILE_SPEED   = 420;
-export const PLAYER_PROJECTILE_LIFE_MS = 1400;
+// ============================================================================
+// PLAYER PROJECTILE CONFIGURATION (re-exported for backward compatibility)
+// ============================================================================
 
-// Player projectile launch delay (boss room only)
-export const PLAYER_PROJECTILE_LAUNCH_DELAY_MS = 200;
+export const PLAYER_PROJECTILE_SPEED = BOSS_PHYSICS.PLAYER_PROJECTILE_SPEED;
+export const PLAYER_PROJECTILE_LIFE_MS = BOSS_PHYSICS.PLAYER_PROJECTILE_LIFE_MS;
+export const PLAYER_PROJECTILE_LAUNCH_DELAY_MS = BOSS_PHYSICS.PLAYER_PROJECTILE_LAUNCH_DELAY_MS;
+export const PLAYER_PROJECTILE_CHEST_RATIO = 0.35; // Legacy, not used
+export const PLAYER_PROJECTILE_HEAD_RATIO = BOSS_PHYSICS.PLAYER_PROJECTILE_HEAD_RATIO;
 
-// Where on the player's body to spawn the shot (measured from top → down)
-export const PLAYER_PROJECTILE_CHEST_RATIO = 0.35; // 35% down from head ≈ chest (old, not used)
+// ============================================================================
+// BOSS VISUAL CONFIGURATION (re-exported for backward compatibility)
+// ============================================================================
 
-// Spawn point on the player's body (top → down)
-export const PLAYER_PROJECTILE_HEAD_RATIO = 0.18; // ~forehead/eyes
-
-// Boss visual reactions / death playback
-export const BOSS_HURT_FLASH_MS = 220;  // flash HURT.png for this long
-export const BOSS_DEATH_FPS = 10;       // DEATH.png playback fps
+export const BOSS_HURT_FLASH_MS = BOSS_PHYSICS.BOSS_HURT_FLASH_MS;
+export const BOSS_DEATH_FPS = BOSS_PHYSICS.BOSS_DEATH_FPS;

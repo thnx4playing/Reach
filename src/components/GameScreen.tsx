@@ -58,6 +58,16 @@ import {
   PLAYER_PROJECTILE_SPEED, PLAYER_PROJECTILE_LIFE_MS, PLAYER_PROJECTILE_LAUNCH_DELAY_MS, PLAYER_PROJECTILE_HEAD_RATIO, BOSS_HURT_FLASH_MS
 } from '../config/gameplay';
 import { prefabWidthPx, alignPrefabYToSurfaceTop } from '../content/maps';
+import { 
+  SHARED, 
+  TOWER_PHYSICS, 
+  BOSS_PHYSICS, 
+  getPhysicsForMode,
+  type GameMode 
+} from '../config/physics';
+import { log } from '../utils/logger';
+import { useAppPause } from '../hooks/useAppPause';
+import { useFPSCounter } from '../hooks/useFPSCounter';
 
 // debug flag
 const VCOLLECT = __DEV__;
@@ -82,15 +92,9 @@ function zToY(floorTopY: number, zWorld: number) {
   return floorTopY - zWorld;
 }
 
-// PERFORMANCE OPTIMIZED: Restored original balanced physics values
-const SCALE      = 2;
-const RUN_SPEED  = 220;   // INCREASED back to original feel
-const GRAVITY    = 1500;  // RESTORED: Better balance between responsive and floaty
-const JUMP_VEL   = 780;   // INCREASED: 20% higher jump for testing (was 650)
-const JUMP_VELOCITY = JUMP_VEL;
-const ACCEL = 1200;  // INCREASED: Faster acceleration
-const DECEL = 800;   // INCREASED: Faster deceleration  
-const PAD_SIZE = 140;
+// Physics constants now come from centralized config
+const SCALE = SHARED.SCALE;
+const PAD_SIZE = SHARED.PAD_SIZE;
 const DEFAULT_FOOT_OFFSET = 0;
 
 // Door-ice helper function
@@ -237,6 +241,10 @@ const GameComponent: React.FC<{
   const modeRef = useRef<'tower'|'bossroom'>('tower');
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
+  // App lifecycle hooks
+  const { shouldRun } = useAppPause();
+  const { stats: fpsStats, markFrameStart } = useFPSCounter();
+
 // ---- Boss state (bossroom only) ----
 const MAX_BOSS_HP = 6;
 const [bossHP, setBossHP] = useState(MAX_BOSS_HP);
@@ -264,7 +272,7 @@ const bossPoseRef = useRef<PosePayload>({
   const isAttackingRef = useRef(false);
   const attackEndAtRef = useRef(0);
   const attackHitRegisteredRef = useRef(false);
-  const ATTACK_DURATION_MS = 500; // 6 frames at 12 FPS = 500ms
+  const ATTACK_DURATION_MS = BOSS_PHYSICS.ATTACK_DURATION_MS;
 
   // Optional: if you already track facing, wire it here; default face-right.
   const facingLeftRef = useRef(false);
@@ -428,17 +436,17 @@ const bossPoseRef = useRef<PosePayload>({
     
     // Get all platforms and filter for 3-block grass platforms above target
     const allPlatforms = mgr.getAllPlatforms();
-    const threeBlockPlatforms = allPlatforms.filter(p => (p.prefab ?? p.name) === THREE_BLOCK_PREFAB);
+    const threeBlockPlatforms = allPlatforms.filter((p: PlatformDef) => p.prefab === THREE_BLOCK_PREFAB);
     
     // Filter for platforms ABOVE the target (remember: up is negative, so y <= targetY means above)
-    const aboveTarget = threeBlockPlatforms.filter(p => p.y <= targetY);
+    const aboveTarget = threeBlockPlatforms.filter((p: PlatformDef) => p.y <= targetY);
     
     if (aboveTarget.length === 0) {
       return null;
     }
     
     // Sort by Y descending (closest above = largest Y value)
-    const sorted = aboveTarget.sort((a, b) => b.y - a.y);
+    const sorted = aboveTarget.sort((a: PlatformDef, b: PlatformDef) => b.y - a.y);
     const closest = sorted[0];
     
     const w = closest.collision?.width ?? closest.w ?? closest.width ?? 144;
@@ -511,7 +519,7 @@ const bossPoseRef = useRef<PosePayload>({
   const vzPrevRef = useRef<number>(0);
   const onGroundPrevRef = useRef<boolean>(true);
 
-  const FALL_THRESHOLD = SCREEN_H / 5;
+  const FALL_THRESHOLD = SHARED.SCREEN_H * TOWER_PHYSICS.FALL_DAMAGE_THRESHOLD_SCREENS;
   
   // Track previous death state to detect when player dies
   const prevIsDeadRef = useRef(isDead);
@@ -527,13 +535,13 @@ const bossPoseRef = useRef<PosePayload>({
   // Floor calculation (unified)
   const floorTopY = useMemo(() => floorTopYFor(levelData.mapName as ProfileMapName), [levelData.mapName]);
 
-  // Character dims - MOVED HERE to avoid hoisting issues
+  // Character dims - now from centralized config
   const mapDef = MAPS[levelData.mapName];
   const TILE = getTileSize(levelData.mapName) * SCALE;
-  const COL_W = Math.round(0.58 * 48 * SCALE);
-  const COL_H = Math.round(0.88 * 48 * SCALE) - 15;
-  const CHAR_W = 48 * SCALE;
-  const CHAR_H = 48 * SCALE;
+  const COL_W = SHARED.COL_W;
+  const COL_H = SHARED.COL_H;
+  const CHAR_W = SHARED.CHAR_W;
+  const CHAR_H = SHARED.CHAR_H;
 
   // Calculate player's world Y position
   const playerWorldY = floorTopY - zRef.current;
@@ -604,14 +612,14 @@ const bossPoseRef = useRef<PosePayload>({
     updatePlatforms(mgr.getAllPlatforms());
     
     // Check if this level should start in boss room mode
-    console.log('[GameScreen] Level data:', { 
+    log.debug('Level data loaded', { 
       mapName: levelData.mapName, 
       startInBossRoom: levelData.startInBossRoom,
       floorTopY 
     });
     
     if (levelData.startInBossRoom) {
-      console.log('[GameScreen] Starting in boss room mode');
+      log.doors('Starting in boss room mode');
       enterMap("bossroom", {
         setMode, setCameraY,
         setPlatforms: setBossPlatforms,
@@ -624,7 +632,7 @@ const bossPoseRef = useRef<PosePayload>({
         platformManager: platformManager.current
       });
     } else {
-      console.log('[GameScreen] Starting in tower mode');
+      log.doors('Starting in tower mode');
       setMode('tower'); // Ensure we start in tower mode for regular levels
     }
     
@@ -816,11 +824,14 @@ const bossPoseRef = useRef<PosePayload>({
   }, [isDead, playFireDeathSound, playDeathSound]);
 
   useEffect(() => {
+    if (!shouldRun) return; // Gate RAF loop on app pause state
+    
     let raf = 0;
     let last = performance.now();
     let frameCount = 0;
 
     const loop = (t: number) => {
+      markFrameStart(); // Track FPS at start of frame
       frameCount++;
       frameCountRef.current = frameCount;
       
@@ -841,11 +852,11 @@ const bossPoseRef = useRef<PosePayload>({
       }
       
       // PERFORMANCE: Simplified timing - just use basic delta time
-      const dt = Math.min(0.0166, (t - last) / 1000); // Cap at 60 FPS
+      const dt = Math.min(SHARED.MAX_DELTA_TIME, (t - last) / 1000); // Cap to prevent physics explosions
       last = t;
 
       // Skip only if delta time is too large (lag spike)
-      if (dt > 0.05) {
+      if (dt > SHARED.MAX_DELTA_TIME) {
         raf = requestAnimationFrame(loop);
         return;
       }
@@ -916,8 +927,9 @@ const bossPoseRef = useRef<PosePayload>({
         }
       }
 
-      // PERFORMANCE: Simplified horizontal movement
-      const target = speedRef.current === 'idle' ? 0 : RUN_SPEED;
+      // PERFORMANCE: Simplified horizontal movement - now mode-aware
+      const physics = getPhysicsForMode(modeRef.current);
+      const target = speedRef.current === 'idle' ? 0 : physics.RUN_SPEED;
 
       if (onGroundRef.current) {
         // Ground movement with improved responsiveness
@@ -925,14 +937,14 @@ const bossPoseRef = useRef<PosePayload>({
           const desired = dirXRef.current * target;
           vxRef.current = desired * 0.8 + vxRef.current * 0.2; // Fast lerp
         } else {
-          vxRef.current *= 0.75; // Quick deceleration
+          vxRef.current *= physics.GROUND_FRICTION;
         }
       } else {
         // Air control
         if (dirXRef.current === 0) {
-          vxRef.current *= 0.95; // Slight air resistance
+          vxRef.current *= physics.AIR_FRICTION;
         } else {
-          const desired = dirXRef.current * target * 0.5; // Reduced air control
+          const desired = dirXRef.current * target * physics.AIR_CONTROL_MULTIPLIER;
           vxRef.current = desired * 0.3 + vxRef.current * 0.7;
         }
       }
@@ -974,8 +986,8 @@ const bossPoseRef = useRef<PosePayload>({
       // Calculate Y positions for collision detection BEFORE updating physics
       const prevFeetY = floorTopY - prevZ;
 
-      // PERFORMANCE: Simplified vertical physics
-      vzRef.current -= GRAVITY * dt;
+      // PERFORMANCE: Simplified vertical physics - now mode-aware
+      vzRef.current -= physics.GRAVITY * dt;
       zRef.current += vzRef.current * dt;
 
       // Ground clamp for post-warp positioning
@@ -1206,7 +1218,7 @@ const bossPoseRef = useRef<PosePayload>({
         hasTeleportedRef.current = true;
 
         // 1) briefly suppress hazards so this frame can't kill us
-        hazardSuppressUntilMsRef.current = Date.now() + 1000;
+        hazardSuppressUntilMsRef.current = Date.now() + BOSS_PHYSICS.HAZARD_SUPPRESS_MS;
 
         // 2) enter boss room using unified system
         enterMap("bossroom", {
@@ -1260,7 +1272,7 @@ const bossPoseRef = useRef<PosePayload>({
         hasTeleportedDoorIceRef.current = true;
 
         // 1) briefly suppress hazards so this frame can't kill us
-        hazardSuppressUntilMsRef.current = Date.now() + 1000;
+        hazardSuppressUntilMsRef.current = Date.now() + BOSS_PHYSICS.HAZARD_SUPPRESS_MS;
 
         // 2) Clear all state before switching maps (same as direct start)
         setAllPlatforms([]);
@@ -1286,7 +1298,7 @@ const bossPoseRef = useRef<PosePayload>({
           platformManager: platformManager.current
         });
         
-        console.log('[DEBUG] Door-ice teleport triggered!');
+        log.doors('Door-ice teleport triggered');
         
       }
     } else {
@@ -1481,7 +1493,7 @@ const bossPoseRef = useRef<PosePayload>({
       tickJumpTimers(jumpStateRef.current, dt * 1000, onGroundRef.current);
 
       if (shouldExecuteJump(jumpStateRef.current)) {
-        vzRef.current = JUMP_VELOCITY;
+        vzRef.current = physics.JUMP_VELOCITY;
         onGroundRef.current = false;
         consumeJump(jumpStateRef.current);
         playJumpSound();
@@ -1549,7 +1561,7 @@ const bossPoseRef = useRef<PosePayload>({
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, []); // FIXED: Empty dependency to prevent infinite loop
+  }, [shouldRun, markFrameStart]); // Re-run when shouldRun changes
   
   // REMOVED: Performance monitoring debug logging (was causing console spam)
 
@@ -1705,7 +1717,7 @@ const bossPoseRef = useRef<PosePayload>({
                   isHurt={isBossHurt}
                   isDead={isBossDead}
                   onDeathDone={() => {
-                    console.log('[DEBUG] Boss death animation finished, spawning heart pickup...');
+                    log.boss('Death animation finished, spawning heart pickup');
                     setBossDespawned(true);
                     // Clear boss collision boxes
                     bossPoseRef.current = {
@@ -1730,7 +1742,7 @@ const bossPoseRef = useRef<PosePayload>({
                         setHeartPickup(hp);
                         heartPickupRef.current = hp;
                       } catch (e) {
-                        if (__DEV__) console.warn('Heart spawn failed', e);
+                        log.warn('boss', 'Heart spawn failed', e);
                       }
                     }, 2000); // 2s delay before heart appears
                   }}
@@ -1765,9 +1777,9 @@ const bossPoseRef = useRef<PosePayload>({
                       setBossHurtUntilMs(Date.now() + BOSS_HURT_FLASH_MS);
                       
                       // Play boss death sound when HP reaches 0 (before death animation starts)
-                      console.log('[DEBUG] Boss hit - current HP:', hp, 'damage:', dmg, 'next HP:', next);
+                      log.boss('Boss hit', { currentHP: hp, damage: dmg, nextHP: next });
                       if (next === 0 && hp > 0) {
-                        console.log('[DEBUG] Boss HP reached 0, playing death sound and starting death animation');
+                        log.boss('Boss HP reached 0, playing death sound and starting death animation');
                         soundManager.playBossDeathSound();
                       }
                       
