@@ -1,12 +1,12 @@
-import { Dimensions } from 'react-native';
 import type { MapName } from './maps';
 import { prefabHeightPx, getTileSize, alignPrefabYToSurfaceTop } from './maps';
 import { makeStaticFloor } from './floor';
+import { SCREEN, FLOOR_TOP_Y } from '../config/physics';
 
 // Re-export MapName for use in other files
 export type { MapName };
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = { width: SCREEN.WIDTH, height: SCREEN.HEIGHT };
 
 export type Platform = { prefab: string; x: number; y: number; scale?: number };
 export type LevelData = {
@@ -23,11 +23,8 @@ function buildLevel(mapName: MapName, w: number, h: number): LevelData {
   // Only boss room uses prefab floors
   const staticFloor: Platform[] = []; // Empty for core maps - Skia handles floor rendering
   
-  // For core maps, use a fixed floor height that matches Skia rendering
-  // This should match the calculation in src/engine/floor.ts
-  const SKIA_FLOOR_HEIGHT = 32;
-  const SKIA_VISUAL_OFFSET = 52; // GroundBand adjusts upward by 30px, plus adjustment for grass lip and fine-tuning
-  const floorTopY = Math.round(h - SKIA_FLOOR_HEIGHT - 5 + SKIA_VISUAL_OFFSET);
+  // USE THE UNIFIED FLOOR POSITION FROM PHYSICS
+  const floorTopY = FLOOR_TOP_Y;
   
   // Get map-specific decorations (ground-level only)
   const decorations = getMapDecorations(mapName, w, h, floorTopY);
@@ -96,7 +93,8 @@ function getMapDecorations(mapName: MapName, width: number, height: number, floo
 function buildBossRoomLevel(): LevelData {
   const FLOOR_SCALE = 2;
   const staticFloor = makeStaticFloor('bossroom', width, height, FLOOR_SCALE, 'floor-final');
-  const floorTopY = Math.round(height - prefabHeightPx('bossroom', 'floor-final', 2));
+  // USE THE UNIFIED FLOOR POSITION FROM PHYSICS
+  const floorTopY = FLOOR_TOP_Y;
   
   return {
     mapName: 'bossroom', // Use bossroom map type

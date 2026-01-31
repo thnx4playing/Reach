@@ -1,15 +1,16 @@
 import { useEffect, useRef } from "react";
-import { Dimensions } from "react-native";
 import { useHealth } from "./HealthContext";
 import { useSound } from "../audio/useSound";
+import { SHARED, TOWER_PHYSICS } from "../config/physics";
 
 export function useFallDamage(onGroundRef: React.RefObject<boolean>, feetYRef: React.RefObject<number>) {
   const { takeDamage } = useHealth();
   const { playDamageSound } = useSound();
   const prevGrounded = useRef<boolean>(true);
   const peakFeetY = useRef<number>(0);
-  const screenH = Dimensions.get("window").height;
-  const threshold = screenH / 5; // easier to trigger; tune later
+  // Use unified screen height and fall damage threshold from physics
+  const screenH = SHARED.SCREEN_H;
+  const threshold = screenH * TOWER_PHYSICS.FALL_DAMAGE_THRESHOLD_SCREENS;
 
   useEffect(() => {
     const interval = setInterval(() => {

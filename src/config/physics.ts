@@ -1,18 +1,70 @@
 // src/config/physics.ts
-// SINGLE SOURCE OF TRUTH for all physics constants
-// This prevents tower/boss room physics from contaminating each other
+// SINGLE SOURCE OF TRUTH for all physics and screen constants
+// All other files MUST import from here - never use Dimensions.get() elsewhere
 
 import { Dimensions } from 'react-native';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+// ============================================================================
+// SCREEN DIMENSIONS - SINGLE SOURCE OF TRUTH
+// ============================================================================
+// Get dimensions ONCE at app startup and freeze them
+// This prevents drift from minimize/restore cycles
+const windowDimensions = Dimensions.get('window');
+
+export const SCREEN = {
+  WIDTH: windowDimensions.width,
+  HEIGHT: windowDimensions.height,
+  // Expose a function to get fresh dimensions if truly needed (rare)
+  getFresh: () => Dimensions.get('window'),
+} as const;
+
+// ============================================================================
+// FLOOR CONFIGURATION - SINGLE SOURCE OF TRUTH
+// ============================================================================
+export const FLOOR = {
+  // The visual height of the floor prefab in pixels (at scale 1)
+  PREFAB_HEIGHT_PX: 48,
+  // Scale applied to floor
+  SCALE: 2,
+  // Visual offset to align collision with sprite
+  VISUAL_OFFSET: 0,
+  // Collision box height
+  COLLISION_HEIGHT: 32,
+} as const;
+
+// ============================================================================
+// UNIFIED FLOOR CALCULATION - USE THIS EVERYWHERE
+// ============================================================================
+/**
+ * Calculate the floor top Y position.
+ * This is THE canonical function for floor position.
+ * All maps use the same calculation for consistency.
+ */
+export function getFloorTopY(): number {
+  // Floor top is at: screen bottom - floor height
+  // Using collision height for where player stands
+  const floorHeight = FLOOR.COLLISION_HEIGHT * FLOOR.SCALE;
+  return Math.round(SCREEN.HEIGHT - floorHeight);
+}
+
+/**
+ * Get floor top Y for a specific screen height (for boss room with fixed camera)
+ */
+export function getFloorTopYForHeight(screenHeight: number): number {
+  const floorHeight = FLOOR.COLLISION_HEIGHT * FLOOR.SCALE;
+  return Math.round(screenHeight - floorHeight);
+}
+
+// Export the frozen value for use in places that need a constant
+export const FLOOR_TOP_Y = getFloorTopY();
 
 // ============================================================================
 // SHARED CONSTANTS (used by both modes)
 // ============================================================================
 export const SHARED = {
-  // Screen dimensions (consider making these reactive later)
-  SCREEN_W,
-  SCREEN_H,
+  // Screen dimensions - FROM THE SINGLE SOURCE
+  SCREEN_W: SCREEN.WIDTH,
+  SCREEN_H: SCREEN.HEIGHT,
   
   // Character dimensions
   SCALE: 2,
@@ -27,6 +79,9 @@ export const SHARED = {
   // Timing
   MAX_DELTA_TIME: 0.05, // Cap at 50ms to prevent physics explosions on lag
   TARGET_FRAME_TIME: 0.0166, // 60 FPS target
+  
+  // Floor - expose the unified value
+  FLOOR_TOP_Y: getFloorTopY(),
 } as const;
 
 // ============================================================================
@@ -50,17 +105,17 @@ export const TOWER_PHYSICS = {
   COYOTE_TIME_MS: 80,
   
   // Platform collision
-  PLATFORM_LANDING_TOLERANCE_ABOVE: 15,  // px above platform surface
-  PLATFORM_LANDING_TOLERANCE_BELOW: 25,  // px below platform surface
+  PLATFORM_LANDING_TOLERANCE_ABOVE: 15,
+  PLATFORM_LANDING_TOLERANCE_BELOW: 25,
   PLATFORM_HORIZONTAL_MARGIN: 8,
   
   // Camera
-  CAMERA_DEADZONE_FROM_TOP: 0.40, // 40% from top of screen
-  CAMERA_UPDATE_THRESHOLD: 1,     // px minimum movement to update
+  CAMERA_DEADZONE_FROM_TOP: 0.40,
+  CAMERA_UPDATE_THRESHOLD: 1,
   
   // Hazards
-  FALL_DAMAGE_THRESHOLD_SCREENS: 0.2, // 1/5 of screen height
-  LAVA_CHASE_DISTANCE_SCREENS: 0.5,   // How far below player lava spawns
+  FALL_DAMAGE_THRESHOLD_SCREENS: 0.2,
+  LAVA_CHASE_DISTANCE_SCREENS: 0.5,
   
   // Platform generation
   GENERATION_AHEAD_SCREENS: 2.5,
@@ -72,14 +127,14 @@ export const TOWER_PHYSICS = {
 // BOSS ROOM PHYSICS (combat arena)
 // ============================================================================
 export const BOSS_PHYSICS = {
-  // Core movement - slightly different feel for combat
-  GRAVITY: 1500,        // Same as tower for consistency
-  JUMP_VELOCITY: 780,   // Same as tower
-  RUN_SPEED: 220,       // Same as tower
+  // Core movement - same as tower for consistency
+  GRAVITY: 1500,
+  JUMP_VELOCITY: 780,
+  RUN_SPEED: 220,
   ACCEL: 1200,
   DECEL: 800,
   
-  // Air control - same as tower for now
+  // Air control - same as tower
   AIR_CONTROL_MULTIPLIER: 0.5,
   AIR_FRICTION: 0.95,
   GROUND_FRICTION: 0.75,
@@ -88,7 +143,7 @@ export const BOSS_PHYSICS = {
   JUMP_BUFFER_MS: 100,
   COYOTE_TIME_MS: 80,
   
-  // Platform collision - SAME values to prevent "different feel"
+  // Platform collision - SAME values
   PLATFORM_LANDING_TOLERANCE_ABOVE: 15,
   PLATFORM_LANDING_TOLERANCE_BELOW: 25,
   PLATFORM_HORIZONTAL_MARGIN: 8,
@@ -132,10 +187,10 @@ export const BOSS_PHYSICS = {
 export const DOOR_CONFIG = {
   // Tower door (grassy → boss)
   TOWER_DOOR: {
-    SPAWN_Y: 150,           // px up from start
+    SPAWN_Y: 150,
     WIDTH: 64,
     HEIGHT: 96,
-    POSITION_OFFSET: 17,    // Positioning adjustment
+    POSITION_OFFSET: 17,
     TRIGGER_INNER_X_RATIO: 0.55,
     TRIGGER_BOTTOM_Y_RATIO: 0.45,
     TRIGGER_PAD: 2,
@@ -182,7 +237,9 @@ export function calculateMaxJumpDistance(physics: typeof TOWER_PHYSICS | typeof 
 // VALIDATION (dev only)
 // ============================================================================
 if (__DEV__) {
-  // Ensure tower and boss physics are compatible
+  console.log(`[Physics] Screen: ${SCREEN.WIDTH}x${SCREEN.HEIGHT}`);
+  console.log(`[Physics] Floor top Y: ${FLOOR_TOP_Y}`);
+  
   const towerJump = calculateMaxJumpHeight(TOWER_PHYSICS);
   const bossJump = calculateMaxJumpHeight(BOSS_PHYSICS);
   

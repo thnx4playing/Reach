@@ -19,7 +19,6 @@ import type { LevelData } from '../content/levels';
 import { LEVELS } from '../content/levels';
 import { MAPS, getPrefab, getTileSize, MapName } from '../content/maps';
 import { getProfile, MapName as ProfileMapName } from '../config/mapProfiles';
-import { floorTopYFor } from '../engine/floor';
 import { enterMap } from '../engine/enterMap';
 import { ImagePreloaderProvider } from '../render/ImagePreloaderContext';
 import { EnhancedPlatformManager } from '../systems/platform/PlatformManager';
@@ -59,10 +58,12 @@ import {
 } from '../config/gameplay';
 import { prefabWidthPx, alignPrefabYToSurfaceTop } from '../content/maps';
 import { 
+  SCREEN,
   SHARED, 
   TOWER_PHYSICS, 
   BOSS_PHYSICS, 
   getPhysicsForMode,
+  FLOOR_TOP_Y,
   type GameMode 
 } from '../config/physics';
 import { log } from '../utils/logger';
@@ -77,7 +78,8 @@ import {
   shouldExecuteJump, consumeJump, tickIgnoreCeil
 } from '../physics/jump';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const SCREEN_W = SCREEN.WIDTH;
+const SCREEN_H = SCREEN.HEIGHT;
 
 // ───────────────────────────────────────────────────────────────────────────────
 // Coordinate system unification
@@ -532,8 +534,8 @@ const bossPoseRef = useRef<PosePayload>({
   // Optional: disable input when dead
   const inputEnabled = !isDead;
 
-  // Floor calculation (unified)
-  const floorTopY = useMemo(() => floorTopYFor(levelData.mapName as ProfileMapName), [levelData.mapName]);
+  // Floor calculation - use unified constant from physics
+  const floorTopY = FLOOR_TOP_Y;
 
   // Character dims - now from centralized config
   const mapDef = MAPS[levelData.mapName];

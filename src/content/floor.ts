@@ -1,16 +1,18 @@
-import { Dimensions } from 'react-native';
+// src/content/floor.ts
+// This file now uses the SINGLE SOURCE OF TRUTH from physics.ts
+// The makeStaticFloor function is kept for floor tile generation
+
+import { SCREEN, FLOOR_TOP_Y, FLOOR } from '../config/physics';
 import type { MapName } from './maps';
 import { getTileSize, MAPS } from './maps';
 
 /**
  * Returns the Y pixel coordinate of the TOP of the floor strip.
- * You should place feet at (floorTopY + FOOT_OFFSET - lift).
- *
- * @param screenH device screen height in px
- * @param floorPrefabHeightPx height of your floor image in px (not tiles)
+ * Now uses the unified floor position from physics.ts
  */
-export const getFloorTopY = (screenH: number, floorPrefabHeightPx: number) => {
-  return Math.round(screenH - floorPrefabHeightPx);
+export const getFloorTopY = (_screenH?: number, _floorPrefabHeightPx?: number) => {
+  // Ignore parameters - always use the single source of truth
+  return FLOOR_TOP_Y;
 };
 
 /**
@@ -19,7 +21,7 @@ export const getFloorTopY = (screenH: number, floorPrefabHeightPx: number) => {
 export function makeStaticFloor(
   mapName: MapName, 
   screenWidth: number, 
-  screenHeight: number, 
+  _screenHeight: number, // Ignored - use unified value
   scale: number, 
   prefabName?: string
 ) {
@@ -34,22 +36,21 @@ export function makeStaticFloor(
     }
   }
 
-  
   const tileSize = getTileSize(mapName) * scale;
   
-  // NEW: read prefab rows and compute true floor height
+  // Read prefab rows and compute true floor height
   const meta = (MAPS as any)[mapName]?.prefabs?.meta;
   const pf = (MAPS as any)[mapName]?.prefabs?.prefabs?.[prefabName];
   const baseTile = meta?.tileSize ?? 16;
   const rows = (pf?.cells?.length ?? pf?.rects?.length ?? 2);
 
-  const floorHeight = rows * baseTile * scale; // ← instead of 48 * scale
-  const floorTopY = Math.round(screenHeight - floorHeight);
+  const floorHeight = rows * baseTile * scale;
+  
+  // USE THE UNIFIED FLOOR POSITION
+  const floorTopY = FLOOR_TOP_Y;
   
   // Calculate how many floor tiles we need to cover the screen width
   const tilesNeeded = Math.ceil(screenWidth / tileSize);
-  
-
   
   const floorPieces = [];
   for (let i = 0; i < tilesNeeded; i++) {
@@ -60,19 +61,11 @@ export function makeStaticFloor(
       scale: scale,
     };
     floorPieces.push(piece);
-    
-    // Debug: log first few pieces
-
   }
-  
-
   
   return floorPieces;
 }
 
-// Default export using current device size and a reasonable fallback height.
-// Change FLOOR_PREFAB_HEIGHT_PX to your actual floor image height.
-const FLOOR_PREFAB_HEIGHT_PX = 48; // <-- set to your asset height
-const screenH = Dimensions.get('window').height;
-export const floorTopY = getFloorTopY(screenH, FLOOR_PREFAB_HEIGHT_PX);
+// Export using unified value
+export const floorTopY = FLOOR_TOP_Y;
 export default floorTopY;

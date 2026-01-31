@@ -1,19 +1,24 @@
 // src/engine/floor.ts
-import { getProfile, MapName } from "../config/mapProfiles";
-import { MAPS } from "../content/maps";
+// This file now re-exports from the SINGLE SOURCE OF TRUTH in physics.ts
+// Kept for backward compatibility with existing imports
 
-// SCALE/SCREEN_H should come from your constants
-const SCALE = 2;
-const SCREEN_H = 800; // Adjust to your actual screen height
+import { getFloorTopY, FLOOR_TOP_Y, SCREEN, FLOOR } from '../config/physics';
+import type { MapName } from '../config/mapProfiles';
 
-// UNIFIED FLOOR CALCULATION - Single source of truth
-const SKIA_FLOOR_HEIGHT = 32;
-const SKIA_VISUAL_OFFSET = 52;
+// Re-export the unified floor calculation
+export { getFloorTopY, FLOOR_TOP_Y };
 
-export function floorTopYFor(mapName: MapName): number {
-  const profile = getProfile(mapName);
-  
-  // ALL maps now use the same calculation for consistency
-  // This ensures smooth transitions between all map types
-  return Math.round(SCREEN_H - SKIA_FLOOR_HEIGHT - 5 + SKIA_VISUAL_OFFSET);
+/**
+ * Get floor top Y for a specific map.
+ * All maps now use the SAME floor calculation for consistency.
+ * This ensures smooth transitions between all map types.
+ */
+export function floorTopYFor(_mapName: MapName): number {
+  // All maps use the same floor position
+  return FLOOR_TOP_Y;
 }
+
+// Legacy exports for backward compatibility
+export const SCREEN_H = SCREEN.HEIGHT;
+export const SKIA_FLOOR_HEIGHT = FLOOR.COLLISION_HEIGHT;
+export const SKIA_VISUAL_OFFSET = FLOOR.VISUAL_OFFSET;

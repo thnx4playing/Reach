@@ -7,7 +7,6 @@
 // - Fixed totalPlatforms counter sync issues
 // - Improved spatial index cleanup
 
-import { Dimensions } from 'react-native';
 import { 
   prefabWidthPx, 
   prefabHeightPx, 
@@ -17,10 +16,11 @@ import {
 } from '../../content/maps';
 import type { MapName } from '../../content/maps';
 import type { PlatformDef } from './types';
-import { TOWER_PHYSICS, SHARED, calculateMaxJumpHeight } from '../../config/physics';
+import { SCREEN, TOWER_PHYSICS, SHARED, calculateMaxJumpHeight } from '../../config/physics';
 import { log } from '../../utils/logger';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const SCREEN_W = SCREEN.WIDTH;
+const SCREEN_H = SCREEN.HEIGHT;
 
 // ============================================================================
 // PHYSICS (now derived from centralized config)

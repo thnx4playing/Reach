@@ -1,7 +1,8 @@
 // src/scene/boss/TiledFloor.tsx
 import React, { useMemo } from "react";
-import { Group, Image, useImage, Rect, Circle } from "@shopify/react-native-skia";
+import { Group, Image, useImage, Rect } from "@shopify/react-native-skia";
 import BossLavaLayer from "../../render/BossLavaLayer";
+import { SCREEN } from "../../config/physics"; // SINGLE SOURCE OF TRUTH
 
 type Props = {
   left: number;         // room left (world px)
@@ -33,7 +34,7 @@ export default function TiledFloor({
 
   // Use the brick-floor.png image
   const width = right - left;
-  const tileW = img ? (img.width() || 64) : 64; // Use image's natural width or fallback to 64
+  const tileW = img ? (img.width() || 64) : 64;
 
   const xs = useMemo(() => {
     const tiles = Math.ceil(width / tileW);
@@ -42,7 +43,7 @@ export default function TiledFloor({
     return arr;
   }, [left, width, tileW]);
 
-  // Floating embers (distributed across whole screen)
+  // Floating embers - USE UNIFIED SCREEN HEIGHT
   const embers = useMemo(() => {
     const rng = (seed0 = 42) => {
       let seed = seed0 >>> 0;
@@ -54,14 +55,14 @@ export default function TiledFloor({
     const rand = rng(42);
     const count = Math.max(22, Math.floor(width * 0.05));
     const arr = [];
-    // Use screen height for full vertical distribution
-    const screenHeight = 844; // SCREEN_H constant
+    // USE UNIFIED SCREEN HEIGHT FROM PHYSICS
+    const screenHeight = SCREEN.HEIGHT;
     for (let i = 0; i < count; i++) {
       arr.push({
         x: left + rand() * width,
-        y: rand() * screenHeight, // Distribute across entire screen height
-        s: 2 + rand() * 4, // size
-        ph: rand() * Math.PI * 2, // phase
+        y: rand() * screenHeight,
+        s: 2 + rand() * 4,
+        ph: rand() * Math.PI * 2,
       });
     }
     return arr;
@@ -71,7 +72,7 @@ export default function TiledFloor({
 
   // IMPORTANT: integer positions (x/y) avoid seams on older Skia.
   const y = Math.round(topY);
-  const t = (timeMs % 100000) / 1000; // seconds
+  const t = (timeMs % 100000) / 1000;
 
   return (
     <Group transform={[{ translateY: -cameraY }]}>
@@ -91,21 +92,22 @@ export default function TiledFloor({
           x={x}
           y={y}
           width={tileW}
-          height={tileHeight}   // never stretch vertically; tiles are authored at 32px
+          height={tileHeight}
           fit="fill"
         />
       ))}
       
-      {/* Floating embers */}
+      {/* Floating embers - USE UNIFIED SCREEN HEIGHT */}
       {embers.map((e, i) => {
-        const emberY = (e.y - (t * (6 + e.s)) + e.ph * 10) % 844; // Use screen height for wrapping
+        const screenHeight = SCREEN.HEIGHT;
+        const emberY = (e.y - (t * (6 + e.s)) + e.ph * 10) % screenHeight;
         const emberX = e.x + Math.sin(t * 0.8 + e.ph) * 8;
         const alpha = 0.18 + 0.45 * (0.5 + 0.5 * Math.sin(t * 2 + e.ph));
         return (
           <Rect 
             key={`ember-${i}`} 
             x={emberX} 
-            y={emberY < 0 ? emberY + 844 : emberY} // Wrap around screen height
+            y={emberY < 0 ? emberY + screenHeight : emberY}
             width={e.s} 
             height={e.s} 
             color="#ffcc66" 
