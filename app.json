@@ -12,7 +12,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.virtuixtech.reachgame",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "icon": "./assets/appicon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
