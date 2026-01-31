@@ -11,7 +11,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.thnx4playing.reach",
+      "bundleIdentifier": "com.virtuixtech.reach",
       "buildNumber": "1",
       "icon": "./assets/appicon.png",
       "infoPlist": {
@@ -30,6 +30,6 @@
         "projectId": "0a6b60db-bdec-4a5a-9f47-de0aa8c06b44"
       }
     },
-    "owner": "thnx4playing"
+    "owner": "virtuix-technologies"
   }
 }
