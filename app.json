@@ -12,6 +12,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.thnx4playing.reach",
+      "buildNumber": "1",
+      "icon": "./assets/appicon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
